@@ -255,7 +255,7 @@ function Portal() {
             one of three large obvious cards. It also answers the question
             the page actually raises — why this person sees three tiles and
             the colleague beside them sees one. */}
-        <p className="sub">The tools assigned to you.</p>
+        <p className="sub">The modules assigned to you.</p>
 
         {modules === null && !failed && (
           <div className="tiles">
