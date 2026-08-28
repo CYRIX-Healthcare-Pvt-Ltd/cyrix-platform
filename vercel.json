@@ -3,6 +3,23 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "redirects": [
+    { "source": "/my-kpi", "destination": "/kpi/my-kpi", "permanent": false },
+    { "source": "/my-kpi/:rest*", "destination": "/kpi/my-kpi/:rest*", "permanent": false },
+    { "source": "/history", "destination": "/kpi/history", "permanent": false },
+    { "source": "/team", "destination": "/kpi/team", "permanent": false },
+    { "source": "/team/:rest*", "destination": "/kpi/team/:rest*", "permanent": false },
+    { "source": "/approvals", "destination": "/kpi/approvals", "permanent": false },
+    { "source": "/queries", "destination": "/kpi/queries", "permanent": false },
+    { "source": "/deletions", "destination": "/kpi/deletions", "permanent": false },
+    { "source": "/admin", "destination": "/kpi/admin", "permanent": false },
+    { "source": "/admin/:rest*", "destination": "/kpi/admin/:rest*", "permanent": false },
+    { "source": "/me", "destination": "/kpi/me", "permanent": false },
+    { "source": "/help", "destination": "/kpi/help", "permanent": false },
+    { "source": "/score/:rest*", "destination": "/kpi/score/:rest*", "permanent": false },
+    { "source": "/submission/:rest*", "destination": "/kpi/submission/:rest*", "permanent": false },
+    { "source": "/change-password", "destination": "/kpi/change-password", "permanent": false }
+  ],
   "rewrites": [
     {
       "source": "/kpi/",
