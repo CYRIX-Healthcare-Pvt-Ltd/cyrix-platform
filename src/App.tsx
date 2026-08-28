@@ -77,17 +77,34 @@ function SignIn() {
       <aside className="brand">
         <p className="wordmark">CYRIX<span>®</span></p>
         <div>
-          <p className="kicker">One sign-in</p>
+          <p className="kicker">Cyrix Platform</p>
           <h2 className="brand-line">
-            Everything you use,<br />in one place.
+            One account.<br />Every Cyrix tool.
           </h2>
+          {/* Named rather than described. Somebody arriving here is
+              looking for a thing they already use, and the fastest way
+              to reassure them they are in the right place is to show it
+              on the wall. What each person can actually open is decided
+              after sign-in, not here. */}
+          <ul className="brand-list">
+            <li>KPI</li>
+            <li>Spare Mapping</li>
+            <li>BEMMP Dashboard</li>
+          </ul>
         </div>
         <p className="foot-note">India Operations</p>
       </aside>
 
       <main className="pane">
         <div className="form-wrap">
-          <h1>Sign in to continue.</h1>
+          <h1>Sign in to Cyrix.</h1>
+          {/* The employee code has not changed and neither has the
+              password. Saying so is worth a line: this screen is new,
+              and the first instinct on meeting a new login is that you
+              need new credentials for it. */}
+          <p className="lede">
+            The same employee code and password you already use.
+          </p>
           <form onSubmit={submit} className="stack">
             {error && <p className="error" role="alert">{error}</p>}
 
@@ -122,8 +139,9 @@ function SignIn() {
               {busy ? 'Signing In' : 'Sign In'}
             </button>
 
-            {/* Password recovery lives in KPI, which is the app that owns
-                the employee record and knows the address on it. */}
+            {/* Password recovery lives in KPI, which owns the employee
+                record and knows which address is on it. One flow, not
+                one per module. */}
             <a className="quiet-link" href="/kpi">Forgot your password?</a>
           </form>
         </div>

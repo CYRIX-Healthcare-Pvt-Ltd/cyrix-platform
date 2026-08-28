@@ -69,6 +69,22 @@ body {
   font-size: clamp(2rem, 4vw, 2.9rem); font-weight: 700; line-height: 1.12;
   letter-spacing: -0.02em; margin: 0;
 }
+.brand-list {
+  list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem;
+  margin: 2rem 0 0; padding: 0;
+}
+.brand-list li {
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.2); border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+}
+
+.lede {
+  margin: -1.75rem 0 2.5rem; font-size: 0.95rem; color: var(--ink-500);
+  line-height: 1.5;
+}
+
 .foot-note {
   font-size: 0.7rem; font-weight: 500; letter-spacing: 0.14em;
   text-transform: uppercase; color: rgba(255,255,255,0.35); margin: 0;
@@ -195,3 +211,17 @@ body {
   padding: 2rem; background: var(--white); border: 1px solid var(--ink-200);
   border-radius: 14px; color: var(--ink-700); margin: 0;
 }
+
+.boot-fail {
+  min-height: 100%; display: grid; place-items: center;
+  padding: 2rem; background: var(--ink-50); text-align: left;
+}
+.boot-fail > div {
+  max-width: 26rem; background: var(--white); border: 1px solid var(--ink-200);
+  border-radius: 14px; padding: 2rem;
+}
+.boot-fail h1 {
+  font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; margin: 1rem 0 0.6rem;
+}
+.boot-fail p { color: var(--ink-700); margin: 0 0 1.5rem; line-height: 1.55; }
+.boot-fail .primary { width: auto; padding: 0.7rem 1.4rem; }
