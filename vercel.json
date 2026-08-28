@@ -1,0 +1,56 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/kpi/:path*",
+      "destination": "https://cyrix-kpi.vercel.app/kpi/:path*"
+    },
+    {
+      "source": "/spare/:path*",
+      "destination": "https://cyrix-spare-mapping.vercel.app/spare/:path*"
+    },
+    {
+      "source": "/bemmp/api/:path*",
+      "destination": "https://cyrix-bemmp-dashboard.vercel.app/api/:path*"
+    },
+    {
+      "source": "/bemmp/:path*",
+      "destination": "https://cyrix-bemmp-dashboard.vercel.app/bemmp/:path*"
+    },
+    {
+      "source": "/((?!assets/|favicon).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
+}
