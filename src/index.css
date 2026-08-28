@@ -14,7 +14,10 @@
   --ink-50:  #f6f7f8;
   --red-600: #ce2434;
   --white:   #ffffff;
-  --sans: 'Space Grotesk Variable', 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+  /* SF Pro, the stack every Cyrix module uses. Apple-licensed and so not
+     shippable; -apple-system finds it where it exists and Inter is bundled
+     as the stand-in everywhere else. */
+  --sans: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Inter Variable', Inter, 'Segoe UI', Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; }

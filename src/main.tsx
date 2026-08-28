@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import '@fontsource-variable/space-grotesk'
+import '@fontsource-variable/inter'
 import { Boot } from './Boot'
 import App from './App'
 import './index.css'
