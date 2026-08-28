@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import ThemeToggle from './ThemeToggle'
 import type { Session } from '@supabase/supabase-js'
 import {
   ClipboardList, QrCode, Activity, LayoutGrid, LogOut, ArrowRight, Loader2,
@@ -96,6 +97,12 @@ function SignIn() {
       </aside>
 
       <main className="pane">
+        {/* Here too: this is the first screen anybody sees, and somebody
+            who prefers dark should not have to sign in through a white
+            page to reach the control that fixes it. */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <ThemeToggle />
+        </div>
         <div className="form-wrap">
           <h1>Sign in to Cyrix.</h1>
           {/* The employee code has not changed and neither has the
@@ -223,6 +230,8 @@ function Portal() {
     <div className="portal">
       <header className="bar">
         <p className="wordmark small">CYRIX<span>®</span></p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+        <ThemeToggle />
         <button
           className="icon-btn"
           onClick={() => {
@@ -236,6 +245,7 @@ function Portal() {
           <LogOut size={17} />
           <span className="sr">Sign out</span>
         </button>
+        </div>
       </header>
 
       <main className="portal-main">
