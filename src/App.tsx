@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
 import type { Session } from '@supabase/supabase-js'
 import {
@@ -76,7 +77,7 @@ function SignIn() {
   return (
     <div className="split">
       <aside className="brand">
-        <p className="wordmark">CYRIX<span>®</span></p>
+        <Logo height={38} subtitle={false} />
         <div>
           <p className="kicker">Cyrix Platform</p>
           <h2 className="brand-line">
@@ -229,7 +230,7 @@ function Portal() {
   return (
     <div className="portal">
       <header className="bar">
-        <p className="wordmark small">CYRIX<span>®</span></p>
+        <Logo height={20} subtitle={false} />
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
         <ThemeToggle />
         <button
@@ -250,7 +251,11 @@ function Portal() {
 
       <main className="portal-main">
         <h1>{name ? `Hello, ${name}` : 'Hello'}</h1>
-        <p className="sub">Pick where you are going.</p>
+        {/* States what the set is rather than instructing somebody to click
+            one of three large obvious cards. It also answers the question
+            the page actually raises — why this person sees three tiles and
+            the colleague beside them sees one. */}
+        <p className="sub">The tools assigned to you.</p>
 
         {modules === null && !failed && (
           <div className="tiles">

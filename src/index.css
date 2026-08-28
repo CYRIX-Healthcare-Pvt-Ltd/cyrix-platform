@@ -405,3 +405,69 @@ body {
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-new(root) { animation: none; }
 }
+
+/*
+ * Each tile's icon does the thing its module does.
+ *
+ * Not decoration for its own sake: a scanner scans, a monitor has a pulse,
+ * and a checklist gets ticked. The motion is the shortest possible answer
+ * to "what is this one for", which is the only question a picker exists to
+ * answer — so it earns its place where a generic wobble on all three would
+ * not.
+ *
+ * On hover, not ambient. Three things moving on their own on the first
+ * screen after sign-in is a fairground, and this is a page people cross
+ * every working day. Under the pointer it is a response; running forever
+ * it is noise.
+ */
+
+/* Spare — a scan line crossing the tag, the way the scanner sweeps one. */
+.tile[data-module='spare'] .tile-icon { position: relative; overflow: hidden; }
+.tile[data-module='spare'] .tile-icon::after {
+  content: '';
+  position: absolute; left: 0; right: 0; height: 2px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 8px 1px rgba(255, 255, 255, 0.7);
+  top: -2px; opacity: 0;
+}
+.tile[data-module='spare']:hover .tile-icon::after {
+  animation: tile-scan 1.1s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+}
+@keyframes tile-scan {
+  0%   { top: 12%; opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { top: 88%; opacity: 0; }
+}
+
+/* BEMMP — a heartbeat, because the icon is a trace and the module watches
+   equipment that is either alive or is not. Two beats and a rest, which is
+   what makes it read as a pulse rather than a throb. */
+.tile[data-module='bemmp']:hover .tile-icon svg {
+  animation: tile-pulse 1.4s var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) infinite;
+}
+@keyframes tile-pulse {
+  0%, 100% { transform: scale(1); }
+  12%      { transform: scale(1.16); }
+  24%      { transform: scale(1); }
+  36%      { transform: scale(1.09); }
+  48%      { transform: scale(1); }
+}
+
+/* KPI — the clipboard gets ticked: a small nod, once, rather than a loop.
+   A target met is a thing that happens and is done. */
+.tile[data-module='kpi']:hover .tile-icon svg {
+  animation: tile-check 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes tile-check {
+  0%   { transform: rotate(0) scale(1); }
+  35%  { transform: rotate(-7deg) scale(1.08); }
+  70%  { transform: rotate(4deg) scale(1.04); }
+  100% { transform: rotate(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile[data-module='spare']:hover .tile-icon::after,
+  .tile[data-module='bemmp']:hover .tile-icon svg,
+  .tile[data-module='kpi']:hover .tile-icon svg { animation: none; }
+}
