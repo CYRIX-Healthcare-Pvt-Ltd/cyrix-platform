@@ -5,6 +5,18 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/kpi/",
+      "destination": "https://cyrix-kpi.vercel.app/kpi/"
+    },
+    {
+      "source": "/spare/",
+      "destination": "https://cyrix-spare-mapping.vercel.app/spare/"
+    },
+    {
+      "source": "/bemmp/",
+      "destination": "https://cyrix-bemmp-dashboard.vercel.app/bemmp/"
+    },
+    {
       "source": "/kpi/:path*",
       "destination": "https://cyrix-kpi.vercel.app/kpi/:path*"
     },
