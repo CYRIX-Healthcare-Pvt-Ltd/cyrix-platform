@@ -164,8 +164,18 @@ function Portal() {
   useEffect(() => {
     let alive = true
     ;(async () => {
+      // Filter to this person explicitly. Selecting from employees without
+      // a filter and trusting RLS to leave one row does not work: the
+      // policy also exposes your manager and your direct reports, so
+      // maybeSingle() sees several rows and returns null. Everybody with a
+      // manager — nearly everybody — was greeted as nobody.
+      const { data: auth } = await supabase.auth.getUser()
+      const uid = auth.user?.id
       const [me, mods] = await Promise.all([
-        supabase.from('employees').select('full_name, ecode').maybeSingle(),
+        uid
+          ? supabase.from('employees').select('full_name, ecode')
+              .eq('auth_user_id', uid).maybeSingle()
+          : Promise.resolve({ data: null }),
         supabase.rpc('my_modules'),
       ])
       if (!alive) return
