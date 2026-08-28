@@ -1,62 +1,63 @@
+import onLight from './assets/cyrix-logo.png'
+import onDarkArt from './assets/cyrix-logo-white.png'
+
 /**
- * The Cyrix Healthcare lockup, identical in every module.
+ * The Cyrix Healthcare lockup — the real artwork, not a drawing of it.
  *
- * BEMMP's drawing, ported verbatim: it is the one measured against the
- * printed artwork. Each app previously approximated the same wordmark in
- * its own HTML, which is how one company came to have four that are nearly
- * but not quite alike — the ® landed somewhere different in each. The
- * coordinates are the lockup and are not adjusted here; only `height`
- * changes between call sites.
+ * Every module used to approximate this wordmark in its own SVG, which is
+ * how one company came to have four that were nearly but not quite alike.
+ * This is the supplied file, shipped as-is, so there is nothing left to
+ * drift.
  *
- * SVG text rather than an image, so the dark half follows `currentColor`
- * and flips with the theme while the red stays the brand red in both.
+ * Two files rather than one: the artwork is black type on a transparent
+ * ground and would vanish on a dark page. The dark-page copy is the same
+ * image with its *lightness* inverted and hue left alone — a plain invert
+ * would turn the red cyan and the blue orange, which is another company's
+ * logo. Both are in the markup and CSS picks one, so the swap happens in
+ * the same frame as the theme and never flashes the wrong one.
+ *
+ * The lockup is three stacked bands, and the shorter ones are a crop of
+ * the same file rather than separate exports — `.cyrix-logo` clips, so
+ * asking for less shows less of one image.
  */
+
+/** Where each band's ink ends, in the artwork's own 300 x 115 grid. */
+const BAND = { wordmark: 67, entity: 92, full: 115 }
+
 export default function Logo({
-  height = 34,
-  subtitle = true,
   className = '',
+  height,
+  onDark = false,
+  showSubtitle = true,
+  showTagline = false,
 }: {
-  height?: number
-  subtitle?: boolean
   className?: string
+  /**
+   * Rendered height in px. Omit it to let `className` set the height —
+   * which is how a header gets one size on a phone and another on a
+   * desktop, since an inline style would beat the class that does it.
+   */
+  height?: number
+  /** The surface behind this is dark in *both* themes, so pin the white art. */
+  onDark?: boolean
+  showSubtitle?: boolean
+  showTagline?: boolean
 }) {
-  // The full lockup is 78 units tall; the wordmark alone is 52.
-  const box = subtitle ? 78 : 52
+  const band = showTagline ? BAND.full : showSubtitle ? BAND.entity : BAND.wordmark
 
   return (
-    <svg
-      viewBox={`0 0 300 ${box}`}
-      height={height}
-      className={className}
+    <span
+      className={`cyrix-logo ${className}`}
+      data-on={onDark ? 'dark' : undefined}
+      style={{
+        aspectRatio: `300 / ${band}`,
+        ...(height === undefined ? null : { height: `${height}px` }),
+      }}
       role="img"
       aria-label="Cyrix Health Care Pvt Ltd"
     >
-      <text
-        x="0" y="44"
-        fontSize="52" fontWeight="700" letterSpacing="1"
-        fill="currentColor"
-        fontFamily="inherit"
-      >
-        CYRI<tspan fill="#e30613">X</tspan>
-      </text>
-      <text
-        x="171" y="16"
-        fontSize="13" fontWeight="600"
-        fill="#e30613"
-        fontFamily="inherit"
-      >
-        ®
-      </text>
-      {subtitle && (
-        <text
-          x="1" y="66"
-          fontSize="13.5" fontWeight="500" letterSpacing="3.4"
-          fill="currentColor"
-          fontFamily="inherit"
-        >
-          HEALTH CARE PVT LTD
-        </text>
-      )}
-    </svg>
+      <img className="cyrix-logo-light" src={onLight} alt="" />
+      <img className="cyrix-logo-dark" src={onDarkArt} alt="" />
+    </span>
   )
 }

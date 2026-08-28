@@ -241,6 +241,36 @@ body {
 }
 .icon-btn:hover { background: var(--ink-100); }
 
+/*
+ * Who is signed in.
+ *
+ * The name goes at 480px rather than the photo: a face is recognisable at
+ * 32px and a name is not readable at half its length, so the half that
+ * survives the squeeze is the one that still carries meaning. The gap
+ * before the controls is wider than the gap between them, which is what
+ * keeps this reading as identity rather than as a fourth button.
+ */
+.who {
+  display: flex; align-items: center; gap: 0.55rem;
+  margin-right: 0.4rem;
+}
+.who-name {
+  display: none;
+  font-size: 0.8125rem; font-weight: 550; color: var(--ink-700);
+  white-space: nowrap;
+}
+@media (min-width: 480px) { .who-name { display: inline; } }
+
+.user-avatar {
+  width: 2rem; height: 2rem; flex: none;
+  border-radius: 999px; object-fit: cover;
+  background: var(--ink-100);
+}
+.user-avatar-initials {
+  display: grid; place-items: center;
+  font-size: 0.6875rem; font-weight: 650; color: var(--ink-700);
+}
+
 .portal-main {
   max-width: 56rem; margin: 0 auto; padding: 3rem 1.25rem 5rem;
 }
@@ -471,3 +501,50 @@ body {
   .tile[data-module='bemmp']:hover .tile-icon svg,
   .tile[data-module='kpi']:hover .tile-icon svg { animation: none; }
 }
+
+/*
+ * The company lockup.
+ *
+ * Identical in all four modules, down to this block — the mark is one
+ * asset now, and the rules that place it should not be four dialects of
+ * the same idea either.
+ *
+ * Both copies of the artwork are in the markup and CSS shows one. That
+ * is what makes the swap land in the same frame as the theme: choosing
+ * a `src` in JavaScript means a paint with the old file still in place,
+ * which on the circular reveal reads as the logo lagging behind the
+ * page sweeping past it.
+ *
+ * The wrapper clips. The artwork is one image holding three stacked
+ * bands — wordmark, entity line, strapline — and a caller asking for
+ * fewer gets a shorter box over the same picture, so a header and a
+ * login page cannot disagree about the spacing between them.
+ */
+.cyrix-logo {
+  display: block;
+  overflow: hidden;
+  flex: none;
+}
+.cyrix-logo img {
+  display: block;
+  width: 100%;
+}
+.cyrix-logo-dark {
+  display: none;
+}
+
+:root[data-theme='dark'] .cyrix-logo-light { display: none; }
+:root[data-theme='dark'] .cyrix-logo-dark { display: block; }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .cyrix-logo-light { display: none; }
+  :root:not([data-theme='light']) .cyrix-logo-dark { display: block; }
+}
+
+/*
+ * Last, and on purpose: these carry the same specificity as the theme
+ * rules above, so order is what lets a surface that is dark in both
+ * themes — the login hero — keep the white lockup in light mode.
+ */
+.cyrix-logo[data-on='dark'] .cyrix-logo-light { display: none; }
+.cyrix-logo[data-on='dark'] .cyrix-logo-dark { display: block; }

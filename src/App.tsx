@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import Logo from './Logo'
+import Avatar from './Avatar'
 import ThemeToggle from './ThemeToggle'
 import type { Session } from '@supabase/supabase-js'
 import {
@@ -77,7 +78,9 @@ function SignIn() {
   return (
     <div className="split">
       <aside className="brand">
-        <Logo height={38} subtitle={false} />
+        {/* `--shade` is pinned dark in both themes, so this panel does not
+            follow the toggle and neither may the lockup on it. */}
+        <Logo height={38} showSubtitle={false} onDark />
         <div>
           <p className="kicker">Cyrix Platform</p>
           <h2 className="brand-line">
@@ -166,7 +169,8 @@ function SignIn() {
 
 function Portal() {
   const [modules, setModules] = useState<Module[] | null>(null)
-  const [name, setName] = useState('')
+  /** Name and photo together: the header shows both, the greeting one. */
+  const [me, setMe] = useState<{ full_name: string; avatar: string | null } | null>(null)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
@@ -182,13 +186,18 @@ function Portal() {
       const [me, mods] = await Promise.all([
         uid
           ? supabase.from('employees')
-              .select('id, full_name, ecode')
+              // avatar comes along for the ride. It is a data URL on the
+              // row itself rather than a file to go and fetch, so the
+              // photo costs this query nothing extra to carry.
+              .select('id, full_name, ecode, avatar')
               .eq('auth_user_id', uid).maybeSingle()
           : Promise.resolve({ data: null }),
         supabase.rpc('my_modules'),
       ])
       if (!alive) return
-      if (me.data?.full_name) setName(me.data.full_name.trim().split(/\s+/)[0])
+      if (me.data?.full_name) {
+        setMe({ full_name: me.data.full_name.trim(), avatar: me.data.avatar ?? null })
+      }
       if (mods.error) setFailed(true)
       else setModules((mods.data ?? []) as Module[])
 
@@ -230,8 +239,19 @@ function Portal() {
   return (
     <div className="portal">
       <header className="bar">
-        <Logo height={20} subtitle={false} />
+        <Logo height={20} showSubtitle={false} />
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+        {/* Who is signed in, shown the same way every module shows it. The
+            portal has no profile page of its own — the employee record
+            lives in KPI — so this identifies rather than links, and the
+            name is hidden on a phone where the mark and three controls
+            already fill the bar. */}
+        {me && (
+          <span className="who">
+            <span className="who-name">{me.full_name}</span>
+            <Avatar name={me.full_name} src={me.avatar} />
+          </span>
+        )}
         <ThemeToggle />
         <button
           className="icon-btn"
@@ -250,7 +270,7 @@ function Portal() {
       </header>
 
       <main className="portal-main">
-        <h1>{name ? `Hello, ${name}` : 'Hello'}</h1>
+        <h1>{me ? `Hello, ${me.full_name.split(/\s+/)[0]}` : 'Hello'}</h1>
         {/* States what the set is rather than instructing somebody to click
             one of three large obvious cards. It also answers the question
             the page actually raises — why this person sees three tiles and
