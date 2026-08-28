@@ -173,7 +173,8 @@ function Portal() {
       const uid = auth.user?.id
       const [me, mods] = await Promise.all([
         uid
-          ? supabase.from('employees').select('full_name, ecode')
+          ? supabase.from('employees')
+              .select('id, full_name, ecode')
               .eq('auth_user_id', uid).maybeSingle()
           : Promise.resolve({ data: null }),
         supabase.rpc('my_modules'),
@@ -182,6 +183,38 @@ function Portal() {
       if (me.data?.full_name) setName(me.data.full_name.trim().split(/\s+/)[0])
       if (mods.error) setFailed(true)
       else setModules((mods.data ?? []) as Module[])
+
+      /*
+       * Administrators go straight to the work.
+       *
+       * Neither admin role is appraised, so the tile page offers them one
+       * tile they must click to reach the only screen they came for. KPI's
+       * own routing already sends each of them to the right place from its
+       * root, so this only has to get them into KPI.
+       *
+       * Once per session, and that is the important part: the Apps control
+       * inside every module points back here, and forwarding on every visit
+       * would make it a button that appears to do nothing. Coming back
+       * deliberately shows the tiles; signing in fresh does not stop here.
+       */
+      if (!me.data?.id) return
+      const roles = await supabase.from('user_roles')
+        .select('role').eq('employee_id', me.data.id)
+      if (!alive) return
+      const isAdmin = (roles.data ?? []).some(
+        r => r.role === 'hr_admin' || r.role === 'sw_admin')
+      if (!isAdmin) return
+
+      try {
+        if (sessionStorage.getItem('cyrix.portal.forwarded') === '1') return
+        sessionStorage.setItem('cyrix.portal.forwarded', '1')
+      } catch {
+        // Private windows and blocked site data throw rather than return
+        // null. Showing the tiles is the safe outcome: one extra click
+        // beats a redirect that cannot remember it already happened.
+        return
+      }
+      window.location.assign('/kpi')
     })()
     return () => { alive = false }
   }, [])
@@ -190,7 +223,16 @@ function Portal() {
     <div className="portal">
       <header className="bar">
         <p className="wordmark small">CYRIX<span>®</span></p>
-        <button className="icon-btn" onClick={() => supabase.auth.signOut()} title="Sign out">
+        <button
+          className="icon-btn"
+          onClick={() => {
+            // Clear the once-per-session forward, or the next person to sign
+            // in on this browser inherits a flag set for somebody else.
+            try { sessionStorage.removeItem('cyrix.portal.forwarded') } catch { /* not available */ }
+            supabase.auth.signOut()
+          }}
+          title="Sign out"
+        >
           <LogOut size={17} />
           <span className="sr">Sign out</span>
         </button>
