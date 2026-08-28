@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/kpi/:path*",
-      "destination": "https://cyrix-kpi.vercel.app/kpi/:path*"
+      "destination": "https://cyrix-kpi-1qzs.vercel.app/kpi/:path*"
     },
     {
       "source": "/spare/:path*",
