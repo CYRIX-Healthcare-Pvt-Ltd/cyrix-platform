@@ -194,10 +194,67 @@ body {
 .tile:focus-visible { outline: 2px solid var(--red-600); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) { .tile:hover { transform: none; } }
 
+/*
+ * A colour per module, the way Spare colours its own navigation.
+ *
+ * Three identical black squares made the tiles read as one repeated thing
+ * and pushed all the recognition onto the label. A module keeps its colour
+ * wherever it appears, so the tile is recognisable before it is read —
+ * which is the whole job of a picker.
+ *
+ * Keyed off the module code from the registry, so a new module gets the
+ * neutral default rather than a broken style, and its colour is one line
+ * here rather than a change to the component.
+ */
 .tile-icon {
   display: grid; place-items: center; flex: none;
   width: 2.75rem; height: 2.75rem; border-radius: 11px;
   background: var(--ink-950); color: var(--white);
+}
+.tile[data-module='kpi']   .tile-icon { background: #d97706; }  /* amber */
+.tile[data-module='spare'] .tile-icon { background: #9333ea; }  /* purple */
+.tile[data-module='bemmp'] .tile-icon { background: #0d9488; }  /* teal */
+
+/*
+ * Roughly a third of the wheel apart, deliberately.
+ *
+ * Indigo and violet were the first pair here and they read as the same
+ * colour at 44px: two tiles that look alike are worse than no colour at
+ * all, because the eye stops trusting it and goes back to reading labels.
+ *
+ * Spare's is the purple its own Scan tab and QR icon already use, so the
+ * tile matches what you see a moment after clicking it. KPI took the amber
+ * that freed up. The rule that survives is distinctness first — a module
+ * gets its own colour where it has one, and a clearly different one where
+ * it does not.
+ */
+
+/*
+ * Motion, kept to the two properties that do not cost a layout.
+ *
+ * The icon lifts a little under the pointer and the arrow leans the way it
+ * points; pressing scales the whole tile down, which is the only feedback
+ * a link gives that it registered the press before the next page arrives.
+ * ease-out on the way in so it starts fast — this is a response to the
+ * cursor, and anything that starts slowly reads as lag.
+ *
+ * Small numbers on purpose. This is the first screen after signing in and
+ * people pass through it every day; a tile that performs is charming once
+ * and tiresome by the end of the week.
+ */
+.tile-icon {
+  transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.tile:hover .tile-icon { transform: scale(1.07); }
+/* Carries the hover lift, or pressing would drop the tile 2px at the same
+   moment it scales and read as a stutter rather than a press. */
+.tile:active { transform: translateY(-2px) scale(0.985); }
+.tile-go { transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1), color 180ms ease; }
+.tile:hover .tile-go { transform: translateX(3px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-icon, .tile-go { transition: none; }
+  .tile:hover .tile-icon, .tile:hover .tile-go, .tile:active { transform: none; }
 }
 .tile-body { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
 .tile-name { font-weight: 700; font-size: 1.02rem; letter-spacing: -0.01em; }

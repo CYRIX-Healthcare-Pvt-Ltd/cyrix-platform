@@ -265,7 +265,7 @@ function Portal() {
             {modules.map(m => {
               const Icon = (m.icon && ICONS[m.icon]) || LayoutGrid
               return (
-                <a key={m.code} className="tile" href={m.path}>
+                <a key={m.code} className="tile" data-module={m.code} href={m.path}>
                   <span className="tile-icon"><Icon size={22} /></span>
                   <span className="tile-body">
                     <span className="tile-name">{m.name}</span>
