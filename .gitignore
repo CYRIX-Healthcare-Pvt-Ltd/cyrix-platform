@@ -4,3 +4,6 @@ dist
 .env.local
 *.local
 tsconfig.tsbuildinfo
+
+# Local dev-server launch config, specific to one machine.
+.claude/
