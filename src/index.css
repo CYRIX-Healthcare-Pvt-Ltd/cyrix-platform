@@ -19,8 +19,22 @@
      as the stand-in everywhere else. */
   --sans: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Inter Variable', Inter, 'Segoe UI', Roboto, sans-serif;
 
-  /* Which way the browser's own controls go — scrollbars here, and the
-     select popups and date pickers in the modules. */
+  /*
+   * Dark in both themes, for the surfaces that are dark on purpose rather
+   * than merely the darkest step of the ramp: the sign-in hero. It is the
+   * value --ink-950 has in light, pinned, because the panel carries white
+   * text and white-alpha pills — invert it and the hero turns white while
+   * everything written on it stays white and disappears.
+   */
+  --shade: #0b0d10;
+
+  /* The sign-in error box. Its light values are the ones it always had. */
+  --error-ink:  #7f1020;
+  --error-bg:   #fdecee;
+  --error-line: #f6c9ce;
+
+  /* Which way the browser draws its own controls: scrollbars here, and the
+     select popups and date pickers inside the modules. */
   color-scheme: light;
 }
 
@@ -48,6 +62,9 @@
   --ink-50:  #111318;
   --red-600: #ff5c6b;
   --white:   #1c1f25;
+  --error-ink:  #ffb4bd;
+  --error-bg:   #2a1216;
+  --error-line: #5d2028;
   color-scheme: dark;
 }
 
@@ -63,6 +80,9 @@
     --ink-50:  #111318;
     --red-600: #ff5c6b;
     --white:   #1c1f25;
+    --error-ink:  #ffb4bd;
+    --error-bg:   #2a1216;
+    --error-line: #5d2028;
     color-scheme: dark;
   }
 }
@@ -101,14 +121,20 @@ body {
 
 .brand {
   display: none; flex-direction: column; justify-content: space-between;
-  background: var(--ink-950); color: var(--white); padding: 3rem;
+  background: var(--shade); color: #ffffff; padding: 3rem;
 }
 @media (min-width: 1024px) { .brand { display: flex; } }
 
 .wordmark {
   font-weight: 700; font-size: 1.1rem; letter-spacing: 0.02em; margin: 0;
 }
-.wordmark span { color: var(--red-600); font-size: 0.6em; vertical-align: super; }
+/* The brand red, pinned. --red-600 brightens in dark for contrast against
+   a dark page, but the hero this sits on is the same black in both themes —
+   so following the ramp would leave one element changing on a panel that
+   does not. The bar's small wordmark is on a surface that does change, and
+   keeps the token. */
+.wordmark span { color: #ce2434; font-size: 0.6em; vertical-align: super; }
+.bar .wordmark span { color: var(--red-600); }
 .wordmark.small { font-size: 0.95rem; color: var(--ink-950); }
 
 .kicker {
@@ -187,7 +213,8 @@ body {
 
 .error {
   margin: 0; padding: 0.8rem 0.95rem; font-size: 0.9rem;
-  color: #7f1020; background: #fdecee; border: 1px solid #f6c9ce; border-radius: 8px;
+  color: var(--error-ink); background: var(--error-bg);
+  border: 1px solid var(--error-line); border-radius: 8px;
 }
 
 .pane-foot {
