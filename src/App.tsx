@@ -79,8 +79,13 @@ function SignIn() {
     <div className="split">
       <aside className="brand">
         {/* `--shade` is pinned dark in both themes, so this panel does not
-            follow the toggle and neither may the lockup on it. */}
-        <Logo height={38} showSubtitle={false} onDark />
+            follow the toggle and neither may the lockup on it.
+
+            Small on purpose. The panel's own headline is the thing meant
+            to be read here; the mark is the corner it is said from, and a
+            wordmark competing with "One account. Every Cyrix tool." makes
+            the panel two statements instead of one. */}
+        <Logo height={30} showSubtitle={false} onDark />
         <div>
           <p className="kicker">Cyrix Platform</p>
           <h2 className="brand-line">
