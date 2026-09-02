@@ -208,6 +208,19 @@ body {
 .field input::placeholder { color: var(--ink-300); }
 .field input:focus { outline: none; border-bottom-color: var(--ink-950); }
 
+/* A password field and its eye. The button sits ON the rule rather than
+   beside the input, because that underline is the whole visual language
+   of this screen and a control that pushed it would break the row. */
+.field-input { position: relative; }
+.field-input input { padding-right: 2.4rem; }
+.reveal {
+  position: absolute; right: 0; bottom: 0.35rem;
+  display: flex; align-items: center; padding: 0.35rem;
+  background: none; border: 0; cursor: pointer; color: var(--ink-500);
+  transition: color 140ms ease;
+}
+.reveal:hover { color: var(--ink-950); }
+
 .primary {
   display: flex; align-items: center; justify-content: center; gap: 0.5rem;
   width: 100%; padding: 0.95rem; font: inherit; font-size: 0.72rem;

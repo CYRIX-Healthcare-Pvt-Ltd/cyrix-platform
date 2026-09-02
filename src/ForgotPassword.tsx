@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Eye, EyeOff } from 'lucide-react'
 import { requestOtp, submitOtp } from './lib/passwordOtp'
 import { emailFeedback, isOfficialEmail, OFFICIAL_DOMAIN } from './lib/officialEmail'
 
@@ -124,9 +124,14 @@ export default function ForgotPassword({ onBack }: { onBack: (ecode?: string) =>
             autoFocus
             hint="Six digits, good for 10 minutes."
           />
+          {/* The eye goes on the one you are composing, not on the one
+              that checks it. Revealing both would make the confirm field
+              a copy-and-compare rather than the second, independent
+              typing it exists to be. */}
           <Field
             label="New Password"
             type="password"
+            reveal
             value={pw}
             onChange={setPw}
             autoComplete="new-password"
@@ -177,7 +182,7 @@ export default function ForgotPassword({ onBack }: { onBack: (ecode?: string) =>
  */
 function Field({
   label, value, onChange, type = 'text', placeholder, autoComplete, autoFocus,
-  uppercase, hint, disabled, error, onBlur, inputMode,
+  uppercase, hint, disabled, error, onBlur, inputMode, reveal,
 }: {
   label: string
   value: string
@@ -200,27 +205,48 @@ function Field({
   /** Leaving the field is what counts as having finished typing in it. */
   onBlur?: () => void
   inputMode?: 'numeric'
+  /** Offer an eye. Only for a password somebody is composing. */
+  reveal?: boolean
 }): ReactNode {
+  const [shown, setShown] = useState(false)
+
   return (
     <label className="field">
       <span>{label}</span>
-      <input
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        autoFocus={autoFocus}
-        disabled={disabled}
-        inputMode={inputMode}
-        autoCapitalize={uppercase ? 'characters' : undefined}
-        autoCorrect="off"
-        spellCheck={false}
-        required
-        onChange={e => onChange(e.target.value)}
-        onBlur={onBlur}
-        aria-invalid={!!error}
-        style={uppercase ? { textTransform: 'uppercase' } : undefined}
-      />
+      <span className="field-input">
+        <input
+          type={reveal && shown ? 'text' : type}
+          value={value}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          autoFocus={autoFocus}
+          disabled={disabled}
+          inputMode={inputMode}
+          autoCapitalize={uppercase ? 'characters' : undefined}
+          autoCorrect="off"
+          spellCheck={false}
+          required
+          onChange={e => onChange(e.target.value)}
+          onBlur={onBlur}
+          aria-invalid={!!error}
+          style={{
+            ...(uppercase ? { textTransform: 'uppercase' as const } : {}),
+            ...(reveal ? {} : { paddingRight: 0 }),
+          }}
+        />
+        {reveal && (
+          <button
+            type="button"
+            className="reveal"
+            onClick={() => setShown(s => !s)}
+            aria-label={shown ? 'Hide password' : 'Show password'}
+            aria-pressed={shown}
+            title={shown ? 'Hide password' : 'Show password'}
+          >
+            {shown ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        )}
+      </span>
       {/* The rule under the field is the whole visual language of this
           screen, so a problem is said with it rather than by adding a
           box. */}
