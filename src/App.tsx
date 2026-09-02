@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import Logo from './Logo'
 import Avatar from './Avatar'
 import ThemeToggle from './ThemeToggle'
+import ForgotPassword from './ForgotPassword'
 import type { Session } from '@supabase/supabase-js'
 import {
   ClipboardList, QrCode, Activity, LayoutGrid, LogOut, ArrowRight, Loader2,
@@ -55,6 +56,22 @@ function SignIn() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  /*
+   * ?reset=1 opens straight into recovery.
+   *
+   * It is how the modules hand somebody over: KPI's sign-in no longer
+   * carries the flow, and a link that lands on the front door and then
+   * asks the person to find the recovery link themselves is a handover
+   * that loses half the people making it. Read once, at mount — the
+   * portal has no router, and this is the only address it answers to.
+   */
+  const [mode, setMode] = useState<'signin' | 'forgot'>(() => {
+    try {
+      return new URLSearchParams(window.location.search).has('reset') ? 'forgot' : 'signin'
+    } catch {
+      return 'signin'
+    }
+  })
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -113,7 +130,22 @@ function SignIn() {
           <ThemeToggle />
         </div>
         <div className="form-wrap">
-          <h1>Sign in to Cyrix.</h1>
+          {mode === 'forgot' && <p className="eyebrow">Account Recovery</p>}
+          <h1>{mode === 'signin' ? 'Sign in to Cyrix.' : 'Reset your password.'}</h1>
+
+          {mode === 'forgot' ? (
+            <ForgotPassword
+              onBack={code => {
+                setMode('signin')
+                // The employee code comes back filled in; the password
+                // deliberately does not. It used to be pre-filled because
+                // a reset made the password the employee code, and that
+                // is exactly the behaviour this replaced.
+                if (code) { setEcode(code); setPassword(''); setError(null) }
+              }}
+            />
+          ) : (
+          <>
           {/* The employee code has not changed and neither has the
               password. Saying so is worth a line: this screen is new,
               and the first instinct on meeting a new login is that you
@@ -155,11 +187,22 @@ function SignIn() {
               {busy ? 'Signing In' : 'Sign In'}
             </button>
 
-            {/* Password recovery lives in KPI, which owns the employee
-                record and knows which address is on it. One flow, not
-                one per module. */}
-            <a className="quiet-link" href="/kpi">Forgot your password?</a>
+            {/* Recovery lives here now, at the front door. It used to
+                point into KPI, which owns the employee record — but
+                somebody who cannot sign in cannot sign in to anything,
+                so sending them into a module to fix an account-wide
+                problem was sending them the wrong way. One flow, and it
+                is on the screen that failed them. */}
+            <button
+              type="button"
+              className="quiet-link"
+              onClick={() => { setMode('forgot'); setError(null) }}
+            >
+              Forgot your password?
+            </button>
           </form>
+          </>
+          )}
         </div>
         <footer className="pane-foot">
           <span>Cyrix Healthcare</span>

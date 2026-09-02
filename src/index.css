@@ -33,6 +33,14 @@
   --error-bg:   #fdecee;
   --error-line: #f6c9ce;
 
+  /* Its opposite, for the recovery flow — "a code is on its way" and
+     "password changed" are the only good news this screen ever has, and
+     saying them in the error box's shape but not its colour is what
+     makes them read as progress rather than as another problem. */
+  --ok-ink:  #14532d;
+  --ok-bg:   #edfaf1;
+  --ok-line: #bce5ca;
+
   /* Which way the browser draws its own controls: scrollbars here, and the
      select popups and date pickers inside the modules. */
   color-scheme: light;
@@ -65,6 +73,9 @@
   --error-ink:  #ffb4bd;
   --error-bg:   #2a1216;
   --error-line: #5d2028;
+  --ok-ink:  #86efac;
+  --ok-bg:   #10241a;
+  --ok-line: #1f4a33;
   color-scheme: dark;
 }
 
@@ -83,6 +94,9 @@
     --error-ink:  #ffb4bd;
     --error-bg:   #2a1216;
     --error-line: #5d2028;
+    --ok-ink:  #86efac;
+    --ok-bg:   #10241a;
+    --ok-line: #1f4a33;
     color-scheme: dark;
   }
 }
@@ -204,10 +218,16 @@ body {
 .primary:hover:not(:disabled) { background: var(--red-600); }
 .primary:disabled { opacity: 0.6; cursor: default; }
 
+/* An <a> on the sign-in and a <button> in the recovery flow — the same
+   control either way, so the button is stripped back to the anchor
+   rather than given a look of its own. */
 .quiet-link {
+  display: block; width: 100%; padding: 0; background: none; border: 0;
+  cursor: pointer; font-family: inherit;
   text-align: center; font-size: 0.68rem; font-weight: 600;
   letter-spacing: 0.13em; text-transform: uppercase; color: var(--ink-500);
   text-decoration: none;
+  transition: color 140ms ease;
 }
 .quiet-link:hover { color: var(--red-600); }
 
@@ -216,6 +236,41 @@ body {
   color: var(--error-ink); background: var(--error-bg);
   border: 1px solid var(--error-line); border-radius: 8px;
 }
+
+/* ---------------- account recovery ---------------- */
+
+.notice {
+  margin: 0; padding: 0.8rem 0.95rem; font-size: 0.9rem; line-height: 1.45;
+  color: var(--ok-ink); background: var(--ok-bg);
+  border: 1px solid var(--ok-line); border-radius: 8px;
+}
+
+/* Sits above the heading, naming what this screen became. Without it the
+   only thing that changes when recovery opens is the sentence in the
+   <h1>, which is easy to miss on a screen you arrived at by mistake. */
+.eyebrow {
+  margin: 0 0 0.6rem; font-size: 0.68rem; font-weight: 600;
+  letter-spacing: 0.13em; text-transform: uppercase; color: var(--ink-500);
+}
+
+/* Answered already and not up for revision. Dashed rather than merely
+   greyed: the rule under the field is this screen's whole vocabulary, so
+   the rule is where "you cannot change this now" gets said. */
+.field input:disabled {
+  color: var(--ink-500); border-bottom-style: dashed; cursor: not-allowed;
+}
+
+/* Scoped through .field on purpose: `.field span` above is (0,1,1) and
+   would otherwise win, putting the hint back in uppercase label type. */
+.field .field-hint {
+  display: block; margin-top: 0.5rem; font-size: 0.78rem; color: var(--ink-500);
+  text-transform: none; letter-spacing: normal; font-weight: 400;
+}
+.field .field-error {
+  display: block; margin-top: 0.5rem; font-size: 0.78rem; font-weight: 500;
+  color: var(--red-600); text-transform: none; letter-spacing: normal;
+}
+.field input[aria-invalid='true'] { border-bottom-color: var(--red-600); }
 
 .pane-foot {
   display: flex; justify-content: space-between; padding-top: 1.5rem;
