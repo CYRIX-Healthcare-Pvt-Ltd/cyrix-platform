@@ -170,10 +170,6 @@ body {
   padding: 0.3rem 0.75rem;
 }
 
-.lede {
-  margin: -1.75rem 0 2.5rem; font-size: 0.95rem; color: var(--ink-500);
-  line-height: 1.5;
-}
 
 .foot-note {
   font-size: 0.7rem; font-weight: 500; letter-spacing: 0.14em;

@@ -147,13 +147,6 @@ function SignIn() {
             />
           ) : (
           <>
-          {/* The employee code has not changed and neither has the
-              password. Saying so is worth a line: this screen is new,
-              and the first instinct on meeting a new login is that you
-              need new credentials for it. */}
-          <p className="lede">
-            The same employee code and password you already use.
-          </p>
           <form onSubmit={submit} className="stack">
             {error && <p className="error" role="alert">{error}</p>}
 
