@@ -626,3 +626,14 @@ body {
  */
 .cyrix-logo[data-on='dark'] .cyrix-logo-light { display: none; }
 .cyrix-logo[data-on='dark'] .cyrix-logo-dark { display: block; }
+
+/* A button that reads as a link, for the retry inside the failure line.
+   The failure used to be a dead end whose only exit was a manual reload;
+   this is that reload, scoped to the one request that actually failed. */
+.link-btn {
+  background: none; border: 0; padding: 0; font: inherit;
+  color: var(--red-600); text-decoration: underline;
+  cursor: pointer;
+}
+.link-btn:hover { text-decoration: none; }
+.link-btn:disabled { color: var(--ink-500); cursor: default; text-decoration: none; }

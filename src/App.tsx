@@ -236,6 +236,39 @@ function Portal() {
   /** Name and photo together: the header shows both, the greeting one. */
   const [me, setMe] = useState<{ full_name: string; avatar: string | null } | null>(null)
   const [failed, setFailed] = useState(false)
+  /** A retry is in flight, so the button says so rather than doing nothing. */
+  const [retrying, setRetrying] = useState(false)
+
+  /**
+   * The module list, asked for more than once before it is given up on.
+   *
+   * This ran once on mount and never again, so any blip — a cold
+   * function, a token being refreshed underneath it, a phone changing
+   * cells mid-request — put "Could not load your modules" on the screen
+   * and left it there until somebody reloaded by hand. That reload
+   * almost always worked, which is the whole tell: the request was
+   * fine, the page just never asked a second time.
+   *
+   * Three attempts inside about a second. Long enough to cover a blip,
+   * short enough that a real outage still fails while somebody is
+   * looking at the page rather than after they have given up on it.
+   */
+  const loadModules = async (): Promise<Module[] | null> => {
+    for (let attempt = 0; ; attempt++) {
+      const res = await supabase.rpc('my_modules')
+      if (!res.error) return (res.data ?? []) as Module[]
+      if (attempt >= 2) return null
+      await new Promise(r => setTimeout(r, 300 * (attempt + 1)))
+    }
+  }
+
+  /** The failure is a dead end without this — the only way out was a reload. */
+  const retry = async () => {
+    setRetrying(true)
+    const mods = await loadModules()
+    setRetrying(false)
+    if (mods) { setModules(mods); setFailed(false) }
+  }
 
   useEffect(() => {
     let alive = true
@@ -256,14 +289,14 @@ function Portal() {
               .select('id, full_name, ecode, avatar')
               .eq('auth_user_id', uid).maybeSingle()
           : Promise.resolve({ data: null }),
-        supabase.rpc('my_modules'),
+        loadModules(),
       ])
       if (!alive) return
       if (me.data?.full_name) {
         setMe({ full_name: me.data.full_name.trim(), avatar: me.data.avatar ?? null })
       }
-      if (mods.error) setFailed(true)
-      else setModules((mods.data ?? []) as Module[])
+      if (mods === null) setFailed(true)
+      else setModules(mods)
 
       /*
        * Administrators go straight to the work.
@@ -349,7 +382,11 @@ function Portal() {
 
         {failed && (
           <p className="empty">
-            Could not load your modules just now. Refresh, or tell HR if it keeps happening.
+            Could not load your modules just now.{' '}
+            <button className="link-btn" onClick={retry} disabled={retrying}>
+              {retrying ? 'Trying…' : 'Try again'}
+            </button>
+            {' '}— or tell HR if it keeps happening.
           </p>
         )}
 
