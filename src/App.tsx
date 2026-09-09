@@ -110,16 +110,6 @@ function SignIn() {
           <h2 className="brand-line">
             One account.<br />Every Cyrix tool.
           </h2>
-          {/* Named rather than described. Somebody arriving here is
-              looking for a thing they already use, and the fastest way
-              to reassure them they are in the right place is to show it
-              on the wall. What each person can actually open is decided
-              after sign-in, not here. */}
-          <ul className="brand-list">
-            <li>KPI</li>
-            <li>Spare Mapping</li>
-            <li>BEMMP Dashboard</li>
-          </ul>
         </div>
       </aside>
 
