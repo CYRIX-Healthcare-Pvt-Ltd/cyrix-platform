@@ -49,6 +49,14 @@
       "source": "/bemmp/:path*",
       "destination": "https://cyrix-bemmp-dashboard.vercel.app/bemmp/:path*"
     },
+        {
+      "source": "/pulse/",
+      "destination": "https://pulse.cyrix.in/pulse/"
+    },
+    {
+      "source": "/pulse/:path*",
+      "destination": "https://pulse.cyrix.in/pulse/:path*"
+    },
     {
       "source": "/((?!assets/|favicon|sw\\.js).*)",
       "destination": "/index.html"
