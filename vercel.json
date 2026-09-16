@@ -58,6 +58,14 @@
       "destination": "https://pulse.cyrix.in/pulse/:path*"
     },
     {
+      "source": "/revive/",
+      "destination": "https://cyrix-revive-lab.vercel.app/revive/"
+    },
+    {
+      "source": "/revive/:path*",
+      "destination": "https://cyrix-revive-lab.vercel.app/revive/:path*"
+    },
+    {
       "source": "/((?!assets/|favicon|sw\\.js).*)",
       "destination": "/index.html"
     }

@@ -5,7 +5,7 @@ import ThemeToggle from './ThemeToggle'
 import ForgotPassword from './ForgotPassword'
 import type { Session } from '@supabase/supabase-js'
 import {
-  ClipboardList, QrCode, Activity, LayoutGrid, LogOut, ArrowRight, Loader2,
+  ClipboardList, QrCode, Activity, Wrench, LayoutGrid, LogOut, ArrowRight, Loader2,
   Eye, EyeOff,
 } from 'lucide-react'
 import { supabase, ecodeToEmail, type Module } from './lib/supabase'
@@ -22,7 +22,7 @@ import { supabase, ecodeToEmail, type Module } from './lib/supabase'
 
 /** The icon names the registry uses, resolved to real components. */
 const ICONS: Record<string, typeof ClipboardList> = {
-  ClipboardList, QrCode, Activity,
+  ClipboardList, QrCode, Activity, Wrench,
 }
 
 export default function App() {
