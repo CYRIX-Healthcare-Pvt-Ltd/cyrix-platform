@@ -372,6 +372,14 @@ body {
 .tile[data-module='kpi']   .tile-icon { background: #d97706; }  /* amber */
 .tile[data-module='spare'] .tile-icon { background: #9333ea; }  /* purple */
 .tile[data-module='bemmp'] .tile-icon { background: #0d9488; }  /* teal */
+/* Revive Lab and Travel Expense both arrived on the neutral default, and
+   two black squares side by side were the repeated thing again (the user,
+   1 Oct: "revive lab and travel exp color is same"). Blue sits between the
+   teal and the purple, pink between the purple and the amber — each about
+   an eighth of the wheel from its nearest neighbour, which at five colours
+   is as far apart as they can be. */
+.tile[data-module='revive'] .tile-icon { background: #2563eb; }  /* blue */
+.tile[data-module='travel'] .tile-icon { background: #db2777; }  /* pink */
 
 /*
  * Roughly a third of the wheel apart, deliberately.
