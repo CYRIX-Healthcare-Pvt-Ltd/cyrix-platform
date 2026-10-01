@@ -66,6 +66,14 @@
       "destination": "https://cyrix-revive-lab.vercel.app/revive/:path*"
     },
     {
+      "source": "/travel/",
+      "destination": "https://cyrix-travel.vercel.app/travel/"
+    },
+    {
+      "source": "/travel/:path*",
+      "destination": "https://cyrix-travel.vercel.app/travel/:path*"
+    },
+    {
       "source": "/((?!assets/|favicon|sw\\.js).*)",
       "destination": "/index.html"
     }
