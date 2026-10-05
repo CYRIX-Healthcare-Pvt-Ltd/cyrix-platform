@@ -380,6 +380,9 @@ body {
    is as far apart as they can be. */
 .tile[data-module='revive'] .tile-icon { background: #2563eb; }  /* blue */
 .tile[data-module='travel'] .tile-icon { background: #db2777; }  /* pink */
+/* My Task (5 Oct) takes lime: the widest gap left on the wheel was between
+   the amber and the teal, and lime sits in it, clear of both. */
+.tile[data-module='tasks'] .tile-icon { background: #65a30d; }  /* lime */
 
 /*
  * Roughly a third of the wheel apart, deliberately.

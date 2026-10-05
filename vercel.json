@@ -74,6 +74,14 @@
       "destination": "https://cyrix-travel.vercel.app/travel/:path*"
     },
     {
+      "source": "/tasks/",
+      "destination": "https://cyrix-task.vercel.app/tasks/"
+    },
+    {
+      "source": "/tasks/:path*",
+      "destination": "https://cyrix-task.vercel.app/tasks/:path*"
+    },
+    {
       "source": "/((?!assets/|favicon|sw\\.js).*)",
       "destination": "/index.html"
     }
