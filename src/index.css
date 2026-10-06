@@ -368,21 +368,22 @@ body {
   display: grid; place-items: center; flex: none;
   width: 2.75rem; height: 2.75rem; border-radius: 11px;
   background: var(--ink-950); color: var(--white);
+  --glow: rgba(11, 13, 16, 0.35);
 }
-.tile[data-module='kpi']   .tile-icon { background: #d97706; }  /* amber */
-.tile[data-module='spare'] .tile-icon { background: #9333ea; }  /* purple */
-.tile[data-module='bemmp'] .tile-icon { background: #0d9488; }  /* teal */
+.tile[data-module='kpi']   .tile-icon { background: #d97706; --glow: rgba(217, 119, 6, 0.7); }  /* amber */
+.tile[data-module='spare'] .tile-icon { background: #9333ea; --glow: rgba(147, 51, 234, 0.7); }  /* purple */
+.tile[data-module='bemmp'] .tile-icon { background: #0d9488; --glow: rgba(13, 148, 136, 0.7); }  /* teal */
 /* Revive Lab and Travel Expense both arrived on the neutral default, and
    two black squares side by side were the repeated thing again (the user,
    1 Oct: "revive lab and travel exp color is same"). Blue sits between the
    teal and the purple, pink between the purple and the amber — each about
    an eighth of the wheel from its nearest neighbour, which at five colours
    is as far apart as they can be. */
-.tile[data-module='revive'] .tile-icon { background: #2563eb; }  /* blue */
-.tile[data-module='travel'] .tile-icon { background: #db2777; }  /* pink */
+.tile[data-module='revive'] .tile-icon { background: #2563eb; --glow: rgba(37, 99, 235, 0.7); }  /* blue */
+.tile[data-module='travel'] .tile-icon { background: #db2777; --glow: rgba(219, 39, 119, 0.7); }  /* pink */
 /* My Task (5 Oct) takes lime: the widest gap left on the wheel was between
    the amber and the teal, and lime sits in it, clear of both. */
-.tile[data-module='tasks'] .tile-icon { background: #65a30d; }  /* lime */
+.tile[data-module='tasks'] .tile-icon { background: #65a30d; --glow: rgba(101, 163, 13, 0.7); }  /* lime */
 
 /*
  * Roughly a third of the wheel apart, deliberately.
@@ -412,9 +413,10 @@ body {
  * and tiresome by the end of the week.
  */
 .tile-icon {
-  transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+  transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 240ms ease;
 }
-.tile:hover .tile-icon { transform: scale(1.07); }
+/* Under the pointer the icon lifts with a soft light of its own colour beneath it. */
+.tile:hover .tile-icon { transform: scale(1.07); box-shadow: 0 10px 22px -8px var(--glow); }
 /* Carries the hover lift, or pressing would drop the tile 2px at the same
    moment it scales and read as a stutter rather than a press. */
 .tile:active { transform: translateY(-2px) scale(0.985); }
@@ -504,67 +506,201 @@ body {
 /*
  * Each tile's icon does the thing its module does.
  *
- * Not decoration for its own sake: a scanner scans, a monitor has a pulse,
- * and a checklist gets ticked. The motion is the shortest possible answer
- * to "what is this one for", which is the only question a picker exists to
- * answer — so it earns its place where a generic wobble on all three would
- * not.
+ * Not decoration for its own sake: the motion is the shortest answer to
+ * "what is this one for", which is the only question a picker exists to
+ * answer. Each icon's own parts move, rather than the whole icon nodding
+ * (the user, 6 Oct: "make it more advance and awesome"): the scorecard
+ * fills in, the code is scanned, the monitor traces a beat, the wrench
+ * turns the bolt, the trip goes out and comes back, the tasks are ticked.
  *
- * On hover, not ambient. Three things moving on their own on the first
- * screen after sign-in is a fairground, and this is a page people cross
- * every working day. Under the pointer it is a response; running forever
- * it is noise.
+ * Under the pointer on a computer. And once as the tiles arrive, on the
+ * first visit of a browser session: a phone has no pointer, so without it
+ * nobody on a phone would see any of this. Once, and not again on every
+ * return from a module during the day — this is a page people cross every
+ * working day, and a tile that performs every time is charming once and
+ * tiresome by the end of the week.
+ *
+ * Transform, opacity and stroke-dashoffset only, so nothing lays out again.
  */
 
-/* Spare — a scan line crossing the tag, the way the scanner sweeps one. */
+/* When a part plays: under the pointer, or while the tiles arrive. --d is
+   the tile's own wait on arrival, each a little after the one before. */
+.tiles.arrive .tile { --d: calc(var(--i, 0) * 70ms + 320ms); }
+
+/* KPI — the scorecard fills in, a row at a time: each row's point, then its
+   line, the clip pressed once at the start. */
+.tile[data-module='kpi'] .tile-icon svg > * { transform-box: fill-box; transform-origin: center; }
+:is(.tile:hover, .tiles.arrive .tile)[data-module='kpi'] .tile-icon svg > :nth-child(1) {
+  animation: tile-clip 380ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  animation-delay: var(--d, 0ms);
+}
+:is(.tile:hover, .tiles.arrive .tile)[data-module='kpi'] .tile-icon svg > :nth-child(5),
+:is(.tile:hover, .tiles.arrive .tile)[data-module='kpi'] .tile-icon svg > :nth-child(6) {
+  animation: tile-pop 340ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+:is(.tile:hover, .tiles.arrive .tile)[data-module='kpi'] .tile-icon svg > :nth-child(3),
+:is(.tile:hover, .tiles.arrive .tile)[data-module='kpi'] .tile-icon svg > :nth-child(4) {
+  stroke-dasharray: 6;
+  animation: tile-draw-6 320ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+}
+:is(.tile:hover, .tiles.arrive .tile)[data-module='kpi'] .tile-icon svg > :nth-child(5) { animation-delay: calc(var(--d, 0ms) + 80ms); }
+:is(.tile:hover, .tiles.arrive .tile)[data-module='kpi'] .tile-icon svg > :nth-child(3) { animation-delay: calc(var(--d, 0ms) + 160ms); }
+:is(.tile:hover, .tiles.arrive .tile)[data-module='kpi'] .tile-icon svg > :nth-child(6) { animation-delay: calc(var(--d, 0ms) + 290ms); }
+:is(.tile:hover, .tiles.arrive .tile)[data-module='kpi'] .tile-icon svg > :nth-child(4) { animation-delay: calc(var(--d, 0ms) + 370ms); }
+@keyframes tile-clip { 45% { transform: translateY(1.2px) scaleX(1.15); } }
+@keyframes tile-pop { from { transform: scale(0); } }
+@keyframes tile-draw-6 { from { stroke-dashoffset: 7; opacity: 0; } 25% { opacity: 1; } to { stroke-dashoffset: 0; } }
+
+/* Spare — a viewfinder snaps on and a scan line sweeps the tag, down and
+   back, the code's points flickering as the line passes them: being read. */
 .tile[data-module='spare'] .tile-icon { position: relative; overflow: hidden; }
+.tile[data-module='spare'] .tile-icon::before {
+  content: '';
+  position: absolute; inset: 6px; pointer-events: none;
+  --c: rgba(255, 255, 255, 0.95);
+  background:
+    linear-gradient(var(--c), var(--c)) left top / 8px 2px,
+    linear-gradient(var(--c), var(--c)) left top / 2px 8px,
+    linear-gradient(var(--c), var(--c)) right top / 8px 2px,
+    linear-gradient(var(--c), var(--c)) right top / 2px 8px,
+    linear-gradient(var(--c), var(--c)) left bottom / 8px 2px,
+    linear-gradient(var(--c), var(--c)) left bottom / 2px 8px,
+    linear-gradient(var(--c), var(--c)) right bottom / 8px 2px,
+    linear-gradient(var(--c), var(--c)) right bottom / 2px 8px;
+  background-repeat: no-repeat;
+  opacity: 0; transform: scale(1.35);
+  transition: opacity 160ms ease, transform 300ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.tile[data-module='spare']:hover .tile-icon::before { opacity: 1; transform: scale(1); }
 .tile[data-module='spare'] .tile-icon::after {
   content: '';
-  position: absolute; left: 0; right: 0; height: 2px;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 0 8px 1px rgba(255, 255, 255, 0.7);
-  top: -2px; opacity: 0;
+  position: absolute; left: 9px; right: 9px; top: 9px; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #fff 18%, #fff 82%, transparent);
+  box-shadow: 0 0 8px 1px rgba(255, 255, 255, 0.75), 0 0 2px rgba(255, 255, 255, 0.9);
+  opacity: 0;
 }
 .tile[data-module='spare']:hover .tile-icon::after {
-  animation: tile-scan 1.1s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+  animation: tile-scan 1.5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 @keyframes tile-scan {
-  0%   { top: 12%; opacity: 0; }
-  15%  { opacity: 1; }
-  85%  { opacity: 1; }
-  100% { top: 88%; opacity: 0; }
+  0%   { transform: translateY(0); opacity: 0; }
+  8%   { opacity: 1; }
+  50%  { transform: translateY(24px); opacity: 1; }
+  92%  { opacity: 1; }
+  100% { transform: translateY(0); opacity: 0; }
+}
+:is(.tile:hover, .tiles.arrive .tile)[data-module='spare'] .tile-icon svg > :nth-child(n+4) {
+  animation: tile-read 1.5s linear infinite backwards;
+}
+:is(.tile:hover, .tiles.arrive .tile)[data-module='spare'] .tile-icon svg > :nth-child(8)  { animation-delay: calc(var(--d, 0ms) + 250ms); }  /* top */
+:is(.tile:hover, .tiles.arrive .tile)[data-module='spare'] .tile-icon svg > :nth-child(6)  { animation-delay: calc(var(--d, 0ms) + 360ms); }
+:is(.tile:hover, .tiles.arrive .tile)[data-module='spare'] .tile-icon svg > :nth-child(7),
+:is(.tile:hover, .tiles.arrive .tile)[data-module='spare'] .tile-icon svg > :nth-child(10),
+:is(.tile:hover, .tiles.arrive .tile)[data-module='spare'] .tile-icon svg > :nth-child(11) { animation-delay: calc(var(--d, 0ms) + 390ms); }  /* middle */
+:is(.tile:hover, .tiles.arrive .tile)[data-module='spare'] .tile-icon svg > :nth-child(4),
+:is(.tile:hover, .tiles.arrive .tile)[data-module='spare'] .tile-icon svg > :nth-child(9)  { animation-delay: calc(var(--d, 0ms) + 450ms); }
+:is(.tile:hover, .tiles.arrive .tile)[data-module='spare'] .tile-icon svg > :nth-child(5),
+:is(.tile:hover, .tiles.arrive .tile)[data-module='spare'] .tile-icon svg > :nth-child(12) { animation-delay: calc(var(--d, 0ms) + 530ms); }  /* bottom */
+@keyframes tile-read {
+  0%   { opacity: 1; }
+  4%   { opacity: 0.25; }
+  16%  { opacity: 1; }
+  100% { opacity: 1; }
 }
 
-/* BEMMP — a heartbeat, because the icon is a trace and the module watches
-   equipment that is either alive or is not. Two beats and a rest, which is
-   what makes it read as a pulse rather than a throb. */
-.tile[data-module='bemmp']:hover .tile-icon svg {
-  animation: tile-pulse 1.4s var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) infinite;
+/* BEMMP — the monitor traces a beat, left to right, and the square glows as
+   the trace crosses the peak, and a little at the dip: lub-dub. */
+:is(.tile:hover, .tiles.arrive .tile)[data-module='bemmp'] .tile-icon svg path {
+  /* The trace is drawn from its right end, so a negative offset sweeps it in from the left. */
+  stroke-dasharray: 56;
+  animation: tile-trace 1.6s linear infinite backwards;
+  animation-delay: var(--d, 0ms);
 }
-@keyframes tile-pulse {
-  0%, 100% { transform: scale(1); }
-  12%      { transform: scale(1.16); }
-  24%      { transform: scale(1); }
-  36%      { transform: scale(1.09); }
-  48%      { transform: scale(1); }
+@keyframes tile-trace {
+  0%   { stroke-dashoffset: -56; opacity: 1; }
+  55%  { stroke-dashoffset: 0; opacity: 1; }
+  82%  { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+.tile[data-module='bemmp']:hover .tile-icon { animation: tile-beat 1.6s linear infinite; }
+@keyframes tile-beat {
+  0%, 14%, 30%, 36%, 48%, 100% { box-shadow: 0 10px 22px -8px var(--glow); }
+  21% { box-shadow: 0 10px 24px -4px var(--glow), 0 0 0 5px rgba(13, 148, 136, 0.22); }
+  41% { box-shadow: 0 10px 22px -6px var(--glow), 0 0 0 3px rgba(13, 148, 136, 0.14); }
 }
 
-/* KPI — the clipboard gets ticked: a small nod, once, rather than a loop.
-   A target met is a thing that happens and is done. */
-.tile[data-module='kpi']:hover .tile-icon svg {
-  animation: tile-check 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+/* Revive Lab — the wrench turns the bolt twice, and settles: a repair made. */
+:is(.tile:hover, .tiles.arrive .tile)[data-module='revive'] .tile-icon svg {
+  transform-origin: 72% 28%;  /* the jaw, where the bolt is */
+  animation: tile-turn 820ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  animation-delay: var(--d, 0ms);
 }
-@keyframes tile-check {
-  0%   { transform: rotate(0) scale(1); }
-  35%  { transform: rotate(-7deg) scale(1.08); }
-  70%  { transform: rotate(4deg) scale(1.04); }
-  100% { transform: rotate(0) scale(1); }
+@keyframes tile-turn {
+  0%   { transform: rotate(0); }
+  20%  { transform: rotate(32deg); }
+  38%  { transform: rotate(0); }
+  58%  { transform: rotate(32deg); }
+  78%  { transform: rotate(-4deg); }
+  100% { transform: rotate(0); }
+}
+
+/* Travel Expense — the trip goes out and comes back: away along its
+   heading, quickening, then in again from behind, slowing to a stop. */
+.tile[data-module='travel'] .tile-icon { overflow: hidden; }
+:is(.tile:hover, .tiles.arrive .tile)[data-module='travel'] .tile-icon svg {
+  animation: tile-fly 900ms backwards;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes tile-fly {
+  0%     { transform: translate(0, 0); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.4); }
+  40%    { transform: translate(170%, -170%); }
+  40.01% { transform: translate(-170%, 170%); animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+  100%   { transform: translate(0, 0); }
+}
+
+/* My Task — the tasks are ticked, top to bottom, each line after its tick;
+   the middle one, still to do, is written but not ticked. */
+:is(.tile:hover, .tiles.arrive .tile)[data-module='tasks'] .tile-icon svg path {
+  stroke-dasharray: 10;
+  animation: tile-draw-10 300ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+}
+:is(.tile:hover, .tiles.arrive .tile)[data-module='tasks'] .tile-icon svg > path:nth-child(2) { animation-delay: calc(var(--d, 0ms) + 40ms); }   /* top tick */
+:is(.tile:hover, .tiles.arrive .tile)[data-module='tasks'] .tile-icon svg > path:nth-child(3) { animation-delay: calc(var(--d, 0ms) + 140ms); }  /* its line */
+:is(.tile:hover, .tiles.arrive .tile)[data-module='tasks'] .tile-icon svg > path:nth-child(4) { animation-delay: calc(var(--d, 0ms) + 240ms); }  /* still to do */
+:is(.tile:hover, .tiles.arrive .tile)[data-module='tasks'] .tile-icon svg > path:nth-child(1) { animation-delay: calc(var(--d, 0ms) + 340ms); }  /* bottom tick */
+:is(.tile:hover, .tiles.arrive .tile)[data-module='tasks'] .tile-icon svg > path:nth-child(5) { animation-delay: calc(var(--d, 0ms) + 440ms); }  /* its line */
+@keyframes tile-draw-10 { from { stroke-dashoffset: 11; opacity: 0; } 20% { opacity: 1; } to { stroke-dashoffset: 0; } }
+
+/* Arriving: the tiles rise in one after another, each icon playing once. */
+.tiles.arrive .tile {
+  animation: tile-in 520ms cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+@keyframes tile-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+/* Once on arrival, not on a loop: the scan and the trace go round once. */
+.tiles.arrive .tile[data-module='spare'] .tile-icon svg > :nth-child(n+4) { animation-iteration-count: 1; }
+.tiles.arrive .tile[data-module='bemmp'] .tile-icon svg path { animation-iteration-count: 1; }
+.tiles.arrive .tile[data-module='spare'] .tile-icon::after {
+  animation: tile-scan 1.5s cubic-bezier(0.65, 0, 0.35, 1) backwards;
+  animation-delay: var(--d, 0ms);
+}
+.tiles.arrive .tile[data-module='spare'] .tile-icon::before {
+  animation: tile-finder 1.5s cubic-bezier(0.23, 1, 0.32, 1) backwards;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes tile-finder {
+  0%   { opacity: 0; transform: scale(1.35); }
+  18%  { opacity: 1; transform: scale(1); }
+  82%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tile[data-module='spare']:hover .tile-icon::after,
-  .tile[data-module='bemmp']:hover .tile-icon svg,
-  .tile[data-module='kpi']:hover .tile-icon svg { animation: none; }
+  .tile,
+  .tile *,
+  .tile-icon::before,
+  .tile-icon::after { animation: none !important; }
+  .tile:hover .tile-icon::before { opacity: 0; }
 }
 
 /*

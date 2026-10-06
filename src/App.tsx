@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import Logo from './Logo'
 import Avatar from './Avatar'
 import ThemeToggle from './ThemeToggle'
@@ -24,6 +24,9 @@ import { supabase, ecodeToEmail, type Module } from './lib/supabase'
 const ICONS: Record<string, typeof ClipboardList> = {
   ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks,
 }
+
+/** Set once the tiles have arrived in this browser session, so they do not arrive again on every return. */
+const ARRIVED = 'cyrix.portal.arrived'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -221,6 +224,25 @@ function Portal() {
   const [failed, setFailed] = useState(false)
   /** A retry is in flight, so the button says so rather than doing nothing. */
   const [retrying, setRetrying] = useState(false)
+  /**
+   * The tiles rise in and each icon plays once — on the first visit of a
+   * browser session only. A phone has no pointer, so this is where it sees
+   * the motion at all; coming back from a module during the day, the tiles
+   * are simply there (index.css, "Each tile's icon does the thing its
+   * module does").
+   */
+  const [arriving, setArriving] = useState(() => {
+    try { return sessionStorage.getItem(ARRIVED) !== '1' } catch { return false }
+  })
+  useEffect(() => {
+    if (!arriving || !modules?.length) return
+    // The last tile's icon is done by about 1.6 s; then hover has the icons to itself.
+    const t = window.setTimeout(() => {
+      setArriving(false)
+      try { sessionStorage.setItem(ARRIVED, '1') } catch { /* not available: it plays again next time */ }
+    }, 2200)
+    return () => window.clearTimeout(t)
+  }, [arriving, modules])
 
   /**
    * The module list, asked for more than once before it is given up on.
@@ -338,7 +360,7 @@ function Portal() {
           onClick={() => {
             // Clear the once-per-session forward, or the next person to sign
             // in on this browser inherits a flag set for somebody else.
-            try { sessionStorage.removeItem('cyrix.portal.forwarded') } catch { /* not available */ }
+            try { sessionStorage.removeItem('cyrix.portal.forwarded'); sessionStorage.removeItem(ARRIVED) } catch { /* not available */ }
             supabase.auth.signOut()
           }}
           title="Sign out"
@@ -380,11 +402,11 @@ function Portal() {
         )}
 
         {modules && modules.length > 0 && (
-          <div className="tiles">
-            {modules.map(m => {
+          <div className={arriving ? 'tiles arrive' : 'tiles'}>
+            {modules.map((m, i) => {
               const Icon = (m.icon && ICONS[m.icon]) || LayoutGrid
               return (
-                <a key={m.code} className="tile" data-module={m.code} href={m.path}>
+                <a key={m.code} className="tile" data-module={m.code} href={m.path} style={{ '--i': i } as CSSProperties}>
                   <span className="tile-icon"><Icon size={22} /></span>
                   <span className="tile-body">
                     <span className="tile-name">{m.name}</span>
