@@ -82,7 +82,7 @@
       "destination": "https://cyrix-task.vercel.app/tasks/:path*"
     },
     {
-      "source": "/((?!assets/|favicon|sw\\.js).*)",
+      "source": "/((?!assets/|favicon|sw\\.js|manifest\\.webmanifest|icon-).*)",
       "destination": "/index.html"
     }
   ],

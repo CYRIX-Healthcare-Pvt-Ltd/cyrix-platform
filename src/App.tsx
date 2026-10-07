@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import Logo from './Logo'
 import Avatar from './Avatar'
 import ThemeToggle from './ThemeToggle'
+import InstallButton from './InstallButton'
 import ForgotPassword from './ForgotPassword'
 import type { Session } from '@supabase/supabase-js'
 import {
@@ -346,7 +347,7 @@ function Portal() {
         {/* Who is signed in, shown the same way every module shows it. The
             portal has no profile page of its own — the employee record
             lives in KPI — so this identifies rather than links, and the
-            name is hidden on a phone where the mark and three controls
+            name is hidden on a phone where the mark and the controls
             already fill the bar. */}
         {me && (
           <span className="who">
@@ -355,6 +356,7 @@ function Portal() {
           </span>
         )}
         <ThemeToggle />
+        <InstallButton />
         <button
           className="icon-btn"
           onClick={() => {
