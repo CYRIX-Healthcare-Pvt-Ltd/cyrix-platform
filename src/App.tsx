@@ -410,7 +410,7 @@ function Portal() {
             // Clear the once-per-session forward, or the next person to sign
             // in on this browser inherits a flag set for somebody else.
             try { sessionStorage.removeItem('cyrix.portal.forwarded'); sessionStorage.removeItem(ARRIVED) } catch { /* not available */ }
-            supabase.auth.signOut()
+            supabase.auth.signOut({ scope: 'local' }) /* this device only; Sign out from all devices is the code step's (0149) */
           }}
           title="Sign out"
         >
