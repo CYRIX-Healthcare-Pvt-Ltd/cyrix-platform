@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import Logo from './Logo'
 import Avatar from './Avatar'
 import ThemeToggle from './ThemeToggle'
@@ -52,6 +52,9 @@ export default function App() {
   const sid = sessionIdOf(session)
   const [device, setDevice] = useState<DeviceCheck | null>(null)
   const [round, setRound] = useState(0)
+  // The code screen already showing: a look must not remount it (each mount once mailed a code).
+  const pendingRef = useRef(false)
+  pendingRef.current = device?.state === 'pending'
   useEffect(() => {
     if (!sid) { setDevice(null); return }
     let alive = true
@@ -74,7 +77,7 @@ export default function App() {
       sessionState()
         .then(s => {
           if (s === 'revoked') void supabase.auth.signOut({ scope: 'local' })
-          else if (s === 'pending') setRound(r => r + 1)
+          else if (s === 'pending' && pendingRef.current === false) setRound(r => r + 1)
         })
         .catch(() => { /* offline: look again next minute */ })
     }

@@ -12,6 +12,15 @@ import { requestDeviceCode, submitDeviceCode } from './lib/passwordOtp'
  * every other sign-in and keeps this one. No email on record: no code can
  * be sent, and IT or HR adds one.
  */
+const GAP = 60_000
+const KEY = 'cyrix.deviceCodeAt'
+function lastSent(): number {
+  try { return Number(sessionStorage.getItem(KEY)) || 0 } catch { return 0 }
+}
+function markSent() {
+  try { sessionStorage.setItem(KEY, String(Date.now())) } catch { /* private mode */ }
+}
+
 export default function DeviceGate({ others, emailHint, onDone }: {
   others: number
   emailHint: string | null
@@ -22,9 +31,18 @@ export default function DeviceGate({ others, emailHint, onDone }: {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'send' | 'keep' | 'signout' | null>(null)
   const asked = useRef(false)
+  const [wait, setWait] = useState(() => Math.max(0, Math.ceil((lastSent() + GAP - Date.now()) / 1000)))
+
+  useEffect(() => {
+    if (wait <= 0) return
+    const t = setTimeout(() => setWait(Math.max(0, Math.ceil((lastSent() + GAP - Date.now()) / 1000))), 1000)
+    return () => clearTimeout(t)
+  }, [wait])
 
   const send = async () => {
     setBusy('send'); setError(null)
+    markSent()
+    setWait(GAP / 1000)
     const r = await requestDeviceCode()
     setBusy(null)
     if (r.ok) setSent(`A code was sent to ${emailHint}.`)
@@ -32,8 +50,13 @@ export default function DeviceGate({ others, emailHint, onDone }: {
   }
 
   useEffect(() => {
-    if (emailHint && !asked.current) { asked.current = true; void send() }
-    // Once, on arriving here.
+    // Once per sign-in: a remount (tab switch, the minute look) finds the
+    // earlier send in sessionStorage and does not mail another code.
+    if (emailHint && !asked.current) {
+      asked.current = true
+      if (Date.now() - lastSent() < 10 * 60_000) setSent(`A code was sent to ${emailHint}.`)
+      else void send()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -90,8 +113,8 @@ export default function DeviceGate({ others, emailHint, onDone }: {
                 <button type="button" className="secondary-btn" disabled={!ready} onClick={() => void go('signout')}>
                   {busy === 'signout' && <Loader2 className="spin" size={15} />} Sign out from all devices and log in
                 </button>
-                <button type="button" className="quiet-link" disabled={!!busy} onClick={() => void send()}>
-                  {busy === 'send' ? 'Sending…' : 'Send a new code'}
+                <button type="button" className="quiet-link" disabled={!!busy || wait > 0} onClick={() => void send()}>
+                  {busy === 'send' ? 'Sending…' : wait > 0 ? `Send a new code in ${wait}s` : 'Send a new code'}
                 </button>
               </>
             )}
