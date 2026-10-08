@@ -4,6 +4,8 @@ import Avatar from './Avatar'
 import ThemeToggle from './ThemeToggle'
 import InstallButton from './InstallButton'
 import ForgotPassword from './ForgotPassword'
+import DeviceGate from './DeviceGate'
+import { deviceCheck, sessionIdOf, sessionState, type DeviceCheck } from './lib/session'
 import type { Session } from '@supabase/supabase-js'
 import {
   ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, LayoutGrid, LogOut, ArrowRight, Loader2,
@@ -42,8 +44,53 @@ export default function App() {
     return () => sub.subscription.unsubscribe()
   }, [])
 
+  /*
+    Already signed in on another device (0149; the user, 8 Oct): this one
+    waits for the code mailed to the person. Asked once per sign-in, and
+    again whenever the minute's look below says so.
+  */
+  const sid = sessionIdOf(session)
+  const [device, setDevice] = useState<DeviceCheck | null>(null)
+  const [round, setRound] = useState(0)
+  useEffect(() => {
+    if (!sid) { setDevice(null); return }
+    let alive = true
+    setDevice(null)
+    deviceCheck()
+      .then(d => {
+        if (!alive) return
+        if (d.state === 'revoked') void supabase.auth.signOut({ scope: 'local' })
+        else setDevice(d)
+      })
+      // A check that cannot be made does not lock anybody out of every tool.
+      .catch(() => { if (alive) setDevice({ state: 'ok' }) })
+    return () => { alive = false }
+  }, [sid, round])
+
+  // Each minute and on coming back: "sign out from all devices" elsewhere ends this one within a minute.
+  useEffect(() => {
+    if (!sid) return
+    const look = () => {
+      sessionState()
+        .then(s => {
+          if (s === 'revoked') void supabase.auth.signOut({ scope: 'local' })
+          else if (s === 'pending') setRound(r => r + 1)
+        })
+        .catch(() => { /* offline: look again next minute */ })
+    }
+    const timer = window.setInterval(look, 60_000)
+    const back = () => { if (document.visibilityState === 'visible') look() }
+    document.addEventListener('visibilitychange', back)
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', back) }
+  }, [sid])
+
   if (!ready) return <Splash />
-  return session ? <Portal /> : <SignIn />
+  if (!session) return <SignIn />
+  if (!device) return <Splash />
+  if (device.state === 'pending') {
+    return <DeviceGate others={device.others} emailHint={device.email_hint} onDone={() => setDevice({ state: 'ok' })} />
+  }
+  return <Portal />
 }
 
 function Splash() {
@@ -322,7 +369,7 @@ function Portal() {
         .select('role').eq('employee_id', me.data.id)
       if (!alive) return
       const isAdmin = (roles.data ?? []).some(
-        r => r.role === 'hr_admin' || r.role === 'sw_admin')
+        r => r.role === 'hr_admin' || r.role === 'sw_admin' || r.role === 'it_admin')
       if (!isAdmin) return
 
       try {

@@ -93,3 +93,11 @@ export const submitOtp = (args: {
     code: args.code,
     password: args.password,
   })
+
+/** A sign-in on a second device (0149): the code goes to the address on record. */
+export const requestDeviceCode = (): Promise<OtpReply> =>
+  call({ action: 'request', purpose: 'device' })
+
+/** The code, and which way in: keep the other devices, or sign them all out. */
+export const submitDeviceCode = (args: { code: string; choice: 'keep' | 'signout_others' }): Promise<OtpReply> =>
+  call({ action: 'device_submit', purpose: 'device', code: args.code, choice: args.choice })

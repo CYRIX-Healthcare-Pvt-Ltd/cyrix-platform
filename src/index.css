@@ -222,6 +222,17 @@ body {
 .primary:hover:not(:disabled) { background: var(--red-600); }
 .primary:disabled { opacity: 0.6; cursor: default; }
 
+/* The second way in, beside .primary: the same shape, drawn in outline (0149). */
+.secondary-btn {
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  width: 100%; padding: 0.95rem; font: inherit; font-size: 0.72rem;
+  font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--ink-950); background: transparent; border: 1px solid var(--ink-950); cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+.secondary-btn:hover:not(:disabled) { color: var(--red-600); border-color: var(--red-600); }
+.secondary-btn:disabled { opacity: 0.45; cursor: default; }
+
 /* An <a> on the sign-in and a <button> in the recovery flow — the same
    control either way, so the button is stripped back to the anchor
    rather than given a look of its own. */
