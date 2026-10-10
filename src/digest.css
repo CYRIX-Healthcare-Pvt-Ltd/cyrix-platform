@@ -237,6 +237,27 @@
 .digest-sheet .digest-list { padding: 1rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px)); margin: 0; }
 .digest-row:hover { border-color: var(--hue); background: var(--soft); }
 
+/* ---- a post with a picture: the picture whole, the words beside it (desktop) or under it (phone) ---- */
+.digest-sheet.wide { max-width: min(72rem, 96vw); }
+.digest-split { display: flex; flex-direction: column; }
+.digest-split-img { display: flex; align-items: center; justify-content: center; background: #0b0d10; cursor: zoom-in; }
+.digest-split-img img { display: block; width: 100%; height: auto; }
+.digest-split-side { min-width: 0; display: flex; flex-direction: column; }
+.digest-split-head { padding: 1.2rem 1.4rem 0.2rem; display: grid; gap: 0.35rem; }
+.digest-split-head h2 { margin: 0.15rem 0 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.25; color: var(--ink-950); text-wrap: balance; }
+.digest-split-head p { margin: 0; font-size: 0.82rem; color: var(--ink-500); }
+.digest-split-kind { justify-self: start; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.7rem; border-radius: 99px;
+  background: var(--grad); color: #fff; font-size: 0.75rem; font-weight: 700; }
+@media (min-width: 860px) {
+  .digest-sheet.wide { overflow: hidden !important; }
+  .digest-split { flex-direction: row; height: min(88vh, 56rem); }
+  .digest-split-img { flex: 1 1 58%; min-width: 0; overflow: hidden; }
+  .digest-split-img img { width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; }
+  .digest-split-side { flex: 1 1 42%; overflow-y: auto; border-left: 1px solid var(--ink-200); }
+  .digest-split-head { padding-top: 1.5rem; }
+  .digest-split-head h2 { padding-right: 2.2rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .digest *, .digest *::before, .digest *::after { animation: none !important; transition: none !important; }
 }

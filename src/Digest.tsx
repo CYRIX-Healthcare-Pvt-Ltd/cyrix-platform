@@ -141,7 +141,8 @@ export default function Digest() {
     }, 1500)
     const { next, rest } = pick(rows)
     const shown = [...(next ? [next] : []), ...rest]
-    if (shown.length) void supabase.rpc('digest_seen', { p_ids: shown.map(r => r.id) })
+    // .then(): a Supabase call is only sent once something asks for its answer.
+    if (shown.length) void supabase.rpc('digest_seen', { p_ids: shown.map(r => r.id) }).then(() => {}, () => {})
   }, [])
   useEffect(() => { void load() }, [load])
 
@@ -365,7 +366,7 @@ function PollCard({ p, onOpen }: { p: Post; onOpen: (p: Post) => void }) {
   )
 }
 
-function Sheet({ label, onClose, children }: { label: string; onClose: () => void; children: React.ReactNode }) {
+function Sheet({ label, onClose, children, wide }: { label: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', esc)
@@ -373,7 +374,7 @@ function Sheet({ label, onClose, children }: { label: string; onClose: () => voi
   }, [onClose])
   return (
     <div className="sheet-shade" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="sheet digest-sheet" role="dialog" aria-modal="true" aria-label={label}>
+      <div className={wide ? 'sheet digest-sheet wide' : 'sheet digest-sheet'} role="dialog" aria-modal="true" aria-label={label}>
         <button type="button" className="digest-sheet-close" onClick={onClose} title="Close"><X size={18} /><span className="sr">Close</span></button>
         {children}
       </div>
@@ -385,7 +386,7 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
   const [comments, setComments] = useState<Comment[] | null>(null)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
-  useEffect(() => { void supabase.rpc('digest_opened', { p_id: p.id }) }, [p.id])
+  useEffect(() => { void supabase.rpc('digest_opened', { p_id: p.id }).then(() => {}, () => {}) }, [p.id])
   const load = useCallback(async () => {
     const { data } = await supabase.rpc('digest_comments_for', { p_id: p.id })
     setComments((data ?? []) as Comment[])
@@ -402,17 +403,7 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
   const remove = async (id: string) => { await supabase.rpc('digest_delete_comment', { p_id: id }); void load() }
   const kind = p.kind === 'meeting' ? 'Meeting' : p.kind === 'poll' ? 'Poll' : 'News'
   const place = where(p)
-
-  return (
-    <Sheet label={p.title} onClose={onClose}>
-      {/* Filled, in the post's own colour (the user, 10 Oct: "make it awesome and filled"). */}
-      <div className={p.image_url ? 'digest-sheet-hero photo' : 'digest-sheet-hero'} style={{ background: cover(p) }}>
-        {!p.image_url && <span className="digest-sheet-art" aria-hidden><KindIcon p={p} size={120} /></span>}
-        <span className="digest-sheet-kind"><KindIcon p={p} size={14} /> {kind}</span>
-        <h2>{p.title}</h2>
-        <p>{desk(p)} · {ago(p.created_at)}</p>
-      </div>
-
+  const body = (
       <div className="digest-sheet-body" style={tint(p.color)}>
         {p.kind === 'meeting' && (
           <div className="digest-sheet-meet">
@@ -448,6 +439,40 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
           </div>
         </div>
       </div>
+  )
+
+  return (
+    <Sheet label={p.title} onClose={onClose} wide={!!p.image_url}>
+      {p.image_url ? (
+        /* A picture is shown whole, never cropped under the title (the user, 10 Oct: "I posted a long
+           pic"): on a desktop the picture left and the words right, on a phone the picture first. */
+        <div className="digest-split">
+          <a className="digest-split-img" href={p.image_url} target="_blank" rel="noreferrer" title="Open the full picture">
+            <img src={p.image_url} alt={p.title} />
+          </a>
+          <div className="digest-split-side">
+            <div className="digest-split-head" style={tint(p.color)}>
+              <span className="digest-split-kind"><KindIcon p={p} size={14} /> {kind}</span>
+              <h2>{p.title}</h2>
+              <p>{desk(p)} · {ago(p.created_at)}</p>
+            </div>
+            {body}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Filled, in the post's own colour (the user, 10 Oct: "make it awesome and filled"). */}
+          <div className="digest-sheet-hero" style={{ background: cover(p) }}>
+            <span className="digest-sheet-art" aria-hidden><KindIcon p={p} size={120} /></span>
+            <span className="digest-sheet-kind"><KindIcon p={p} size={14} /> {kind}</span>
+            <h2>{p.title}</h2>
+            <p>{desk(p)} · {ago(p.created_at)}</p>
+          </div>
+          {body}
+        </>
+      )}
     </Sheet>
   )
 }
+
+
