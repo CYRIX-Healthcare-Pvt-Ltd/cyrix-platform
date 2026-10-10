@@ -15,7 +15,7 @@ import {
  * already, and where the browser cannot install at all: a dead button is
  * worse than none.
  */
-const useRoute = (): InstallRoute => {
+export const useRoute = (): InstallRoute => {
   const [, bump] = useState(0)
   useEffect(() => subscribeToInstallability(() => bump(n => n + 1)), [])
   return installRoute({
@@ -53,7 +53,7 @@ export default function InstallButton() {
 }
 
 /** Where the browser's own install lives, for the browsers that give no button. */
-function Steps({ ios, onClose }: { ios: boolean; onClose: () => void }) {
+export function Steps({ ios, onClose }: { ios: boolean; onClose: () => void }) {
   const close = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     close.current?.focus()

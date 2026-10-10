@@ -3,6 +3,8 @@ import Logo from './Logo'
 import Avatar from './Avatar'
 import ThemeToggle from './ThemeToggle'
 import InstallButton from './InstallButton'
+import NotifyCard from './NotifyCard'
+import { dropPush } from './lib/push'
 import ForgotPassword from './ForgotPassword'
 import DeviceGate from './DeviceGate'
 import { deviceCheck, sessionIdOf, sessionState, type DeviceCheck } from './lib/session'
@@ -413,7 +415,9 @@ function Portal() {
             // Clear the once-per-session forward, or the next person to sign
             // in on this browser inherits a flag set for somebody else.
             try { sessionStorage.removeItem('cyrix.portal.forwarded'); sessionStorage.removeItem(ARRIVED) } catch { /* not available */ }
-            supabase.auth.signOut({ scope: 'local' }) /* this device only; Sign out from all devices is the code step's (0149) */
+            // This device stops receiving their notifications (KPI 0154).
+            void dropPush(supabase).finally(() =>
+              supabase.auth.signOut({ scope: 'local' }) /* this device only; Sign out from all devices is the code step's (0149) */)
           }}
           title="Sign out"
         >
@@ -430,6 +434,8 @@ function Portal() {
             the page actually raises — why this person sees three tiles and
             the colleague beside them sees one. */}
         <p className="sub">The modules assigned to you.</p>
+
+        {me && <NotifyCard />}
 
         {modules === null && !failed && (
           <div className="tiles">

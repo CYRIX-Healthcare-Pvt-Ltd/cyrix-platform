@@ -82,7 +82,7 @@
       "destination": "https://cyrix-task.vercel.app/tasks/:path*"
     },
     {
-      "source": "/((?!assets/|favicon|sw\\.js|manifest\\.webmanifest|icon-).*)",
+      "source": "/((?!assets/|favicon|sw\\.js|push-sw\\.js|manifest\\.webmanifest|icon-).*)",
       "destination": "/index.html"
     }
   ],
@@ -101,6 +101,19 @@
         {
           "key": "Strict-Transport-Security",
           "value": "max-age=63072000; includeSubDomains; preload"
+        }
+      ]
+    },
+    {
+      "source": "/push-sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Content-Type",
+          "value": "text/javascript; charset=utf-8"
         }
       ]
     },
