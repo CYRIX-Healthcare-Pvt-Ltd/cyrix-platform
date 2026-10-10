@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import {
   Heart, MessageCircle, Megaphone, Newspaper, Send, Trash2, Video, X, MapPin, Clock, ChevronRight, BarChart3, Check,
+  TriangleAlert, Pin, Briefcase, CalendarClock,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import './digest.css'
@@ -16,10 +17,17 @@ import './digest.css'
  * counts as opened (0166).
  */
 export interface Post {
-  id: string; kind: 'news' | 'meeting' | 'poll'; title: string; body: string; image_url: string | null; color: Hue
+  id: string; kind: Kind; title: string; body: string; image_url: string | null; color: Hue
   meet_at: string | null; meet_minutes: number | null; meet_link: string | null; meet_place: string | null
   posted_as: 'hr' | 'it' | 'mkt'; author: string | null; created_at: string
   likes: number; liked: boolean; comments: number
+  /** A vacancy (0170): where, apply by, and how to apply. */
+  vac_location: string | null; apply_by: string | null; apply_link: string | null
+}
+/** Every kind of post (0170; the user: "announcement, alerts, notice, vacancy"). */
+type Kind = 'news' | 'announcement' | 'alert' | 'notice' | 'vacancy' | 'meeting' | 'poll'
+const KIND_WORD: Record<Kind, string> = {
+  news: 'News', announcement: 'Announcement', alert: 'Alert', notice: 'Notice', vacancy: 'Vacancy', meeting: 'Meeting', poll: 'Poll',
 }
 /** One of the named colours, or any colour as #rrggbb (0168). */
 type Hue = string
@@ -70,8 +78,13 @@ const where = (p: Post) => {
   const l = (p.meet_link ?? '').toLowerCase()
   return l.includes('meet.google') ? 'Google Meet' : l.includes('teams.') ? 'Microsoft Teams' : l.includes('zoom.') ? 'Zoom' : null
 }
-const KindIcon = ({ p, size = 18 }: { p: Post; size?: number }) =>
-  p.kind === 'meeting' ? <Video size={size} /> : p.kind === 'poll' ? <BarChart3 size={size} /> : <Newspaper size={size} />
+const KindIcon = ({ p, size = 18 }: { p: Post; size?: number }) => {
+  const I = { news: Newspaper, announcement: Megaphone, alert: TriangleAlert, notice: Pin, vacancy: Briefcase, meeting: Video, poll: BarChart3 }[p.kind] ?? Newspaper
+  return <I size={size} />
+}
+/** How to apply: an email address becomes an email; anything else is a link. */
+const applyHref = (l: string) => (/^mailto:/i.test(l) ? l : /@/.test(l) && !/^https?:/i.test(l) ? `mailto:${l}` : l)
+const shortDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 
 /** What the home page shows: the next meeting, then the newest, enough to fill the rows. */
 function pick(posts: Post[]) {
@@ -79,7 +92,11 @@ function pick(posts: Post[]) {
   const next = posts
     .filter(p => p.kind === 'meeting' && new Date(p.meet_at!).getTime() + (p.meet_minutes ?? 60) * 60000 > now)
     .sort((a, b) => a.meet_at!.localeCompare(b.meet_at!))[0]
-  const rest = posts.filter(p => p.kind !== 'meeting').slice(0, next ? 4 : 6)
+  // An alert from the last week goes first, then the newest.
+  const week = now - 7 * 864e5
+  const isAlert = (p: Post) => p.kind === 'alert' && new Date(p.created_at).getTime() > week
+  const others = posts.filter(p => p.kind !== 'meeting')
+  const rest = [...others.filter(isAlert), ...others.filter(p => !isAlert(p))].slice(0, next ? 4 : 6)
   return { next, rest }
 }
 
@@ -209,9 +226,9 @@ export default function Digest() {
                   <strong>{p.title}</strong>
                   <span>{p.kind === 'meeting'
                     ? `Meeting · ${new Date(p.meet_at!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
-                    : `${p.kind === 'poll' ? 'Poll' : 'News'} · ${desk(p)} · ${ago(p.created_at)}`}</span>
+                    : `${KIND_WORD[p.kind]} · ${desk(p)} · ${ago(p.created_at)}`}</span>
                 </span>
-                {p.kind === 'news' && <span className="digest-row-n"><Heart size={13} /> {p.likes}</span>}
+                {p.kind !== 'meeting' && p.kind !== 'poll' && <span className="digest-row-n"><Heart size={13} /> {p.likes}</span>}
               </button>
             ))}
           </div>
@@ -253,13 +270,20 @@ function MeetingCard({ p, onJoin, onOpen }: { p: Post; onJoin: (p: Post) => void
 
 function NewsCard({ p, onLike, onOpen }: { p: Post; onLike: (p: Post) => void; onOpen: (p: Post) => void }) {
   return (
-    <article className="digest-news" style={tint(p.color)}>
+    <article className={p.kind === 'alert' ? 'digest-news alert' : 'digest-news'} style={tint(p.color)}>
       <button type="button" className="digest-cover" onClick={() => onOpen(p)} style={{ background: cover(p) }} aria-label={p.title}>
-        {!p.image_url && <span className="digest-cover-art" aria-hidden><Newspaper size={38} /><i /><i /><i /></span>}
+        {!p.image_url && <span className="digest-cover-art" aria-hidden><KindIcon p={p} size={38} /><i /><i /><i /></span>}
         <span className="digest-chip">{desk(p)}</span>
+        {p.kind !== 'news' && <span className="digest-kind"><KindIcon p={p} size={13} /> {KIND_WORD[p.kind]}</span>}
       </button>
       <div className="digest-news-body">
         <button type="button" className="digest-news-title" onClick={() => onOpen(p)}>{p.title}</button>
+        {p.kind === 'vacancy' && (p.vac_location || p.apply_by) && (
+          <p className="digest-vac">
+            {p.vac_location && <span><MapPin size={13} /> {p.vac_location}</span>}
+            {p.apply_by && <span><CalendarClock size={13} /> Apply by {shortDate(p.apply_by)}</span>}
+          </p>
+        )}
         {p.body && <p>{p.body}</p>}
         <div className="digest-news-foot">
           <button type="button" className={p.liked ? 'digest-like on' : 'digest-like'} onClick={() => onLike(p)} aria-pressed={p.liked}>
@@ -401,7 +425,7 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
     if (!error) { setText(''); void load() }
   }
   const remove = async (id: string) => { await supabase.rpc('digest_delete_comment', { p_id: id }); void load() }
-  const kind = p.kind === 'meeting' ? 'Meeting' : p.kind === 'poll' ? 'Poll' : 'News'
+  const kind = KIND_WORD[p.kind]
   const place = where(p)
   const body = (
       <div className="digest-sheet-body" style={tint(p.color)}>
@@ -412,9 +436,18 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
             <button type="button" className="digest-sheet-btn" onClick={() => onJoin(p)}><Video size={16} /> Join meeting</button>
           </div>
         )}
+        {p.kind === 'vacancy' && (
+          <div className="digest-sheet-meet">
+            {p.vac_location && <span><MapPin size={15} /> {p.vac_location}</span>}
+            {p.apply_by && <span><CalendarClock size={15} /> Apply by {new Date(p.apply_by).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
+            {p.apply_link && (
+              <a className="digest-sheet-btn" href={applyHref(p.apply_link)} target="_blank" rel="noreferrer"><Briefcase size={16} /> Apply</a>
+            )}
+          </div>
+        )}
         {p.body && <p className="digest-panel-body">{p.body}</p>}
         {p.kind === 'poll' && <PollBody p={p} />}
-        {p.kind === 'news' && (
+        {p.kind !== 'meeting' && p.kind !== 'poll' && (
           <button type="button" className={p.liked ? 'digest-bigheart on' : 'digest-bigheart'} onClick={() => onLike(p)} aria-pressed={p.liked}>
             <Heart size={18} fill={p.liked ? 'currentColor' : 'none'} /> {p.likes} {p.likes === 1 ? 'like' : 'likes'}
           </button>

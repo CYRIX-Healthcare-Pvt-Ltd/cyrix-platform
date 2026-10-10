@@ -39,11 +39,17 @@ export default function App() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    // Signed out — from here, from inside a module, or after 3 idle hours — the next sign-in is
+    // a fresh one, so an administrator is forwarded to their page again (the user, 10 Oct).
+    const forget = (s: Session | null) => {
+      if (!s) { try { sessionStorage.removeItem('cyrix.portal.forwarded') } catch { /* not available */ } }
+    }
     supabase.auth.getSession().then(({ data }) => {
+      forget(data.session)
       setSession(data.session)
       setReady(true)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => { forget(s); setSession(s) })
     return () => sub.subscription.unsubscribe()
   }, [])
 
@@ -275,6 +281,8 @@ function Portal() {
   const [modules, setModules] = useState<Module[] | null>(null)
   /** Name and photo together: the header shows both, the greeting one. */
   const [me, setMe] = useState<{ full_name: string; avatar: string | null } | null>(null)
+  /** HR, SW, IT and Marketing admin logins: no Cyrix Digest on their home page (the user, 10 Oct). */
+  const [adminLogin, setAdminLogin] = useState<boolean | null>(null)
   const [failed, setFailed] = useState(false)
   /** A retry is in flight, so the button says so rather than doing nothing. */
   const [retrying, setRetrying] = useState(false)
@@ -370,13 +378,14 @@ function Portal() {
        * would make it a button that appears to do nothing. Coming back
        * deliberately shows the tiles; signing in fresh does not stop here.
        */
-      if (!me.data?.id) return
+      if (!me.data?.id) { setAdminLogin(false); return }
       const roles = await supabase.from('user_roles')
         .select('role').eq('employee_id', me.data.id)
       if (!alive) return
       const isAdmin = (roles.data ?? []).some(
         // Marketing too (KPI 0164): its whole KPI is the Cyrix Digest page.
         r => r.role === 'hr_admin' || r.role === 'sw_admin' || r.role === 'it_admin' || r.role === 'mkt_admin')
+      setAdminLogin(isAdmin)
       if (!isAdmin) return
 
       try {
@@ -436,7 +445,7 @@ function Portal() {
             the page actually raises — why this person sees three tiles and
             the colleague beside them sees one. */}
         <p className="sub">The modules assigned to you.</p>
-        {me && <DigestTeaser />}
+        {me && adminLogin === false && <DigestTeaser />}
 
         {me && <NotifyCard />}
 
@@ -481,7 +490,7 @@ function Portal() {
         )}
 
         {/* Company news and meetings, under the tiles (KPI 0163). */}
-        {me && <Digest />}
+        {me && adminLogin === false && <Digest />}
       </main>
     </div>
   )

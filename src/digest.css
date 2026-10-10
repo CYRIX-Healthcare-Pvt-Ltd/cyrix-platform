@@ -258,6 +258,16 @@
   .digest-split-head h2 { padding-right: 2.2rem; }
 }
 
+/* ---- kinds (0170): the badge on the cover, the alert's edge, the vacancy's where and when ---- */
+.digest-kind { position: absolute !important; top: 0.7rem; right: 0.7rem; display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.22rem 0.6rem; border-radius: 99px;
+  background: rgb(0 0 0 / 0.35); color: #fff; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.02em; backdrop-filter: blur(4px); }
+.digest-news.alert { border: 2px solid #e11d48; animation: digest-alert 2.2s ease-in-out infinite; }
+.digest-news.alert .digest-kind { background: #e11d48; }
+@keyframes digest-alert { 0%, 100% { box-shadow: 0 0 0 0 rgb(225 29 72 / 0.45); } 50% { box-shadow: 0 0 0 6px rgb(225 29 72 / 0); } }
+.digest-vac { display: flex !important; flex-wrap: wrap; gap: 0.35rem 0.9rem; font-size: 0.8rem !important; color: var(--hue) !important; font-weight: 600; -webkit-line-clamp: unset !important; }
+.digest-vac span { display: inline-flex; align-items: center; gap: 0.3rem; }
+a.digest-sheet-btn { text-decoration: none; }
+
 @media (prefers-reduced-motion: reduce) {
   .digest *, .digest *::before, .digest *::after { animation: none !important; transition: none !important; }
 }
