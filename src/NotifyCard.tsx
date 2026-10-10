@@ -31,11 +31,17 @@ export default function NotifyCard() {
     || Number(get(localStorage, LATER) ?? 0) > Date.now()
     || get(sessionStorage, SHOWN) === '1')
 
+  // Not while SW Admin has device notifications switched off (KPI 0161).
+  const [pushOn, setPushOn] = useState<boolean | null>(null)
+  useEffect(() => {
+    void supabase.from('app_settings').select('value').eq('key', 'push_enabled').maybeSingle()
+      .then(({ data }) => setPushOn(data?.value !== false), () => setPushOn(true))
+  }, [])
   // Wherever it is already allowed, keep this device on for whoever is signed in.
-  useEffect(() => { void syncPush(supabase).catch(() => {}) }, [])
+  useEffect(() => { if (pushOn) void syncPush(supabase).catch(() => {}) }, [pushOn])
 
   const canInstall = route === 'prompt' || route === 'ios' || route === 'desktop-manual'
-  const show = !closed && (push === 'ask' || push === 'install-first' || canInstall)
+  const show = pushOn === true && !closed && (push === 'ask' || push === 'install-first' || canInstall)
   useEffect(() => { if (show) put(sessionStorage, SHOWN, '1') }, [show])
   if (!show) return null
 
