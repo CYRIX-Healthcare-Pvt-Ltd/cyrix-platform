@@ -4,6 +4,7 @@ import Avatar from './Avatar'
 import ThemeToggle from './ThemeToggle'
 import InstallButton from './InstallButton'
 import NotifyCard from './NotifyCard'
+import Digest, { DigestTeaser } from './Digest'
 import { dropPush } from './lib/push'
 import ForgotPassword from './ForgotPassword'
 import DeviceGate from './DeviceGate'
@@ -374,7 +375,8 @@ function Portal() {
         .select('role').eq('employee_id', me.data.id)
       if (!alive) return
       const isAdmin = (roles.data ?? []).some(
-        r => r.role === 'hr_admin' || r.role === 'sw_admin' || r.role === 'it_admin')
+        // Marketing too (KPI 0164): its whole KPI is the Cyrix Digest page.
+        r => r.role === 'hr_admin' || r.role === 'sw_admin' || r.role === 'it_admin' || r.role === 'mkt_admin')
       if (!isAdmin) return
 
       try {
@@ -434,6 +436,7 @@ function Portal() {
             the page actually raises — why this person sees three tiles and
             the colleague beside them sees one. */}
         <p className="sub">The modules assigned to you.</p>
+        {me && <DigestTeaser />}
 
         {me && <NotifyCard />}
 
@@ -476,6 +479,9 @@ function Portal() {
             })}
           </div>
         )}
+
+        {/* Company news and meetings, under the tiles (KPI 0163). */}
+        {me && <Digest />}
       </main>
     </div>
   )
