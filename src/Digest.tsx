@@ -65,10 +65,37 @@ const ago = (iso: string) => {
   const d = Math.round(h / 24)
   return d < 30 ? `${d} day${d === 1 ? '' : 's'} ago` : new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
+/** Join opens this long before a meeting starts (the user, 12 Oct: "15 mins before start only enable it"). */
+const JOIN_EARLY_MS = 15 * 60_000
+
+/** The clock, on the half minute, so a Join button opens on time without a reload. */
+function useNow(ms = 30_000) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => { const t = window.setInterval(() => setNow(Date.now()), ms); return () => window.clearInterval(t) }, [ms])
+  return now
+}
+
+/** Join, open from 15 minutes before the start until the end; before that it says when it opens. */
+function JoinButton({ p, onJoin, className }: { p: Post; onJoin: (p: Post) => void; className: string }) {
+  const now = useNow()
+  const start = new Date(p.meet_at!).getTime()
+  const opens = start - JOIN_EARLY_MS
+  const end = start + (p.meet_minutes ?? 60) * 60_000
+  if (now >= end) return null
+  if (now < opens) {
+    const at = new Date(opens)
+    const sameDay = at.toDateString() === new Date(now).toDateString()
+    const label = at.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase()
+      + (sameDay ? '' : ', ' + at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))
+    return <button type="button" className={className} disabled><Clock size={16} /> Join opens at {label}</button>
+  }
+  return <button type="button" className={className} onClick={() => onJoin(p)}><Video size={16} /> Join meeting</button>
+}
+
 const when = (p: Post) => {
   const s = new Date(p.meet_at!)
   const e = new Date(s.getTime() + (p.meet_minutes ?? 60) * 60000)
-  const t = (d: Date) => d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+  const t = (d: Date) => d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase()
   return `${s.toLocaleDateString('en-GB', { weekday: 'short' })} · ${t(s)} – ${t(e)}`
 }
 const desk = (p: Post) => (p.posted_as === 'it' ? 'IT' : p.posted_as === 'mkt' ? 'Marketing' : 'HR')
@@ -262,7 +289,7 @@ function MeetingCard({ p, onJoin, onOpen }: { p: Post; onJoin: (p: Post) => void
       </button>
       {p.body && <p className="digest-meeting-body">{p.body}</p>}
       <div className="digest-meeting-actions">
-        <button type="button" className="digest-join" onClick={() => onJoin(p)}><Video size={16} /> Join meeting</button>
+        <JoinButton p={p} onJoin={onJoin} className="digest-join" />
       </div>
     </article>
   )
@@ -433,7 +460,7 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
           <div className="digest-sheet-meet">
             <span><Clock size={15} /> {new Date(p.meet_at!).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })} · {when(p)}</span>
             {place && <span><MapPin size={15} /> {place}</span>}
-            <button type="button" className="digest-sheet-btn" onClick={() => onJoin(p)}><Video size={16} /> Join meeting</button>
+            <JoinButton p={p} onJoin={onJoin} className="digest-sheet-btn" />
           </div>
         )}
         {p.kind === 'vacancy' && (
