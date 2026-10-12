@@ -278,7 +278,9 @@ function MeetingCard({ p, onJoin, onOpen }: { p: Post; onJoin: (p: Post) => void
   const d = new Date(p.meet_at!)
   const place = where(p)
   return (
-    <article className="digest-meeting" style={{ background: grad(p.color) }}>
+    // The whole card opens the post, the words under the title too (the user, 12 Oct); Join keeps its own job.
+    <article className="digest-meeting" style={{ background: grad(p.color) }}
+      onClick={e => { if (!(e.target as HTMLElement).closest('button, a')) onOpen(p) }}>
       <div className="digest-meeting-top">
         <span className="digest-badge"><Megaphone size={13} /> Upcoming meeting</span>
         <span className="digest-by">{desk(p)}</span>

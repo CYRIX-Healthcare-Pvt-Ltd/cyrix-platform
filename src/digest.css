@@ -328,3 +328,8 @@ a.digest-sheet-btn { text-decoration: none; }
 .digest-form-a { display: flex; justify-content: space-between; gap: 1rem; padding: 0.45rem 0; border-top: 1px solid var(--ink-200); font-size: 0.875rem; }
 .digest-form-a span { color: var(--ink-500); }
 .digest-form-a strong { color: var(--ink-900); text-align: right; font-weight: 600; }
+
+/* The whole meeting card opens the post (KPI 12 Oct): it says so under the pointer. */
+.digest-meeting { cursor: pointer; }
+.digest-meeting-body { transition: opacity 160ms ease; }
+.digest-meeting:hover .digest-meeting-body { opacity: 0.85; }
