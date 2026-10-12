@@ -1,4 +1,5 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { supabase } from './lib/supabase'
 import { Loader2, Eye, EyeOff } from 'lucide-react'
 import { requestOtp, submitOtp } from './lib/passwordOtp'
 import { emailFeedback, isOfficialEmail, OFFICIAL_DOMAIN } from './lib/officialEmail'
@@ -27,6 +28,20 @@ import { emailFeedback, isOfficialEmail, OFFICIAL_DOMAIN } from './lib/officialE
 export default function ForgotPassword({ onBack }: { onBack: (ecode?: string) => void }) {
   const [ecode, setEcode] = useState('')
   const [email, setEmail] = useState('')
+  /*
+    Their own address with the middle hidden, once a code is typed (KPI 0186; the user, 13 Oct:
+    "when ecode field is entered, the placeholder mail should be shown but not fully, with *****").
+    Only ever the masked form comes back.
+  */
+  const [hint, setHint] = useState<string | null>(null)
+  useEffect(() => {
+    const code = ecode.trim()
+    if (code.length < 2) { setHint(null); return }
+    const t = window.setTimeout(() => {
+      void supabase.rpc('email_hint', { p_ecode: code }).then(({ data }) => setHint((data as string | null) ?? null), () => setHint(null))
+    }, 350)
+    return () => window.clearTimeout(t)
+  }, [ecode])
   const [otp, setOtp] = useState('')
   const [pw, setPw] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -106,7 +121,7 @@ export default function ForgotPassword({ onBack }: { onBack: (ecode?: string) =>
         type="email"
         value={email}
         onChange={v => { setEmail(v); if (touched) setTouched(false) }}
-        placeholder={`you@${OFFICIAL_DOMAIN}`}
+        placeholder={hint ?? `you@${OFFICIAL_DOMAIN}`}
         disabled={sent}
         onBlur={() => setTouched(true)}
         error={sent ? null : emailProblem}

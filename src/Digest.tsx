@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   Heart, MessageCircle, Megaphone, Newspaper, Send, Trash2, Video, X, MapPin, Clock, ChevronRight, BarChart3, Check,
-  TriangleAlert, Pin, Briefcase, CalendarClock, ClipboardList, Pencil,
+  TriangleAlert, Pin, Briefcase, CalendarClock, ClipboardList, Pencil, PlayCircle, Play,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import './digest.css'
@@ -25,11 +25,13 @@ export interface Post {
   vac_location: string | null; apply_by: string | null; apply_link: string | null
   /** A meeting has a link, even while it is kept back until 15 minutes before (KPI 0182). */
   has_link?: boolean
+  /** Minutes before the start that Join opens, and a Video post's YouTube id (KPI 0185). */
+  join_early?: number; video_id?: string | null
 }
 /** Every kind of post (0170; the user: "announcement, alerts, notice, vacancy"). */
-type Kind = 'news' | 'announcement' | 'alert' | 'notice' | 'vacancy' | 'meeting' | 'poll' | 'form'
+type Kind = 'news' | 'announcement' | 'alert' | 'notice' | 'vacancy' | 'meeting' | 'poll' | 'form' | 'video'
 const KIND_WORD: Record<Kind, string> = {
-  news: 'News', announcement: 'Announcement', alert: 'Alert', notice: 'Notice', vacancy: 'Vacancy', meeting: 'Meeting', poll: 'Poll', form: 'Form',
+  news: 'News', announcement: 'Announcement', alert: 'Alert', notice: 'Notice', vacancy: 'Vacancy', meeting: 'Meeting', poll: 'Poll', form: 'Form', video: 'Video',
 }
 /** One of the named colours, or any colour as #rrggbb (0168). */
 type Hue = string
@@ -57,7 +59,9 @@ const hue = (h: Hue) => {
 }
 const grad = (h: Hue) => `linear-gradient(135deg, ${hue(h).from}, ${hue(h).to})`
 const tint = (h: Hue) => ({ ['--hue' as string]: hue(h).ink, ['--soft' as string]: hue(h).soft, ['--grad' as string]: grad(h) }) as CSSProperties
-const cover = (p: Post) => (p.image_url ? `center/cover no-repeat url(${p.image_url})` : grad(p.color))
+const ytThumb = (id: string) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
+const cover = (p: Post) => (p.image_url ? `center/cover no-repeat url(${p.image_url})`
+  : p.video_id ? `center/cover no-repeat url(${ytThumb(p.video_id)})` : grad(p.color))
 
 const ago = (iso: string) => {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
@@ -81,7 +85,7 @@ function useNow(ms = 30_000) {
 function JoinButton({ p, onJoin, className }: { p: Post; onJoin: (p: Post) => void; className: string }) {
   const now = useNow()
   const start = new Date(p.meet_at!).getTime()
-  const opens = start - JOIN_EARLY_MS
+  const opens = start - (p.join_early != null ? p.join_early * 60_000 : JOIN_EARLY_MS)
   const end = start + (p.meet_minutes ?? 60) * 60_000
   if (now >= end) return null
   // Announced before its link (KPI 0180): everybody is told when it comes. Once set, the link
@@ -111,7 +115,7 @@ const where = (p: Post) => {
   return l.includes('meet.google') ? 'Google Meet' : l.includes('teams.') ? 'Microsoft Teams' : l.includes('zoom.') ? 'Zoom' : null
 }
 const KindIcon = ({ p, size = 18 }: { p: Post; size?: number }) => {
-  const I = { news: Newspaper, announcement: Megaphone, alert: TriangleAlert, notice: Pin, vacancy: Briefcase, meeting: Video, poll: BarChart3, form: ClipboardList }[p.kind] ?? Newspaper
+  const I = { news: Newspaper, announcement: Megaphone, alert: TriangleAlert, notice: Pin, vacancy: Briefcase, meeting: Video, poll: BarChart3, form: ClipboardList, video: PlayCircle }[p.kind] ?? Newspaper
   return <I size={size} />
 }
 /** How to apply: an email address becomes an email; anything else is a link. */
@@ -308,7 +312,8 @@ function NewsCard({ p, onLike, onOpen }: { p: Post; onLike: (p: Post) => void; o
   return (
     <article className={p.kind === 'alert' ? 'digest-news alert' : 'digest-news'} style={tint(p.color)}>
       <button type="button" className="digest-cover" onClick={() => onOpen(p)} style={{ background: cover(p) }} aria-label={p.title}>
-        {!p.image_url && <span className="digest-cover-art" aria-hidden><KindIcon p={p} size={38} /><i /><i /><i /></span>}
+        {!p.image_url && !p.video_id && <span className="digest-cover-art" aria-hidden><KindIcon p={p} size={38} /><i /><i /><i /></span>}
+        {p.video_id && <span className="digest-play" aria-hidden><Play size={26} fill="currentColor" /></span>}
         <span className="digest-chip">{desk(p)}</span>
         {p.kind !== 'news' && <span className="digest-kind"><KindIcon p={p} size={13} /> {KIND_WORD[p.kind]}</span>}
       </button>
@@ -575,6 +580,65 @@ function FormBody({ p }: { p: Post }) {
   )
 }
 
+/* ---- Videos (KPI 0185; the user, 13 Oct: "we are posting videos in YouTube") ---- */
+type YTPlayer = { getCurrentTime(): number; getDuration(): number; destroy(): void }
+let ytApi: Promise<unknown> | null = null
+/** YouTube's player, loaded once. */
+function loadYouTube(): Promise<unknown> {
+  const w = window as unknown as { YT?: { Player: unknown }; onYouTubeIframeAPIReady?: () => void }
+  if (ytApi) return ytApi
+  ytApi = new Promise(resolve => {
+    if (w.YT?.Player) { resolve(w.YT); return }
+    const before = w.onYouTubeIframeAPIReady
+    w.onYouTubeIframeAPIReady = () => { before?.(); resolve(w.YT) }
+    const tag = document.createElement('script')
+    tag.src = 'https://www.youtube.com/iframe_api'
+    document.head.appendChild(tag)
+  })
+  return ytApi
+}
+
+/**
+ * Plays inside Digest, so the player can say how far each person got: the furthest point they
+ * reached, sent every 15 seconds while it plays, and on pause, at the end and on closing.
+ */
+function VideoPlayer({ postId, videoId }: { postId: string; videoId: string }) {
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    let player: YTPlayer | null = null
+    let furthest = 0
+    let sent = -1
+    let timer = 0
+    let gone = false
+    const report = () => {
+      if (!player || postId === PREVIEW_ID) return
+      const at = Math.floor(player.getCurrentTime?.() ?? 0)
+      furthest = Math.max(furthest, at)
+      if (furthest === sent) return
+      sent = furthest
+      void supabase.rpc('digest_video_progress', { p_id: postId, p_seconds: furthest, p_duration: Math.round(player.getDuration?.() ?? 0) }).then(() => {}, () => {})
+    }
+    void loadYouTube().then(yt => {
+      if (gone || !box.current) return
+      const YT = yt as { Player: new (el: HTMLElement, o: object) => YTPlayer; PlayerState: { PLAYING: number } }
+      player = new YT.Player(box.current, {
+        videoId,
+        host: 'https://www.youtube-nocookie.com',
+        playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
+        events: {
+          onStateChange: (e: { data: number }) => {
+            window.clearInterval(timer)
+            if (e.data === YT.PlayerState.PLAYING) timer = window.setInterval(report, 15_000)
+            report()
+          },
+        },
+      })
+    })
+    return () => { gone = true; window.clearInterval(timer); report(); player?.destroy() }
+  }, [postId, videoId])
+  return <div className="digest-video"><div ref={box} /></div>
+}
+
 function Sheet({ label, onClose, children, wide }: { label: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -663,6 +727,20 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
         </div>
       </div>
   )
+
+  if (p.kind === 'video' && p.video_id) {
+    return (
+      <Sheet label={p.title} onClose={onClose} wide>
+        <VideoPlayer postId={p.id} videoId={p.video_id} />
+        <div className="digest-split-head" style={tint(p.color)}>
+          <span className="digest-split-kind"><KindIcon p={p} size={14} /> {kind}</span>
+          <h2>{p.title}</h2>
+          <p>{desk(p)} · {ago(p.created_at)}</p>
+        </div>
+        {body}
+      </Sheet>
+    )
+  }
 
   return (
     <Sheet label={p.title} onClose={onClose} wide={!!p.image_url}>
