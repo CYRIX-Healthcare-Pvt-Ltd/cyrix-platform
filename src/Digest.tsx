@@ -27,6 +27,8 @@ export interface Post {
   has_link?: boolean
   /** Minutes before the start that Join opens, and a Video post's YouTube id (KPI 0185). */
   join_early?: number; video_id?: string | null
+  /** A draft sent to this person as a test (KPI 0187): only they see it, and Join works at once. */
+  is_test?: boolean
 }
 /** Every kind of post (0170; the user: "announcement, alerts, notice, vacancy"). */
 type Kind = 'news' | 'announcement' | 'alert' | 'notice' | 'vacancy' | 'meeting' | 'poll' | 'form' | 'video'
@@ -88,6 +90,11 @@ function JoinButton({ p, onJoin, className }: { p: Post; onJoin: (p: Post) => vo
   const opens = start - (p.join_early != null ? p.join_early * 60_000 : JOIN_EARLY_MS)
   const end = start + (p.meet_minutes ?? 60) * 60_000
   if (now >= end) return null
+  if (p.is_test) {
+    return p.meet_link
+      ? <button type="button" className={className} onClick={() => onJoin(p)}><Video size={16} /> Join meeting (test)</button>
+      : <button type="button" className={className} disabled><Clock size={16} /> Meeting link will be shared soon</button>
+  }
   // Announced before its link (KPI 0180): everybody is told when it comes. Once set, the link
   // itself only arrives 15 minutes before (0182), so "has one" is what decides this.
   if (!p.meet_link && !(p.has_link ?? false)) return <button type="button" className={className} disabled><Clock size={16} /> Meeting link will be shared soon</button>
@@ -287,6 +294,7 @@ function MeetingCard({ p, onJoin, onOpen }: { p: Post; onJoin: (p: Post) => void
       onClick={e => { if (!(e.target as HTMLElement).closest('button, a')) onOpen(p) }}>
       <div className="digest-meeting-top">
         <span className="digest-badge"><Megaphone size={13} /> Upcoming meeting</span>
+        {p.is_test && <span className="digest-test-chip">Test · only you can see this</span>}
         <span className="digest-by">{desk(p)}</span>
       </div>
       <button type="button" className="digest-meeting-main" onClick={() => onOpen(p)}>
@@ -315,6 +323,7 @@ function NewsCard({ p, onLike, onOpen }: { p: Post; onLike: (p: Post) => void; o
         {!p.image_url && !p.video_id && <span className="digest-cover-art" aria-hidden><KindIcon p={p} size={38} /><i /><i /><i /></span>}
         {p.video_id && <span className="digest-play" aria-hidden><Play size={26} fill="currentColor" /></span>}
         <span className="digest-chip">{desk(p)}</span>
+        {p.is_test && <span className="digest-test-chip">Test · only you can see this</span>}
         {p.kind !== 'news' && <span className="digest-kind"><KindIcon p={p} size={13} /> {KIND_WORD[p.kind]}</span>}
       </button>
       <div className="digest-news-body">
@@ -423,6 +432,7 @@ function PollCard({ p, onOpen }: { p: Post; onOpen: (p: Post) => void }) {
       <div className="digest-pollcard-head" style={{ background: grad(p.color) }}>
         <div className="digest-meeting-top">
           <span className="digest-badge"><BarChart3 size={13} /> Poll</span>
+          {p.is_test && <span className="digest-test-chip">Test · only you can see this</span>}
           <span className="digest-by">{desk(p)}</span>
         </div>
         <button type="button" className="digest-pollcard-q" onClick={() => onOpen(p)}>{p.title}</button>
@@ -467,6 +477,7 @@ function FormCard({ p, onOpen }: { p: Post; onOpen: (p: Post) => void }) {
       <div className="digest-pollcard-head" style={{ background: grad(p.color) }}>
         <div className="digest-meeting-top">
           <span className="digest-badge"><ClipboardList size={13} /> Form</span>
+          {p.is_test && <span className="digest-test-chip">Test · only you can see this</span>}
           <span className="digest-by">{desk(p)}</span>
         </div>
         <button type="button" className="digest-pollcard-q" onClick={() => onOpen(p)}>{p.title}</button>

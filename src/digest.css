@@ -342,3 +342,8 @@ a.digest-sheet-btn { text-decoration: none; }
 @media (prefers-reduced-motion: reduce) { .digest-play { transition: none; } }
 .digest-video { position: relative; aspect-ratio: 16 / 9; background: #000; }
 .digest-video > div, .digest-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* A draft sent as a test (KPI 0187): plainly marked, so nobody takes it for the real thing. */
+.digest-test-chip { display: inline-flex; align-items: center; padding: 0.2rem 0.55rem; border-radius: 999px;
+  background: #fbbf24; color: #422006; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.02em; }
+.digest-cover .digest-test-chip { position: absolute; top: 0.75rem; left: 50%; transform: translateX(-50%); z-index: 1; }
