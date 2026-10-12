@@ -82,6 +82,14 @@
       "destination": "https://cyrix-task.vercel.app/tasks/:path*"
     },
     {
+      "source": "/cyra/",
+      "destination": "https://cyrix-cyra.vercel.app/cyra/"
+    },
+    {
+      "source": "/cyra/:path*",
+      "destination": "https://cyrix-cyra.vercel.app/cyra/:path*"
+    },
+    {
       "source": "/((?!assets/|favicon|sw\\.js|push-sw\\.js|manifest\\.webmanifest|icon-).*)",
       "destination": "/index.html"
     }

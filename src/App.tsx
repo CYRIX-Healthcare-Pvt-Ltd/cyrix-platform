@@ -32,14 +32,15 @@ const ICONS: Record<string, typeof ClipboardList> = {
 }
 
 /**
- * CYRA lives on its own site with its own accounts, but is signed in to from here only
- * (the user, 12 Oct: "login also only our portal"). It is handed this sign-in's access
+ * CYRA has its own accounts (another Supabase project) and is served at /cyra/ like the
+ * other modules (vercel.json; the user, 12 Oct: "this should be app.cyrix.in/cyra"), but is
+ * signed in to from here only ("login also only our portal"). It is handed this sign-in's access
  * token after the # — never sent to a server, never in a log — and its engine asks
  * cyra_whoami() (KPI 0171) who this is: ecode, work email, and whether they hold CYRA.
  * CYRA refuses a token issued more than 10 minutes ago, and a session's token lives an
  * hour, so one older than 5 minutes is renewed first.
  */
-const CYRA_SSO = 'https://cyra-v2-app.vercel.app/sso'
+const CYRA_SSO = '/cyra/sso'
 async function openCyra() {
   let { data: { session } } = await supabase.auth.getSession()
   const issued = (() => {
