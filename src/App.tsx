@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import Logo from './Logo'
-import Avatar from './Avatar'
+import ProfileCard from './ProfileCard'
 import ThemeToggle from './ThemeToggle'
 import InstallButton from './InstallButton'
 import NotifyCard from './NotifyCard'
@@ -438,17 +438,10 @@ function Portal() {
       <header className="bar">
         <Logo height={30} />
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-        {/* Who is signed in, shown the same way every module shows it. The
-            portal has no profile page of its own — the employee record
-            lives in KPI — so this identifies rather than links, and the
-            name is hidden on a phone where the mark and the controls
-            already fill the bar. */}
-        {me && (
-          <span className="who">
-            <span className="who-name">{me.full_name}</span>
-            <Avatar name={me.full_name} src={me.avatar} />
-          </span>
-        )}
+        {/* Who is signed in, shown the same way every module shows it; a press
+            opens their basic details (ProfileCard). The name is hidden on a
+            phone where the mark and the controls already fill the bar. */}
+        {me && <ProfileCard name={me.full_name} avatar={me.avatar} />}
         <ThemeToggle />
         <InstallButton />
         <button

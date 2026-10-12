@@ -320,10 +320,36 @@ body {
  * before the controls is wider than the gap between them, which is what
  * keeps this reading as identity rather than as a fourth button.
  */
+.who-wrap { position: relative; display: flex; }
 .who {
   display: flex; align-items: center; gap: 0.55rem;
   margin-right: 0.4rem;
+  padding: 0.2rem 0.25rem 0.2rem 0.5rem; border: 0; border-radius: 999px;
+  background: transparent; cursor: pointer; font: inherit; color: inherit;
 }
+.who:hover { background: var(--ink-100); }
+
+/* Basic details, under the name (ProfileCard). */
+.profile-card {
+  position: absolute; top: calc(100% + 0.5rem); right: 0; z-index: 40;
+  width: min(20rem, calc(100vw - 2rem));
+  display: block; padding: 1rem;
+  background: var(--white); border: 1px solid var(--ink-200); border-radius: 14px;
+  box-shadow: 0 16px 40px -12px rgba(11, 13, 16, 0.28);
+  transform-origin: top right;
+  animation: profile-in 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes profile-in { from { opacity: 0; transform: translateY(-4px) scale(0.97); } }
+@media (prefers-reduced-motion: reduce) { .profile-card { animation: none; } }
+.profile-head { display: flex; align-items: center; gap: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--ink-200); }
+.profile-head .user-avatar { width: 2.75rem; height: 2.75rem; }
+.profile-name { display: block; font-weight: 650; color: var(--ink-950); }
+.profile-sub { display: block; font-size: 0.8125rem; color: var(--ink-500); }
+.profile-loading { padding-top: 0.75rem; }
+.profile-rows { margin: 0; padding-top: 0.5rem; display: block; }
+.profile-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.4rem 0; font-size: 0.8125rem; }
+.profile-row dt { color: var(--ink-500); flex: none; }
+.profile-row dd { margin: 0; color: var(--ink-900); text-align: right; overflow-wrap: anywhere; }
 .who-name {
   display: none;
   font-size: 0.8125rem; font-weight: 550; color: var(--ink-700);
