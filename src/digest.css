@@ -300,3 +300,11 @@ a.digest-sheet-btn { text-decoration: none; }
 /* Join before it opens (15 minutes ahead): says when, and does nothing. */
 .digest-join:disabled, .digest-sheet-btn:disabled { opacity: 0.7; cursor: default; transform: none; box-shadow: none; }
 .digest-join:disabled::after { display: none; }
+
+/* The preview KPI's Digest page shows of a draft (DigestPreview). */
+.digest-preview { padding: 1rem; min-height: 100vh; background: var(--ink-50); }
+.digest-preview-tabs { display: inline-flex; gap: 0.25rem; padding: 0.25rem; margin-bottom: 1rem; border-radius: 999px; background: var(--white); border: 1px solid var(--ink-200); }
+.digest-preview-tabs button { border: 0; border-radius: 999px; padding: 0.4rem 0.9rem; font: inherit; font-size: 0.8125rem; font-weight: 600; color: var(--ink-500); background: transparent; cursor: pointer; }
+.digest-preview-tabs button.on { background: var(--ink-950); color: var(--white); }
+.digest-preview .digest { margin: 0; }
+.digest-preview-grid { grid-template-columns: minmax(0, 26rem) !important; }

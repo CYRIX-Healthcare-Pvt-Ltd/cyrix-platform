@@ -19,7 +19,8 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(d.title || 'Cyrix', {
       body: d.body || '',
       icon: '/icon-192.png',
-      badge: '/icon-192.png',
+      // The status-bar mark: Android draws only its shape in one colour, so it is the C of the Cyrix logo in white on nothing (the user, 12 Oct).
+      badge: '/icon-badge-96.png',
       tag: d.tag || undefined,
       renotify: !!d.tag,
       data: { url: d.url || '/' },

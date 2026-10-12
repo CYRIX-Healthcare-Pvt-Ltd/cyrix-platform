@@ -82,6 +82,8 @@ function JoinButton({ p, onJoin, className }: { p: Post; onJoin: (p: Post) => vo
   const opens = start - JOIN_EARLY_MS
   const end = start + (p.meet_minutes ?? 60) * 60_000
   if (now >= end) return null
+  // Announced before its link (KPI 0180): everybody is told when it comes.
+  if (!p.meet_link) return <button type="button" className={className} disabled><Clock size={16} /> Meeting link will be shared soon</button>
   if (now < opens) {
     const at = new Date(opens)
     const sameDay = at.toDateString() === new Date(now).toDateString()
@@ -324,10 +326,15 @@ function NewsCard({ p, onLike, onOpen }: { p: Post; onLike: (p: Post) => void; o
   )
 }
 
+/** The id a draft carries in the preview (KPI's Digest page shows it before it is posted). */
+const PREVIEW_ID = 'preview'
+let previewOptions: Option[] = []
+
 /** The question's options, and this person's answer. */
 function usePoll(id: string) {
   const [opts, setOpts] = useState<Option[] | null>(null)
   const load = useCallback(async () => {
+    if (id === PREVIEW_ID) { setOpts(previewOptions); return }
     const { data } = await supabase.rpc('digest_poll', { p_id: id })
     setOpts((data ?? []) as Option[])
   }, [id])
@@ -350,6 +357,7 @@ function PollBody({ p, compact }: { p: Post; compact?: boolean }) {
   const showResults = (voted && !changing) || closed
   const toggle = (id: string) => setChosen(s => (multi ? (s.includes(id) ? s.filter(x => x !== id) : [...s, id]) : [id]))
   const vote = async () => {
+    if (p.id === PREVIEW_ID) return
     setBusy(true); setErr(null)
     const { error } = await supabase.rpc('digest_vote', { p_id: p.id, p_options: chosen })
     setBusy(false)
@@ -437,15 +445,19 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
   const [comments, setComments] = useState<Comment[] | null>(null)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
-  useEffect(() => { void supabase.rpc('digest_opened', { p_id: p.id }).then(() => {}, () => {}) }, [p.id])
+  useEffect(() => {
+    if (p.id === PREVIEW_ID) return
+    void supabase.rpc('digest_opened', { p_id: p.id }).then(() => {}, () => {})
+  }, [p.id])
   const load = useCallback(async () => {
+    if (p.id === PREVIEW_ID) { setComments([]); return }
     const { data } = await supabase.rpc('digest_comments_for', { p_id: p.id })
     setComments((data ?? []) as Comment[])
   }, [p.id])
   useEffect(() => { void load() }, [load])
 
   const add = async () => {
-    if (!text.trim()) return
+    if (!text.trim() || p.id === PREVIEW_ID) return
     setBusy(true)
     const { error } = await supabase.rpc('digest_add_comment', { p_id: p.id, p_body: text.trim() })
     setBusy(false)
@@ -535,4 +547,48 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
   )
 }
 
-
+/**
+ * A draft as people will see it (the user, 12 Oct: "need a preview for all mode of digests so
+ * user can see how it will look in user page"). KPI's Digest page shows this page in a frame and
+ * sends the draft by postMessage; it is drawn with the very cards and pop-up of the home page,
+ * as the home page card or opened. Nothing is read or written.
+ */
+export function DigestPreview() {
+  const [post, setPost] = useState<Post | null>(null)
+  const [view, setView] = useState<'card' | 'open'>('card')
+  useEffect(() => {
+    const on = (e: MessageEvent) => {
+      const d = e.data as { type?: string; post?: Post; options?: string[]; multi?: boolean; closes?: string | null } | null
+      if (!d || d.type !== 'cyrix-digest-preview' || !d.post) return
+      previewOptions = (d.options ?? []).map((label, i) => ({
+        id: 'o' + i, label, votes: 0, mine: false, closes_at: d.closes ?? null, multi: !!d.multi, voters: 0,
+      }))
+      setPost({ ...d.post, id: PREVIEW_ID })
+    }
+    window.addEventListener('message', on)
+    // Ready: the page that framed this sends the draft now, and again whenever it changes.
+    window.parent.postMessage({ type: 'cyrix-digest-preview-ready' }, '*')
+    return () => window.removeEventListener('message', on)
+  }, [])
+  const noop = () => {}
+  if (!post) return null
+  return (
+    <div className="digest-preview">
+      <div className="digest-preview-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected={view === 'card'} className={view === 'card' ? 'on' : ''} onClick={() => setView('card')}>On the home page</button>
+        <button type="button" role="tab" aria-selected={view === 'open'} className={view === 'open' ? 'on' : ''} onClick={() => setView('open')}>Opened</button>
+      </div>
+      {view === 'card' ? (
+        <section className="digest">
+          <div className="digest-grid digest-preview-grid" key={JSON.stringify(post) + previewOptions.length}>
+            {post.kind === 'meeting' ? <MeetingCard p={post} onJoin={noop} onOpen={() => setView('open')} />
+              : post.kind === 'poll' ? <PollCard p={post} onOpen={() => setView('open')} />
+              : <NewsCard p={post} onLike={noop} onOpen={() => setView('open')} />}
+          </div>
+        </section>
+      ) : (
+        <PostSheet key={JSON.stringify(post) + previewOptions.length} p={post} onClose={() => setView('card')} onLike={noop} onJoin={noop} />
+      )}
+    </div>
+  )
+}
