@@ -23,6 +23,8 @@ export interface Post {
   likes: number; liked: boolean; comments: number
   /** A vacancy (0170): where, apply by, and how to apply. */
   vac_location: string | null; apply_by: string | null; apply_link: string | null
+  /** A meeting has a link, even while it is kept back until 15 minutes before (KPI 0182). */
+  has_link?: boolean
 }
 /** Every kind of post (0170; the user: "announcement, alerts, notice, vacancy"). */
 type Kind = 'news' | 'announcement' | 'alert' | 'notice' | 'vacancy' | 'meeting' | 'poll' | 'form'
@@ -82,8 +84,9 @@ function JoinButton({ p, onJoin, className }: { p: Post; onJoin: (p: Post) => vo
   const opens = start - JOIN_EARLY_MS
   const end = start + (p.meet_minutes ?? 60) * 60_000
   if (now >= end) return null
-  // Announced before its link (KPI 0180): everybody is told when it comes.
-  if (!p.meet_link) return <button type="button" className={className} disabled><Clock size={16} /> Meeting link will be shared soon</button>
+  // Announced before its link (KPI 0180): everybody is told when it comes. Once set, the link
+  // itself only arrives 15 minutes before (0182), so "has one" is what decides this.
+  if (!p.meet_link && !(p.has_link ?? false)) return <button type="button" className={className} disabled><Clock size={16} /> Meeting link will be shared soon</button>
   if (now < opens) {
     const at = new Date(opens)
     const sameDay = at.toDateString() === new Date(now).toDateString()
