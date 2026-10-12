@@ -117,9 +117,18 @@ export default function App() {
     return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', back) }
   }, [sid])
 
+  // /cyra itself — the tile's link, a bookmark, or a page loaded before the tile could
+  // handle the click (the user, 12 Oct: "clicking on this is reloading this page") —
+  // goes on to CYRA once this device's sign-in is settled.
+  const toCyra = window.location.pathname.replace(/\/+$/, '') === '/cyra'
+  useEffect(() => {
+    if (toCyra && session && device?.state === 'ok') void openCyra()
+  }, [toCyra, session, device])
+
   if (!ready) return <Splash />
   if (!session) return <SignIn />
   if (!device) return <Splash />
+  if (toCyra && device.state === 'ok') return <Splash />
   if (device.state === 'pending') {
     return <DeviceGate others={device.others} emailHint={device.email_hint} onDone={() => setDevice({ state: 'ok' })} />
   }
