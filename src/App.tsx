@@ -11,7 +11,7 @@ import DeviceGate from './DeviceGate'
 import { deviceCheck, sessionIdOf, sessionState, type DeviceCheck } from './lib/session'
 import type { Session } from '@supabase/supabase-js'
 import {
-  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, LayoutGrid, LogOut, ArrowRight, Loader2,
+  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, LayoutGrid, LogOut, ArrowRight, Loader2,
   Eye, EyeOff,
 } from 'lucide-react'
 import { supabase, ecodeToEmail, type Module } from './lib/supabase'
@@ -28,7 +28,28 @@ import { supabase, ecodeToEmail, type Module } from './lib/supabase'
 
 /** The icon names the registry uses, resolved to real components. */
 const ICONS: Record<string, typeof ClipboardList> = {
-  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks,
+  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope,
+}
+
+/**
+ * CYRA lives on its own site with its own accounts, but is signed in to from here only
+ * (the user, 12 Oct: "login also only our portal"). It is handed this sign-in's access
+ * token after the # — never sent to a server, never in a log — and its engine asks
+ * cyra_whoami() (KPI 0171) who this is: ecode, work email, and whether they hold CYRA.
+ * CYRA refuses a token issued more than 10 minutes ago, and a session's token lives an
+ * hour, so one older than 5 minutes is renewed first.
+ */
+const CYRA_SSO = 'https://cyra-v2-app.vercel.app/sso'
+async function openCyra() {
+  let { data: { session } } = await supabase.auth.getSession()
+  const issued = (() => {
+    try { return JSON.parse(atob(session!.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).iat as number }
+    catch { return 0 }
+  })()
+  if (session && Date.now() / 1000 - issued > 300) {
+    session = (await supabase.auth.refreshSession()).data.session
+  }
+  if (session) window.location.assign(`${CYRA_SSO}#pt=${encodeURIComponent(session.access_token)}`)
 }
 
 /** Set once the tiles have arrived in this browser session, so they do not arrive again on every return. */
@@ -476,7 +497,8 @@ function Portal() {
             {modules.map((m, i) => {
               const Icon = (m.icon && ICONS[m.icon]) || LayoutGrid
               return (
-                <a key={m.code} className="tile" data-module={m.code} href={m.path} style={{ '--i': i } as CSSProperties}>
+                <a key={m.code} className="tile" data-module={m.code} href={m.path} style={{ '--i': i } as CSSProperties}
+                  onClick={m.code === 'cyra' ? e => { e.preventDefault(); void openCyra() } : undefined}>
                   <span className="tile-icon"><Icon size={22} /></span>
                   <span className="tile-body">
                     <span className="tile-name">{m.name}</span>

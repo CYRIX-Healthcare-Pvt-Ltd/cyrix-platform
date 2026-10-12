@@ -400,6 +400,8 @@ body {
 /* My Task (5 Oct) takes lime: the widest gap left on the wheel was between
    the amber and the teal, and lime sits in it, clear of both. */
 .tile[data-module='tasks'] .tile-icon { background: #65a30d; --glow: rgba(101, 163, 13, 0.7); }  /* lime */
+/* CYRA (12 Oct) takes red, its own mark's colour, between the pink and the amber. */
+.tile[data-module='cyra'] .tile-icon { background: #dc2626; --glow: rgba(220, 38, 38, 0.7); }  /* red */
 
 /*
  * Roughly a third of the wheel apart, deliberately.
@@ -686,6 +688,20 @@ body {
 :is(.tile:hover, .tiles.arrive .tile)[data-module='tasks'] .tile-icon svg > path:nth-child(1) { animation-delay: calc(var(--d, 0ms) + 340ms); }  /* bottom tick */
 :is(.tile:hover, .tiles.arrive .tile)[data-module='tasks'] .tile-icon svg > path:nth-child(5) { animation-delay: calc(var(--d, 0ms) + 440ms); }  /* its line */
 @keyframes tile-draw-10 { from { stroke-dashoffset: 11; opacity: 0; } 20% { opacity: 1; } to { stroke-dashoffset: 0; } }
+
+/* CYRA — the stethoscope listens: its chest piece beats twice, lub-dub. */
+.tile[data-module='cyra'] .tile-icon svg > circle { transform-box: fill-box; transform-origin: center; }
+:is(.tile:hover, .tiles.arrive .tile)[data-module='cyra'] .tile-icon svg > circle {
+  animation: tile-beat 900ms ease-out backwards;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes tile-beat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.55); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.35); }
+  58% { transform: scale(1); }
+}
 
 /* Arriving: the tiles rise in one after another, each icon playing once. */
 .tiles.arrive .tile {
