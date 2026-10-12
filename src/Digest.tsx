@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import {
   Heart, MessageCircle, Megaphone, Newspaper, Send, Trash2, Video, X, MapPin, Clock, ChevronRight, BarChart3, Check,
-  TriangleAlert, Pin, Briefcase, CalendarClock,
+  TriangleAlert, Pin, Briefcase, CalendarClock, ClipboardList, Pencil,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import './digest.css'
@@ -25,9 +25,9 @@ export interface Post {
   vac_location: string | null; apply_by: string | null; apply_link: string | null
 }
 /** Every kind of post (0170; the user: "announcement, alerts, notice, vacancy"). */
-type Kind = 'news' | 'announcement' | 'alert' | 'notice' | 'vacancy' | 'meeting' | 'poll'
+type Kind = 'news' | 'announcement' | 'alert' | 'notice' | 'vacancy' | 'meeting' | 'poll' | 'form'
 const KIND_WORD: Record<Kind, string> = {
-  news: 'News', announcement: 'Announcement', alert: 'Alert', notice: 'Notice', vacancy: 'Vacancy', meeting: 'Meeting', poll: 'Poll',
+  news: 'News', announcement: 'Announcement', alert: 'Alert', notice: 'Notice', vacancy: 'Vacancy', meeting: 'Meeting', poll: 'Poll', form: 'Form',
 }
 /** One of the named colours, or any colour as #rrggbb (0168). */
 type Hue = string
@@ -108,7 +108,7 @@ const where = (p: Post) => {
   return l.includes('meet.google') ? 'Google Meet' : l.includes('teams.') ? 'Microsoft Teams' : l.includes('zoom.') ? 'Zoom' : null
 }
 const KindIcon = ({ p, size = 18 }: { p: Post; size?: number }) => {
-  const I = { news: Newspaper, announcement: Megaphone, alert: TriangleAlert, notice: Pin, vacancy: Briefcase, meeting: Video, poll: BarChart3 }[p.kind] ?? Newspaper
+  const I = { news: Newspaper, announcement: Megaphone, alert: TriangleAlert, notice: Pin, vacancy: Briefcase, meeting: Video, poll: BarChart3, form: ClipboardList }[p.kind] ?? Newspaper
   return <I size={size} />
 }
 /** How to apply: an email address becomes an email; anything else is a link. */
@@ -223,6 +223,8 @@ export default function Digest() {
     ...(next ? [<MeetingCard key={next.id} p={next} onJoin={join} onOpen={setOpen} />] : []),
     ...rest.map(p => (p.kind === 'poll'
       ? <PollCard key={p.id} p={p} onOpen={setOpen} />
+      : p.kind === 'form'
+      ? <FormCard key={p.id} p={p} onOpen={setOpen} />
       : <NewsCard key={p.id} p={p} onLike={like} onOpen={setOpen} />)),
   ]
 
@@ -257,7 +259,7 @@ export default function Digest() {
                     ? `Meeting · ${new Date(p.meet_at!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
                     : `${KIND_WORD[p.kind]} · ${desk(p)} · ${ago(p.created_at)}`}</span>
                 </span>
-                {p.kind !== 'meeting' && p.kind !== 'poll' && <span className="digest-row-n"><Heart size={13} /> {p.likes}</span>}
+                {p.kind !== 'meeting' && p.kind !== 'poll' && p.kind !== 'form' && <span className="digest-row-n"><Heart size={13} /> {p.likes}</span>}
               </button>
             ))}
           </div>
@@ -329,6 +331,7 @@ function NewsCard({ p, onLike, onOpen }: { p: Post; onLike: (p: Post) => void; o
 /** The id a draft carries in the preview (KPI's Digest page shows it before it is posted). */
 const PREVIEW_ID = 'preview'
 let previewOptions: Option[] = []
+let previewForm: FormQ[] = []
 
 /** The question's options, and this person's answer. */
 function usePoll(id: string) {
@@ -425,6 +428,148 @@ function PollCard({ p, onOpen }: { p: Post; onOpen: (p: Post) => void }) {
   )
 }
 
+/* ---- Forms (KPI 0181; the user, 12 Oct: "can we add forms also?") ---- */
+type QType = 'short' | 'long' | 'one' | 'many' | 'yesno' | 'number' | 'date' | 'rating'
+interface FormQ {
+  id: string; label: string; qtype: QType; options: string[]; required: boolean
+  closes_at: string | null; mine: Record<string, string | string[]> | null; sent_at: string | null; answered: number
+}
+/** The questions, the closing time and this person's answers. */
+function useForm(id: string) {
+  const [qs, setQs] = useState<FormQ[] | null>(null)
+  const load = useCallback(async () => {
+    if (id === PREVIEW_ID) { setQs(previewForm); return }
+    const { data } = await supabase.rpc('digest_form', { p_id: id })
+    setQs((data ?? []) as FormQ[])
+  }, [id])
+  useEffect(() => { void load() }, [load])
+  return { qs, load }
+}
+const closesOn = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+
+function FormCard({ p, onOpen }: { p: Post; onOpen: (p: Post) => void }) {
+  const { qs } = useForm(p.id)
+  const closes = qs?.[0]?.closes_at ?? null
+  const closed = !!closes && new Date(closes).getTime() < Date.now()
+  const sent = !!qs?.[0]?.sent_at
+  return (
+    <article className="digest-pollcard" style={tint(p.color)}>
+      <div className="digest-pollcard-head" style={{ background: grad(p.color) }}>
+        <div className="digest-meeting-top">
+          <span className="digest-badge"><ClipboardList size={13} /> Form</span>
+          <span className="digest-by">{desk(p)}</span>
+        </div>
+        <button type="button" className="digest-pollcard-q" onClick={() => onOpen(p)}>{p.title}</button>
+        {qs && <p className="digest-form-sub">{qs.length} {qs.length === 1 ? 'question' : 'questions'}{closes ? ` · ${closed ? 'closed' : 'closes ' + closesOn(closes)}` : ''}</p>}
+      </div>
+      <div className="digest-pollcard-body">
+        {sent
+          ? <p className="digest-form-sent"><Check size={15} /> Sent{!closed && closes ? ` · you can change it until ${closesOn(closes)}` : ''}</p>
+          : closed ? <p className="digest-poll-meta">This form has closed.</p>
+          : <button type="button" className="digest-vote digest-form-go" onClick={() => onOpen(p)}><Pencil size={15} /> Fill in</button>}
+        <div className="digest-news-foot">
+          <button type="button" className="digest-like" onClick={() => onOpen(p)}><MessageCircle size={16} /> {p.comments}</button>
+          <span className="digest-ago">{ago(p.created_at)}</span>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+/** Fill it in, send it, and change it until it closes. */
+function FormBody({ p }: { p: Post }) {
+  const { qs, load } = useForm(p.id)
+  const [a, setA] = useState<Record<string, string | string[]>>({})
+  const [editing, setEditing] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  useEffect(() => { if (qs?.[0]?.mine) setA(qs[0].mine) }, [qs])
+  if (!qs) return <div className="digest-poll-skel" />
+  const closes = qs[0]?.closes_at ?? null
+  const closed = !!closes && new Date(closes).getTime() < Date.now()
+  const sent = !!qs[0]?.sent_at
+  const show = (v: string | string[] | undefined) => (Array.isArray(v) ? v.join(', ') : v) || '—'
+
+  if ((sent && !editing) || closed) {
+    return (
+      <div className="digest-form">
+        {sent
+          ? <p className="digest-form-sent"><Check size={15} /> Sent {new Date(qs[0].sent_at!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+          : <p className="digest-poll-meta">This form has closed.</p>}
+        {sent && qs.map(q => (
+          <div key={q.id} className="digest-form-a"><span>{q.label}</span><strong>{show(qs[0].mine?.[q.id])}</strong></div>
+        ))}
+        {sent && !closed && <p className="digest-poll-meta"><button type="button" onClick={() => setEditing(true)}>Change answers</button>{closes ? ` · until ${closesOn(closes)}` : ''}</p>}
+      </div>
+    )
+  }
+
+  const put = (id: string, v: string | string[]) => { setErr(null); setA(x => ({ ...x, [id]: v })) }
+  const toggle = (id: string, o: string) => {
+    const cur = Array.isArray(a[id]) ? (a[id] as string[]) : []
+    put(id, cur.includes(o) ? cur.filter(x => x !== o) : [...cur, o])
+  }
+  const send = async () => {
+    if (p.id === PREVIEW_ID) return
+    const gap = qs.find(q => q.required && (!a[q.id] || (Array.isArray(a[q.id]) ? !(a[q.id] as string[]).length : !String(a[q.id]).trim())))
+    if (gap) { setErr(`Answer "${gap.label}" first`); return }
+    setBusy(true); setErr(null)
+    const { error } = await supabase.rpc('digest_form_submit', { p_id: p.id, p_answers: a })
+    setBusy(false)
+    if (error) { setErr(error.message); return }
+    setEditing(false); void load()
+  }
+  return (
+    <div className="digest-form">
+      {qs.map(q => {
+        const v = a[q.id]
+        return (
+          <div key={q.id} className="digest-field">
+            <span className="digest-field-label">{q.label}{q.required && <i aria-hidden> *</i>}</span>
+            {q.qtype === 'short' && <input value={(v as string) ?? ''} maxLength={300} onChange={e => put(q.id, e.target.value)} />}
+            {q.qtype === 'long' && <textarea rows={3} value={(v as string) ?? ''} maxLength={3000} onChange={e => put(q.id, e.target.value)} />}
+            {q.qtype === 'number' && <input type="number" inputMode="decimal" value={(v as string) ?? ''} onChange={e => put(q.id, e.target.value)} />}
+            {q.qtype === 'date' && <input type="date" value={(v as string) ?? ''} onChange={e => put(q.id, e.target.value)} />}
+            {(q.qtype === 'one' || q.qtype === 'yesno') && (
+              <div className="digest-field-choices">
+                {(q.qtype === 'yesno' ? ['Yes', 'No'] : q.options).map(o => (
+                  <button key={o} type="button" className={v === o ? 'digest-option on' : 'digest-option'} onClick={() => put(q.id, o)}>
+                    <span className="digest-tick">{v === o && <Check size={12} />}</span>{o}
+                  </button>
+                ))}
+              </div>
+            )}
+            {q.qtype === 'many' && (
+              <div className="digest-field-choices">
+                {q.options.map(o => {
+                  const on = Array.isArray(v) && v.includes(o)
+                  return (
+                    <button key={o} type="button" className={on ? 'digest-option on' : 'digest-option'} onClick={() => toggle(q.id, o)}>
+                      <span className="digest-tick box">{on && <Check size={12} />}</span>{o}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {q.qtype === 'rating' && (
+              <div className="digest-rating">
+                {['1', '2', '3', '4', '5'].map(n => (
+                  <button key={n} type="button" className={v === n ? 'on' : ''} onClick={() => put(q.id, n)}>{n}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+      {err && <p className="digest-poll-err">{err}</p>}
+      <div className="digest-poll-go">
+        <span className="digest-poll-meta">{closes ? `Closes ${closesOn(closes)}` : ''}</span>
+        <button type="button" className="digest-vote" disabled={busy} onClick={send}><Send size={15} /> {sent ? 'Send changes' : 'Send'}</button>
+      </div>
+    </div>
+  )
+}
+
 function Sheet({ label, onClose, children, wide }: { label: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -486,7 +631,8 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
         )}
         {p.body && <p className="digest-panel-body">{p.body}</p>}
         {p.kind === 'poll' && <PollBody p={p} />}
-        {p.kind !== 'meeting' && p.kind !== 'poll' && (
+        {p.kind === 'form' && <FormBody p={p} />}
+        {p.kind !== 'meeting' && p.kind !== 'poll' && p.kind !== 'form' && (
           <button type="button" className={p.liked ? 'digest-bigheart on' : 'digest-bigheart'} onClick={() => onLike(p)} aria-pressed={p.liked}>
             <Heart size={18} fill={p.liked ? 'currentColor' : 'none'} /> {p.likes} {p.likes === 1 ? 'like' : 'likes'}
           </button>
@@ -558,10 +704,15 @@ export function DigestPreview() {
   const [view, setView] = useState<'card' | 'open'>('card')
   useEffect(() => {
     const on = (e: MessageEvent) => {
-      const d = e.data as { type?: string; post?: Post; options?: string[]; multi?: boolean; closes?: string | null } | null
+      const d = e.data as { type?: string; post?: Post; options?: string[]; multi?: boolean; closes?: string | null
+        questions?: Array<{ label: string; qtype: QType; options: string[]; required: boolean }> } | null
       if (!d || d.type !== 'cyrix-digest-preview' || !d.post) return
       previewOptions = (d.options ?? []).map((label, i) => ({
         id: 'o' + i, label, votes: 0, mine: false, closes_at: d.closes ?? null, multi: !!d.multi, voters: 0,
+      }))
+      previewForm = (d.questions ?? []).map((q, i) => ({
+        id: 'q' + i, label: q.label.trim() || 'Your question', qtype: q.qtype, options: q.options.filter(o => o.trim()),
+        required: q.required, closes_at: d.closes ?? null, mine: null, sent_at: null, answered: 0,
       }))
       setPost({ ...d.post, id: PREVIEW_ID })
     }
@@ -580,14 +731,15 @@ export function DigestPreview() {
       </div>
       {view === 'card' ? (
         <section className="digest">
-          <div className="digest-grid digest-preview-grid" key={JSON.stringify(post) + previewOptions.length}>
+          <div className="digest-grid digest-preview-grid" key={JSON.stringify(post) + previewOptions.length + JSON.stringify(previewForm)}>
             {post.kind === 'meeting' ? <MeetingCard p={post} onJoin={noop} onOpen={() => setView('open')} />
               : post.kind === 'poll' ? <PollCard p={post} onOpen={() => setView('open')} />
+              : post.kind === 'form' ? <FormCard p={post} onOpen={() => setView('open')} />
               : <NewsCard p={post} onLike={noop} onOpen={() => setView('open')} />}
           </div>
         </section>
       ) : (
-        <PostSheet key={JSON.stringify(post) + previewOptions.length} p={post} onClose={() => setView('card')} onLike={noop} onJoin={noop} />
+        <PostSheet key={JSON.stringify(post) + previewOptions.length + JSON.stringify(previewForm)} p={post} onClose={() => setView('card')} onLike={noop} onJoin={noop} />
       )}
     </div>
   )
