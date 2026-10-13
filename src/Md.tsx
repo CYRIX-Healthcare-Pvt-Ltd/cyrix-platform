@@ -51,3 +51,8 @@ export default function Md({ text, className }: { text: string; className?: stri
   flush()
   return <div className={'digest-md' + (className ? ' ' + className : '')}>{blocks}</div>
 }
+
+/** The words alone, for a card's two-line teaser: no marks, links as their text. */
+export const plain = (t: string) => t
+  .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\*\*|__|(^|\s)[*_](?=\S)|(?<=\S)[*_](?=\s|$)/g, '$1')
+  .replace(/^\s*#{1,6}\s+/gm, '').replace(/^\s*(?:[-*•]|\d+[.)])\s+/gm, '').replace(/\s+/g, ' ').trim()

@@ -1,4 +1,4 @@
-import Md from './Md'
+import Md, { plain } from './Md'
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   Heart, MessageCircle, Megaphone, Newspaper, Send, Trash2, Video, X, MapPin, Clock, ChevronRight, BarChart3, Check,
@@ -309,7 +309,7 @@ function MeetingCard({ p, onJoin, onOpen }: { p: Post; onJoin: (p: Post) => void
           {place && <span className="digest-when"><MapPin size={13} /> {place}</span>}
         </span>
       </button>
-      {p.body && <Md className="digest-meeting-body" text={p.body} />}
+      {p.body && <p className="digest-meeting-body">{plain(p.body)}</p>}
       <div className="digest-meeting-actions">
         <JoinButton p={p} onJoin={onJoin} className="digest-join" />
       </div>
@@ -335,7 +335,7 @@ function NewsCard({ p, onLike, onOpen }: { p: Post; onLike: (p: Post) => void; o
             {p.apply_by && <span><CalendarClock size={13} /> Apply by {shortDate(p.apply_by)}</span>}
           </p>
         )}
-        {p.body && <Md text={p.body} />}
+        {p.body && <p>{plain(p.body)}</p>}
         <div className="digest-news-foot">
           <button type="button" className={p.liked ? 'digest-like on' : 'digest-like'} onClick={() => onLike(p)} aria-pressed={p.liked}>
             <Heart size={16} fill={p.liked ? 'currentColor' : 'none'} /> {p.likes}
