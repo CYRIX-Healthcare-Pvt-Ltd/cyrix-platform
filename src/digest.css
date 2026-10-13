@@ -350,3 +350,10 @@ a.digest-sheet-btn { text-decoration: none; }
 
 /* An opened video: wide for the player, and the words under it scroll (the user, 13 Oct). */
 .digest-sheet.video { max-width: min(56rem, 96vw); overflow-y: auto; }
+
+/* Markdown in a post (13 Oct). */
+.digest-md p, .digest-md ul { margin: 0 0 0.5em; }
+.digest-md p:last-child, .digest-md ul:last-child { margin-bottom: 0; }
+.digest-md ul { padding-left: 1.25em; list-style: disc; }
+.digest-md a { color: #8b5cf6; text-decoration: underline; word-break: break-all; }
+.digest-md strong { font-weight: 700; }

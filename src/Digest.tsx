@@ -1,3 +1,4 @@
+import Md from './Md'
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   Heart, MessageCircle, Megaphone, Newspaper, Send, Trash2, Video, X, MapPin, Clock, ChevronRight, BarChart3, Check,
@@ -308,7 +309,7 @@ function MeetingCard({ p, onJoin, onOpen }: { p: Post; onJoin: (p: Post) => void
           {place && <span className="digest-when"><MapPin size={13} /> {place}</span>}
         </span>
       </button>
-      {p.body && <p className="digest-meeting-body">{p.body}</p>}
+      {p.body && <Md className="digest-meeting-body" text={p.body} />}
       <div className="digest-meeting-actions">
         <JoinButton p={p} onJoin={onJoin} className="digest-join" />
       </div>
@@ -334,7 +335,7 @@ function NewsCard({ p, onLike, onOpen }: { p: Post; onLike: (p: Post) => void; o
             {p.apply_by && <span><CalendarClock size={13} /> Apply by {shortDate(p.apply_by)}</span>}
           </p>
         )}
-        {p.body && <p>{p.body}</p>}
+        {p.body && <Md text={p.body} />}
         <div className="digest-news-foot">
           <button type="button" className={p.liked ? 'digest-like on' : 'digest-like'} onClick={() => onLike(p)} aria-pressed={p.liked}>
             <Heart size={16} fill={p.liked ? 'currentColor' : 'none'} /> {p.likes}
@@ -709,7 +710,7 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
             )}
           </div>
         )}
-        {p.body && <p className="digest-panel-body">{p.body}</p>}
+        {p.body && <Md className="digest-panel-body" text={p.body} />}
         {p.kind === 'poll' && <PollBody p={p} />}
         {p.kind === 'form' && <FormBody p={p} />}
         {p.kind !== 'meeting' && p.kind !== 'poll' && p.kind !== 'form' && (
