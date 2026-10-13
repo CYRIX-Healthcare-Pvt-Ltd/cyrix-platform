@@ -650,7 +650,7 @@ function VideoPlayer({ postId, videoId }: { postId: string; videoId: string }) {
   return <div className="digest-video"><div ref={box} /></div>
 }
 
-function Sheet({ label, onClose, children, wide }: { label: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
+function Sheet({ label, onClose, children, wide, video }: { label: string; onClose: () => void; children: React.ReactNode; wide?: boolean; video?: boolean }) {
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', esc)
@@ -658,7 +658,7 @@ function Sheet({ label, onClose, children, wide }: { label: string; onClose: () 
   }, [onClose])
   return (
     <div className="sheet-shade" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className={wide ? 'sheet digest-sheet wide' : 'sheet digest-sheet'} role="dialog" aria-modal="true" aria-label={label}>
+      <div className={video ? 'sheet digest-sheet video' : wide ? 'sheet digest-sheet wide' : 'sheet digest-sheet'} role="dialog" aria-modal="true" aria-label={label}>
         <button type="button" className="digest-sheet-close" onClick={onClose} title="Close"><X size={18} /><span className="sr">Close</span></button>
         {children}
       </div>
@@ -741,7 +741,7 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
 
   if (p.kind === 'video' && p.video_id) {
     return (
-      <Sheet label={p.title} onClose={onClose} wide>
+      <Sheet label={p.title} onClose={onClose} video>
         <VideoPlayer postId={p.id} videoId={p.video_id} />
         <div className="digest-split-head" style={tint(p.color)}>
           <span className="digest-split-kind"><KindIcon p={p} size={14} /> {kind}</span>

@@ -347,3 +347,6 @@ a.digest-sheet-btn { text-decoration: none; }
 .digest-test-chip { display: inline-flex; align-items: center; padding: 0.2rem 0.55rem; border-radius: 999px;
   background: #fbbf24; color: #422006; font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.02em; }
 .digest-cover .digest-test-chip { position: absolute; top: 0.75rem; left: 50%; transform: translateX(-50%); z-index: 1; }
+
+/* An opened video: wide for the player, and the words under it scroll (the user, 13 Oct). */
+.digest-sheet.video { max-width: min(56rem, 96vw); overflow-y: auto; }
