@@ -22,18 +22,31 @@ function inline(s: string): ReactNode[] {
 
 export default function Md({ text, className }: { text: string; className?: string }) {
   const blocks: ReactNode[] = []
-  let list: string[] = []
   let para: string[] = []
+  let list: { ordered: boolean; items: Array<{ text: string; sub: string[] }> } | null = null
   const flush = () => {
     if (para.length) blocks.push(<p key={blocks.length}>{para.map((l, i) => <Fragment key={i}>{i > 0 && <br />}{inline(l)}</Fragment>)}</p>)
-    if (list.length) blocks.push(<ul key={blocks.length}>{list.map((l, i) => <li key={i}>{inline(l)}</li>)}</ul>)
-    para = []; list = []
+    if (list) {
+      const items = list.items.map((it, i) => <li key={i}>{inline(it.text)}{it.sub.length > 0 && <ul>{it.sub.map((x, j) => <li key={j}>{inline(x)}</li>)}</ul>}</li>)
+      blocks.push(list.ordered ? <ol key={blocks.length}>{items}</ol> : <ul key={blocks.length}>{items}</ul>)
+    }
+    para = []; list = null
   }
   for (const line of text.split(/\r?\n/)) {
-    const li = /^\s*[-*•]\s+(.*)$/.exec(line)
-    if (li) { if (para.length) { const l = list; list = []; flush(); list = l } list.push(li[1]) }
-    else if (!line.trim()) flush()
-    else { if (list.length) { const p = para; para = []; flush(); para = p } para.push(line) }
+    const h = /^\s*(#{1,6})\s+(.*)$/.exec(line)
+    const ol = /^(\s*)\d+[.)]\s+(.*)$/.exec(line)
+    const ul = /^(\s*)[-*•]\s+(.*)$/.exec(line)
+    if (h) { flush(); blocks.push(<p key={blocks.length} className={'digest-md-h' + Math.min(h[1].length, 3)}>{inline(h[2])}</p>) }
+    else if (ul && list && (ul[1].length > 0 || list.ordered) && list.items.length) list.items[list.items.length - 1].sub.push(ul[2])
+    else if (ol || ul) {
+      const ordered = !!ol, t = (ol ?? ul)![2]
+      if (para.length || (list && list.ordered !== ordered)) flush()
+      if (!list) list = { ordered, items: [] }
+      list.items.push({ text: t, sub: [] })
+    }
+    else if (!line.trim()) { if (!list) flush() }
+    else if (list && /^\s+/.test(line) && list.items.length) list.items[list.items.length - 1].text += ' ' + line.trim()
+    else { if (list) flush(); para.push(line) }
   }
   flush()
   return <div className={'digest-md' + (className ? ' ' + className : '')}>{blocks}</div>

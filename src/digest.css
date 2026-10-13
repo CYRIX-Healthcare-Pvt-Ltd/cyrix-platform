@@ -357,3 +357,8 @@ a.digest-sheet-btn { text-decoration: none; }
 .digest-md ul { padding-left: 1.25em; list-style: disc; }
 .digest-md a { color: #8b5cf6; text-decoration: underline; word-break: break-all; }
 .digest-md strong { font-weight: 700; }
+.digest-md ol { margin: 0 0 0.5em; padding-left: 1.4em; list-style: decimal; }
+.digest-md li ul { margin: 0.2em 0; list-style: circle; }
+.digest-md-h1, .digest-md-h2, .digest-md-h3 { font-weight: 700; margin: 0.6em 0 0.3em !important; }
+.digest-md-h1 { font-size: 1.2em; } .digest-md-h2 { font-size: 1.1em; } .digest-md-h3 { font-size: 1em; }
+.digest-md > :first-child { margin-top: 0 !important; }
