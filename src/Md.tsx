@@ -4,7 +4,7 @@ import { Fragment, type ReactNode } from 'react'
   A post's words with a little Markdown (the user, 13 Oct): **bold**, *italic*, [text](link),
   bare links, and lines starting "- " as a list. Built as React nodes, so nothing is injected as HTML.
 */
-const INLINE = /(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|\[[^\]]+\]\(https?:\/\/[^\s)]+\)|https?:\/\/[^\s<]+)/g
+const INLINE = /(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|\[[^\]]+\]\(https?:\/\/[^\s)]+\)|https?:\/\/[^\s<]+|\b(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:in|com|org|net|io|co|ai|app|gov|edu)\b(?:\/[^\s<]*)?)/gi
 
 function inline(s: string): ReactNode[] {
   return s.split(INLINE).map((t, i) => {
@@ -16,7 +16,7 @@ function inline(s: string): ReactNode[] {
     }
     if (t.startsWith('*')) return <em key={i}>{inline(t.slice(1, -1))}</em>
     const url = t.replace(/[.,;:!?)]+$/, '')
-    return <Fragment key={i}><a href={url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>{url}</a>{t.slice(url.length)}</Fragment>
+    return <Fragment key={i}><a href={/^https?:/i.test(url) ? url : 'https://' + url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>{url}</a>{t.slice(url.length)}</Fragment>
   })
 }
 
