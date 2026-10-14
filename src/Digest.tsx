@@ -184,10 +184,38 @@ export function DigestTeaser() {
   )
 }
 
+/*
+  A phone's back gesture closes an open sheet, not the app (the user, 14 Oct: "swiped back then the whole
+  app is going back"). Opening pushes a history step; back pops it and closes the sheet. Closing with the
+  X takes the step back off. Nested sheets each hold their own step, so back closes the top one first.
+*/
+function useBackCloses(open: boolean, close: () => void) {
+  const closeRef = useRef(close)
+  closeRef.current = close
+  useEffect(() => {
+    if (!open) return
+    const mark = Math.random().toString(36).slice(2)
+    window.history.pushState({ ...(window.history.state ?? {}), sheet: mark }, '')
+    let popped = false
+    const onPop = () => {
+      if (window.history.state?.sheet === mark) return
+      popped = true
+      closeRef.current()
+    }
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      if (!popped && window.history.state?.sheet === mark) window.history.back()
+    }
+  }, [open])
+}
+
 export default function Digest() {
   const [posts, setPosts] = useState<Post[] | null>(null)
   const [open, setOpen] = useState<Post | null>(null)
   const [all, setAll] = useState(false)
+  useBackCloses(all, () => setAll(false))
+  useBackCloses(!!open, () => { setOpen(null); void load() })
 
   const load = useCallback(async () => {
     const { data } = await supabase.rpc('digest_feed', { p_limit: 30 })
