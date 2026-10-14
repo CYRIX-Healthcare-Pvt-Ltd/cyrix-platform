@@ -216,7 +216,7 @@ function SignIn() {
         </div>
         <div className="form-wrap">
           {mode === 'forgot' && <p className="eyebrow">Account Recovery</p>}
-          <h1>{mode === 'signin' ? 'Sign in to Cyrix.' : 'Reset your password.'}</h1>
+          <h1>{mode === 'signin' ? 'Sign in to Cyra.' : 'Reset your password.'}</h1>
 
           {mode === 'forgot' ? (
             <ForgotPassword
