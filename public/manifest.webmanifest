@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Cyrix",
-  "short_name": "Cyrix",
-  "description": "KPI, My Task, Revive Lab and every other Cyrix module in one app.",
+  "name": "Cyra",
+  "short_name": "Cyra",
+  "description": "KPI, My Task, Revive Lab and every other module in one app.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

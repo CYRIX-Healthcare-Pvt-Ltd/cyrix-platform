@@ -193,6 +193,13 @@ export default function Digest() {
     const { data } = await supabase.rpc('digest_feed', { p_limit: 30 })
     const rows = (data ?? []) as Post[]
     setPosts(rows)
+    // A device notification opens its post (?post=<id>), so tapping it counts as Opened (the user, 14 Oct).
+    const want = new URLSearchParams(window.location.search).get('post')
+    if (want) {
+      const hit = rows.find(r => r.id === want)
+      if (hit) setOpen(hit)
+      const u = new URL(window.location.href); u.searchParams.delete('post'); window.history.replaceState(null, '', u.pathname + u.search + u.hash)
+    }
     // Looked at once it has been on screen for a moment.
     window.setTimeout(() => {
       const el = document.getElementById('digest-title')
