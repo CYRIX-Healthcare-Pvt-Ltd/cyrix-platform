@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bell, Check, Download, Loader2, X } from 'lucide-react'
+import { Bell, Check, Download, Loader2 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import { enablePush, pushState, syncPush, type PushState } from './lib/push'
 import { promptInstall } from './lib/pwa'
@@ -20,6 +20,8 @@ const SHOWN = 'cyrix.prompt.shown'
 const today = () => new Date().toLocaleDateString('en-CA')
 const get = (s: Storage, k: string) => { try { return s.getItem(k) } catch { return null } }
 const put = (s: Storage, k: string, v: string) => { try { s.setItem(k, v) } catch { /* private window */ } }
+// "Remind me later" lasts until the next sign-in (the user, 15 Oct): signing out forgets it was shown.
+supabase.auth.onAuthStateChange(e => { if (e === 'SIGNED_OUT') { try { sessionStorage.removeItem(SHOWN) } catch { /* private window */ } } })
 
 export default function NotifyCard() {
   const [push, setPush] = useState<PushState>(() => pushState())
@@ -60,9 +62,6 @@ export default function NotifyCard() {
       <div className="sheet prompt" role="dialog" aria-modal="true" aria-labelledby="prompt-title">
         <div className="sheet-head">
           <h2 id="prompt-title">Get the most out of Cyra</h2>
-          <button type="button" className="icon-btn sheet-close" onClick={later} title="Close">
-            <X size={16} /><span className="sr">Close</span>
-          </button>
         </div>
         <p className="prompt-sub">Reminders, HR messages and your notifications.</p>
 
