@@ -880,6 +880,13 @@ body {
 .sheet.prompt { display: flex; flex-direction: column; gap: 0.75rem; }
 .prompt-sub { margin: -0.25rem 0 0.25rem; color: var(--ink-500); font-size: 0.9rem; }
 .prompt-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0.9rem; border: 1px solid var(--ink-200); border-radius: 12px; color: var(--ink-700); }
+/* The card's two icons (15 Oct): Install violet as in the top bar, the bell amber as KPI's; each acts out its job. */
+.prompt-ico { flex-shrink: 0; }
+.prompt-ico.install { color: var(--violet); animation: prompt-bob 1.6s ease-in-out infinite; }
+.prompt-ico.bell { color: #f59e0b; transform-origin: 50% 2px; animation: prompt-ring 2.4s ease-in-out infinite; }
+@keyframes prompt-bob { 0%, 100% { transform: translateY(-1px); } 50% { transform: translateY(2px); } }
+@keyframes prompt-ring { 0%, 50%, 100% { transform: rotate(0); } 5% { transform: rotate(14deg); } 10% { transform: rotate(-12deg); } 15% { transform: rotate(9deg); } 20% { transform: rotate(-6deg); } 25% { transform: rotate(3deg); } 30% { transform: rotate(0); } }
+@media (prefers-reduced-motion: reduce) { .prompt-ico { animation: none !important; } }
 .prompt-name { flex: 1; font-weight: 600; color: var(--ink-950); font-size: 0.92rem; }
 .prompt-btn { width: auto !important; padding: 0.6rem 1rem !important; border-radius: 10px; }
 .prompt-ok { display: inline-flex; align-items: center; gap: 0.25rem; color: #047857; font-weight: 600; font-size: 0.88rem; }

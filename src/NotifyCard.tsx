@@ -11,13 +11,13 @@ import { Steps, useRoute } from './InstallButton'
  * pop up, and don't show this again and remind me later also").
  *
  * Only here, on the home page after signing in — not in KPI, where it
- * would come up again on every visit (the user, 10 Oct). "Don't show
- * again" lasts until the month changes, then it asks once more.
+ * would come up again on every visit (the user, 10 Oct). It comes back every
+ * day until the app is installed (the user, 15 Oct): "Don't remind me today"
+ * lasts until tomorrow, "Remind me later" until the next sign-in.
  */
-const NEVER = 'cyrix.prompt.never'
-const LATER = 'cyrix.prompt.later'
+const TODAY = 'cyrix.prompt.today'
 const SHOWN = 'cyrix.prompt.shown'
-const thisMonth = () => new Date().toISOString().slice(0, 7)
+const today = () => new Date().toLocaleDateString('en-CA')
 const get = (s: Storage, k: string) => { try { return s.getItem(k) } catch { return null } }
 const put = (s: Storage, k: string, v: string) => { try { s.setItem(k, v) } catch { /* private window */ } }
 
@@ -27,8 +27,7 @@ export default function NotifyCard() {
   const [steps, setSteps] = useState(false)
   const route = useRoute()
   const [closed, setClosed] = useState(() =>
-    get(localStorage, NEVER) === thisMonth()
-    || Number(get(localStorage, LATER) ?? 0) > Date.now()
+    get(localStorage, TODAY) === today()
     || get(sessionStorage, SHOWN) === '1')
 
   // Not while SW Admin has device notifications switched off (KPI 0161).
@@ -45,8 +44,8 @@ export default function NotifyCard() {
   useEffect(() => { if (show) put(sessionStorage, SHOWN, '1') }, [show])
   if (!show) return null
 
-  const later = () => { put(localStorage, LATER, String(Date.now() + 864e5)); setClosed(true) }
-  const never = () => { put(localStorage, NEVER, thisMonth()); setClosed(true) }
+  const later = () => setClosed(true)
+  const notToday = () => { put(localStorage, TODAY, today()); setClosed(true) }
   const allow = async () => {
     setBusy(true)
     try { setPush(await enablePush(supabase)) } catch { setPush(pushState()) } finally { setBusy(false) }
@@ -60,15 +59,24 @@ export default function NotifyCard() {
     <div className="sheet-shade" onClick={e => { if (e.target === e.currentTarget) later() }}>
       <div className="sheet prompt" role="dialog" aria-modal="true" aria-labelledby="prompt-title">
         <div className="sheet-head">
-          <h2 id="prompt-title">Get the most out of Cyrix</h2>
+          <h2 id="prompt-title">Get the most out of Cyra</h2>
           <button type="button" className="icon-btn sheet-close" onClick={later} title="Close">
             <X size={16} /><span className="sr">Close</span>
           </button>
         </div>
         <p className="prompt-sub">Reminders, HR messages and your notifications.</p>
 
+        {/* Install first, then notifications (the user, 15 Oct): on an iPhone notifications need the app anyway. */}
+        {canInstall && (
+          <div className="prompt-row">
+            <Download size={16} className="prompt-ico install" aria-hidden />
+            <span className="prompt-name">Install the app</span>
+            <button type="button" className="secondary-btn prompt-btn" onClick={install}>Install</button>
+          </div>
+        )}
+
         <div className="prompt-row">
-          <Bell size={16} aria-hidden />
+          <Bell size={16} className="prompt-ico bell" aria-hidden />
           <span className="prompt-name">Notifications</span>
           {push === 'on' ? <span className="prompt-ok"><Check size={15} /> On</span>
             : push === 'ask' ? (
@@ -83,16 +91,8 @@ export default function NotifyCard() {
           <p className="prompt-help">Click the padlock beside the address, set <strong>Notifications</strong> to <strong>Allow</strong>, then reload.</p>
         )}
 
-        {canInstall && (
-          <div className="prompt-row">
-            <Download size={16} aria-hidden />
-            <span className="prompt-name">Install the app</span>
-            <button type="button" className="secondary-btn prompt-btn" onClick={install}>Install</button>
-          </div>
-        )}
-
         <div className="prompt-foot">
-          <button type="button" className="quiet-link prompt-never" onClick={never}>Don&rsquo;t show again</button>
+          <button type="button" className="quiet-link prompt-never" onClick={notToday}>Don&rsquo;t remind me today</button>
           <button type="button" className="secondary-btn prompt-btn" onClick={later}>Remind me later</button>
         </div>
       </div>
