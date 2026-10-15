@@ -362,3 +362,8 @@ a.digest-sheet-btn { text-decoration: none; }
 .digest-md-h1, .digest-md-h2, .digest-md-h3 { font-weight: 700; margin: 0.6em 0 0.3em !important; }
 .digest-md-h1 { font-size: 1.2em; } .digest-md-h2 { font-size: 1.1em; } .digest-md-h3 { font-size: 1em; }
 .digest-md > :first-child { margin-top: 0 !important; }
+
+/* The posting desk's reply under a comment (KPI 0202). */
+.digest-reply { margin-top: 0.4rem; padding: 0.4rem 0.65rem; border-left: 2px solid #8b5cf6; border-radius: 8px; background: rgb(139 92 246 / 0.1); }
+.digest-reply p { margin: 0; }
+.digest-reply strong { color: #8b5cf6; }

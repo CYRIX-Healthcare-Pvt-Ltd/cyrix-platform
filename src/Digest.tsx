@@ -39,7 +39,7 @@ const KIND_WORD: Record<Kind, string> = {
 }
 /** One of the named colours, or any colour as #rrggbb (0168). */
 type Hue = string
-interface Comment { id: string; author: string; ecode: string; body: string; created_at: string; mine: boolean }
+interface Comment { id: string; author: string; ecode: string; body: string; created_at: string; mine: boolean; reply?: string | null; reply_desk?: string | null; reply_at?: string | null }
 interface Option { id: string; label: string; votes: number; mine: boolean; closes_at: string | null; multi: boolean; voters: number }
 
 export const HUES: Record<string, { from: string; to: string; ink: string; soft: string }> = {
@@ -763,6 +763,13 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
               <div>
                 <p><strong>{c.author}</strong> <span>{ago(c.created_at)}</span></p>
                 <p>{c.body}</p>
+                {/* The posting desk's reply (KPI 0202). */}
+                {c.reply && (
+                  <div className="digest-reply">
+                    <p><strong>{({ hr: 'HR', it: 'IT', mkt: 'Marketing' } as Record<string, string>)[c.reply_desk ?? ''] ?? 'Reply'}</strong>{c.reply_at && <span> {ago(c.reply_at)}</span>}</p>
+                    <p>{c.reply}</p>
+                  </div>
+                )}
               </div>
               {c.mine && <button type="button" className="icon-btn" onClick={() => remove(c.id)} title="Delete"><Trash2 size={14} /><span className="sr">Delete</span></button>}
             </div>
