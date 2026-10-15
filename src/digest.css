@@ -367,3 +367,12 @@ a.digest-sheet-btn { text-decoration: none; }
 .digest-reply { margin-top: 0.4rem; padding: 0.4rem 0.65rem; border-left: 2px solid #8b5cf6; border-radius: 8px; background: rgb(139 92 246 / 0.1); }
 .digest-reply p { margin: 0; }
 .digest-reply strong { color: #8b5cf6; }
+
+/* A post's picture full screen in the app (15 Oct). */
+.digest-split-img { border: 0; padding: 0; font: inherit; color: inherit; }
+.picture-view { position: fixed; inset: 0; z-index: 2000; background: rgb(0 0 0 / 0.92); display: flex; align-items: center; justify-content: center; overflow: auto; touch-action: pinch-zoom pan-x pan-y; }
+.picture-view img { max-width: 100vw; max-height: 100vh; object-fit: contain; cursor: zoom-in; }
+.picture-view.full { align-items: flex-start; justify-content: flex-start; }
+.picture-view.full img { max-width: none; max-height: none; cursor: zoom-out; }
+.picture-close { position: fixed; top: 14px; right: 14px; z-index: 1; width: 44px; height: 44px; border-radius: 999px; border: 0; background: rgb(255 255 255 / 0.14); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.picture-close:hover { background: rgb(255 255 255 / 0.24); }

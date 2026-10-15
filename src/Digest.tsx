@@ -703,7 +703,29 @@ function Sheet({ label, onClose, children, wide, video }: { label: string; onClo
   )
 }
 
+/*
+  A post's picture, full screen inside the app (the user, 15 Oct: clicking it opened a new tab).
+  Fitted to the screen; a tap shows it at full size to scroll around, and pinch zoom works on a
+  phone. Close with the X, Escape or the back gesture.
+*/
+function PictureView({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  const [full, setFull] = useState(false)
+  useBackCloses(true, onClose)
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopImmediatePropagation(); onClose() } }
+    window.addEventListener('keydown', esc, true)
+    return () => window.removeEventListener('keydown', esc, true)
+  }, [onClose])
+  return (
+    <div className={full ? 'picture-view full' : 'picture-view'} role="dialog" aria-modal="true" aria-label={alt}>
+      <button type="button" className="picture-close" onClick={onClose} aria-label="Close"><X size={20} /></button>
+      <img src={src} alt={alt} onClick={() => setFull(f => !f)} />
+    </div>
+  )
+}
+
 function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => void; onLike: (p: Post) => void; onJoin: (p: Post) => void }) {
+  const [zoom, setZoom] = useState(false)
   const [comments, setComments] = useState<Comment[] | null>(null)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -798,14 +820,16 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
   }
 
   return (
+    <>
+    {zoom && p.image_url && <PictureView src={p.image_url} alt={p.title} onClose={() => setZoom(false)} />}
     <Sheet label={p.title} onClose={onClose} wide={!!p.image_url}>
       {p.image_url ? (
         /* A picture is shown whole, never cropped under the title (the user, 10 Oct: "I posted a long
            pic"): on a desktop the picture left and the words right, on a phone the picture first. */
         <div className="digest-split">
-          <a className="digest-split-img" href={p.image_url} target="_blank" rel="noreferrer" title="Open the full picture">
+          <button type="button" className="digest-split-img" onClick={() => setZoom(true)} title="See the full picture">
             <img src={p.image_url} alt={p.title} />
-          </a>
+          </button>
           <div className="digest-split-side">
             <div className="digest-split-head" style={tint(p.color)}>
               <span className="digest-split-kind"><KindIcon p={p} size={14} /> {kind}</span>
@@ -828,6 +852,7 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
         </>
       )}
     </Sheet>
+    </>
   )
 }
 
