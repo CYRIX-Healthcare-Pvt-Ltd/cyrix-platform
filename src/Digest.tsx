@@ -211,6 +211,22 @@ function useBackCloses(open: boolean, close: () => void) {
   }, [open])
 }
 
+/*
+  Likes, comments and counts stay current by themselves (the user, 15 Oct): only the data is fetched
+  again, never the page, so nothing flickers, the scroll stays put and an open post stays open.
+  Every so often while the page is on screen, and at once when someone comes back to the tab or app.
+*/
+function useLiveRefresh(refresh: () => void, ms: number) {
+  const ref = useRef(refresh)
+  ref.current = refresh
+  useEffect(() => {
+    const tick = () => { if (document.visibilityState === 'visible') ref.current() }
+    const t = window.setInterval(tick, ms)
+    document.addEventListener('visibilitychange', tick)
+    return () => { window.clearInterval(t); document.removeEventListener('visibilitychange', tick) }
+  }, [ms])
+}
+
 export default function Digest() {
   const [posts, setPosts] = useState<Post[] | null>(null)
   const [open, setOpen] = useState<Post | null>(null)
@@ -242,6 +258,15 @@ export default function Digest() {
     if (shown.length) void supabase.rpc('digest_seen', { p_ids: shown.map(r => r.id) }).then(() => {}, () => {})
   }, [])
   useEffect(() => { void load() }, [load])
+  // The counts only: no "seen" marks, no opening a post from the link again.
+  const refresh = useCallback(async () => {
+    const { data } = await supabase.rpc('digest_feed', { p_limit: 30 })
+    if (!data) return
+    const rows = data as Post[]
+    setPosts(rows)
+    setOpen(o => (o ? rows.find(r => r.id === o.id) ?? o : o))
+  }, [])
+  useLiveRefresh(() => { void refresh() }, 60_000)
 
   if (!posts?.length) return null
   const { next, rest } = pick(posts)
@@ -739,6 +764,8 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
     setComments((data ?? []) as Comment[])
   }, [p.id])
   useEffect(() => { void load() }, [load])
+  // New comments and replies arrive while the post is open.
+  useLiveRefresh(() => { if (p.id !== PREVIEW_ID) void load() }, 30_000)
 
   const add = async () => {
     if (!text.trim() || p.id === PREVIEW_ID) return
