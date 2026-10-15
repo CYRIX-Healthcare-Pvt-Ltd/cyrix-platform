@@ -1,3 +1,4 @@
+import { local } from './lib/storage'
 import Md, { plain } from './Md'
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
@@ -145,8 +146,8 @@ function pick(posts: Post[]) {
 }
 
 const LAST_LOOK = 'cyrix.digest.lastLook'
-const lastLook = () => { try { return Number(localStorage.getItem(LAST_LOOK) ?? 0) } catch { return 0 } }
-const looked = () => { try { localStorage.setItem(LAST_LOOK, String(Date.now())) } catch { /* private window */ } }
+const lastLook = () => { try { return Number(local.getItem(LAST_LOOK) ?? 0) } catch { return 0 } }
+const looked = () => { try { local.setItem(LAST_LOOK, String(Date.now())) } catch { /* private window */ } }
 
 /**
  * Under the greeting, so the Digest is found (the user, 10 Oct: "on login,

@@ -1,3 +1,4 @@
+import { local } from './storage'
 /**
  * Signed out after 3 hours with nothing done (the user, 10 Oct: "auto
  * logout ... on inactive 3 hrs").
@@ -24,8 +25,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 const LAST = 'cyrix.lastActive'
 const WARN_MS = 60_000
 
-const read = () => { try { return Number(localStorage.getItem(LAST) ?? 0) } catch { return 0 } }
-const touch = () => { try { localStorage.setItem(LAST, String(Date.now())) } catch { /* private window */ } }
+const read = () => { try { return Number(local.getItem(LAST) ?? 0) } catch { return 0 } }
+const touch = () => { try { local.setItem(LAST, String(Date.now())) } catch { /* private window */ } }
 const installed = () => {
   try {
     return window.matchMedia('(display-mode: standalone)').matches

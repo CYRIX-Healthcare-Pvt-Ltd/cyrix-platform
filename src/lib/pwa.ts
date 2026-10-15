@@ -1,3 +1,4 @@
+import { local } from './storage'
 /**
  * Getting Cyrix onto people's home screens.
  *
@@ -85,19 +86,30 @@ async function askTheBrowserWhatIsInstalled(): Promise<void> {
   } catch { /* not supported here; offering it is the safe failure */ }
 }
 
+/*
+  Remembered on this device once the installed app has run (the user, 15 Oct: a computer with the
+  app installed still saw "Install" in its browser tab, where Chrome does not always answer
+  getInstalledRelatedApps). Forgotten when Chrome offers to install again, i.e. it was uninstalled.
+*/
+const SEEN_INSTALLED = 'cyra.installed'
+
 /** Call once, before React mounts: beforeinstallprompt fires early and once. */
 export function watchInstallability(): void {
   installed = isInstalled()
+  if (installed) local.setItem(SEEN_INSTALLED, '1')
+  else if (local.getItem(SEEN_INSTALLED) === '1') installed = true
   if (!installed) void askTheBrowserWhatIsInstalled()
 
   window.addEventListener('beforeinstallprompt', e => {
     // Keeps Chrome's own mini-infobar away and the event for the button.
     e.preventDefault()
     deferred = e as BeforeInstallPromptEvent
+    if (!isInstalled()) { local.removeItem(SEEN_INSTALLED); installed = false }
     announce()
   })
   window.addEventListener('appinstalled', () => {
     installed = true
+    local.setItem(SEEN_INSTALLED, '1')
     deferred = null
     announce()
   })

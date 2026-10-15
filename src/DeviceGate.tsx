@@ -1,3 +1,4 @@
+import { session as sessionStore } from './lib/storage'
 import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import Logo from './Logo'
@@ -15,10 +16,10 @@ import { requestDeviceCode, submitDeviceCode } from './lib/passwordOtp'
 const GAP = 60_000
 const KEY = 'cyrix.deviceCodeAt'
 function lastSent(): number {
-  try { return Number(sessionStorage.getItem(KEY)) || 0 } catch { return 0 }
+  try { return Number(sessionStore.getItem(KEY)) || 0 } catch { return 0 }
 }
 function markSent() {
-  try { sessionStorage.setItem(KEY, String(Date.now())) } catch { /* private mode */ }
+  try { sessionStore.setItem(KEY, String(Date.now())) } catch { /* private mode */ }
 }
 
 export default function DeviceGate({ others, emailHint, onDone }: {

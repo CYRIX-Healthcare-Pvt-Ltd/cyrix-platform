@@ -1,3 +1,4 @@
+import { local, session } from './lib/storage'
 import { useEffect, useState } from 'react'
 import { Bell, Check, Download, Loader2 } from 'lucide-react'
 import { supabase } from './lib/supabase'
@@ -21,7 +22,7 @@ const today = () => new Date().toLocaleDateString('en-CA')
 const get = (s: Storage, k: string) => { try { return s.getItem(k) } catch { return null } }
 const put = (s: Storage, k: string, v: string) => { try { s.setItem(k, v) } catch { /* private window */ } }
 // "Remind me later" lasts until the next sign-in (the user, 15 Oct): signing out forgets it was shown.
-supabase.auth.onAuthStateChange(e => { if (e === 'SIGNED_OUT') { try { sessionStorage.removeItem(SHOWN) } catch { /* private window */ } } })
+supabase.auth.onAuthStateChange(e => { if (e === 'SIGNED_OUT') { try { session.removeItem(SHOWN) } catch { /* private window */ } } })
 
 export default function NotifyCard() {
   const [push, setPush] = useState<PushState>(() => pushState())
@@ -29,8 +30,8 @@ export default function NotifyCard() {
   const [steps, setSteps] = useState(false)
   const route = useRoute()
   const [closed, setClosed] = useState(() =>
-    get(localStorage, TODAY) === today()
-    || get(sessionStorage, SHOWN) === '1')
+    get(local, TODAY) === today()
+    || get(session, SHOWN) === '1')
 
   // Not while SW Admin has device notifications switched off (KPI 0161).
   const [pushOn, setPushOn] = useState<boolean | null>(null)
@@ -43,11 +44,11 @@ export default function NotifyCard() {
 
   const canInstall = route === 'prompt' || route === 'ios' || route === 'desktop-manual'
   const show = pushOn === true && !closed && (push === 'ask' || push === 'install-first' || canInstall)
-  useEffect(() => { if (show) put(sessionStorage, SHOWN, '1') }, [show])
+  useEffect(() => { if (show) put(session, SHOWN, '1') }, [show])
   if (!show) return null
 
   const later = () => setClosed(true)
-  const notToday = () => { put(localStorage, TODAY, today()); setClosed(true) }
+  const notToday = () => { put(local, TODAY, today()); setClosed(true) }
   const allow = async () => {
     setBusy(true)
     try { setPush(await enablePush(supabase)) } catch { setPush(pushState()) } finally { setBusy(false) }

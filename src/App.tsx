@@ -1,3 +1,4 @@
+import { session as sessionStore } from './lib/storage'
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import Logo from './Logo'
 import ProfileCard from './ProfileCard'
@@ -64,7 +65,7 @@ export default function App() {
     // Signed out — from here, from inside a module, or after 3 idle hours — the next sign-in is
     // a fresh one, so an administrator is forwarded to their page again (the user, 10 Oct).
     const forget = (s: Session | null) => {
-      if (!s) { try { sessionStorage.removeItem('cyrix.portal.forwarded') } catch { /* not available */ } }
+      if (!s) { try { sessionStore.removeItem('cyrix.portal.forwarded') } catch { /* not available */ } }
     }
     supabase.auth.getSession().then(({ data }) => {
       forget(data.session)
@@ -325,14 +326,14 @@ function Portal() {
    * module does").
    */
   const [arriving, setArriving] = useState(() => {
-    try { return sessionStorage.getItem(ARRIVED) !== '1' } catch { return false }
+    try { return sessionStore.getItem(ARRIVED) !== '1' } catch { return false }
   })
   useEffect(() => {
     if (!arriving || !modules?.length) return
     // The last tile's icon is done by about 1.6 s; then hover has the icons to itself.
     const t = window.setTimeout(() => {
       setArriving(false)
-      try { sessionStorage.setItem(ARRIVED, '1') } catch { /* not available: it plays again next time */ }
+      try { sessionStore.setItem(ARRIVED, '1') } catch { /* not available: it plays again next time */ }
     }, 2200)
     return () => window.clearTimeout(t)
   }, [arriving, modules])
@@ -420,8 +421,8 @@ function Portal() {
       if (!isAdmin) return
 
       try {
-        if (sessionStorage.getItem('cyrix.portal.forwarded') === '1') return
-        sessionStorage.setItem('cyrix.portal.forwarded', '1')
+        if (sessionStore.getItem('cyrix.portal.forwarded') === '1') return
+        sessionStore.setItem('cyrix.portal.forwarded', '1')
       } catch {
         // Private windows and blocked site data throw rather than return
         // null. Showing the tiles is the safe outcome: one extra click
@@ -449,7 +450,7 @@ function Portal() {
           onClick={() => {
             // Clear the once-per-session forward, or the next person to sign
             // in on this browser inherits a flag set for somebody else.
-            try { sessionStorage.removeItem('cyrix.portal.forwarded'); sessionStorage.removeItem(ARRIVED) } catch { /* not available */ }
+            try { sessionStore.removeItem('cyrix.portal.forwarded'); sessionStore.removeItem(ARRIVED) } catch { /* not available */ }
             // This device stops receiving their notifications (KPI 0154).
             void dropPush(supabase).finally(() =>
               supabase.auth.signOut({ scope: 'local' }) /* this device only; Sign out from all devices is the code step's (0149) */)

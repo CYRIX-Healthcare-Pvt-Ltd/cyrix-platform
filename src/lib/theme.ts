@@ -1,8 +1,9 @@
+import { local } from './storage'
 /**
  * One theme choice, shared by every Cyrix module.
  *
  * All four apps are served from app.cyrix.in, so they share an origin and
- * therefore share localStorage. Choosing dark in KPI and clicking through
+ * therefore share local. Choosing dark in KPI and clicking through
  * to Spare should not land you back in light — the modules are meant to
  * read as one product, and nothing gives that away faster than the page
  * changing colour when you move between them.
@@ -44,13 +45,13 @@ export function systemTheme(): 'light' | 'dark' {
 
 export function readTheme(): Theme {
   try {
-    const stored = localStorage.getItem(THEME_KEY)
+    const stored = local.getItem(THEME_KEY)
     if (isTheme(stored)) return stored
 
     for (const key of LEGACY_KEYS) {
-      const legacy = localStorage.getItem(key)
+      const legacy = local.getItem(key)
       if (isTheme(legacy)) {
-        localStorage.setItem(THEME_KEY, legacy)
+        local.setItem(THEME_KEY, legacy)
         return legacy
       }
     }
@@ -81,7 +82,7 @@ export function applyTheme(theme: Theme): void {
 
 export function setTheme(theme: Theme): void {
   try {
-    localStorage.setItem(THEME_KEY, theme)
+    local.setItem(THEME_KEY, theme)
   } catch {
     // Unstorable, but still worth applying for this page view.
   }
