@@ -527,7 +527,8 @@ function useForm(id: string) {
   useEffect(() => { void load() }, [load])
   return { qs, load }
 }
-const closesOn = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+// The day and the time it closes (the user, 15 Oct: "time not showing"): 15 Oct, 6:00 PM.
+const closesOn = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true }).replace(/(am|pm)/i, m => m.toUpperCase())
 
 function FormCard({ p, onOpen }: { p: Post; onOpen: (p: Post) => void }) {
   const { qs } = useForm(p.id)
