@@ -923,7 +923,6 @@ body {
   background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 0.95) 50%, transparent 62%) no-repeat;
   background-size: 260% 100%; -webkit-mask: var(--logo) center / 100% 100% no-repeat; mask: var(--logo) center / 100% 100% no-repeat;
   mix-blend-mode: screen; animation: splash-shine 3s ease-in-out forwards; }
-  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
 /* From either side of the screen, meeting in the middle (the user, 16 Oct: "come from both sides and join, then go"). */
 @keyframes splash-left  { 0% { transform: translateX(-280%); opacity: 0; } 8% { opacity: 1; } 24%, 100% { transform: none; opacity: 1; } }
 @keyframes splash-right { 0% { transform: translateX(280%); opacity: 0; } 8% { opacity: 1; } 24%, 100% { transform: none; opacity: 1; } }
