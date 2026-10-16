@@ -9,6 +9,7 @@ import { Boot } from './Boot'
 import App from './App'
 import { DigestPreview } from './Digest'
 import './index.css'
+import Splash from './Splash'
 
 // Before render, so nobody sees a flash of the wrong palette and a
 // choice made in another module is already in force here.
@@ -26,7 +27,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Boot>
       {/* KPI's Digest page frames this to show a draft as people will see it. */}
-      {digestPreview ? <DigestPreview /> : <App />}
+      {digestPreview ? <DigestPreview /> : <><Splash /><App /></>}
     </Boot>
   </React.StrictMode>,
 )
