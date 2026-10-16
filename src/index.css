@@ -932,6 +932,9 @@ body {
   100%    { transform: none; opacity: 1; } }
 @keyframes splash-open { 0%, 53% { clip-path: inset(0 0 0 100%); opacity: 0; } 55% { opacity: 1; } 70%, 100% { clip-path: inset(0 0 0 0); opacity: 1; } }
 @keyframes splash-shine { 0%, 72% { opacity: 0; background-position: 130% 0; } 75% { opacity: 1; } 88% { opacity: 1; background-position: -30% 0; } 90%, 100% { opacity: 0; background-position: -30% 0; } }
+/* The wave carries on across the drawn X, reaching it as the letters' wave does (the user, 16 Oct). */
+.splash-x-shine { mix-blend-mode: screen; animation: splash-x-shine 3s ease-in-out forwards; }
+@keyframes splash-x-shine { 0%, 79% { transform: translateX(0); } 87%, 100% { transform: translateX(120px); } }
 @keyframes splash-out { 0%, 90% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 
 /* Hover in each tile's own icon colour, like a Digest card (the user, 16 Oct). */
