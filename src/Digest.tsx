@@ -1,5 +1,6 @@
 import { local } from './lib/storage'
 import Md, { plain } from './Md'
+import FileView from './FileView'
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   Heart, MessageCircle, Megaphone, Newspaper, Send, Trash2, Video, X, MapPin, Clock, ChevronRight, BarChart3, Check,
@@ -754,6 +755,9 @@ function PictureView({ src, alt, onClose }: { src: string; alt: string; onClose:
 
 function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => void; onLike: (p: Post) => void; onJoin: (p: Post) => void }) {
   const [zoom, setZoom] = useState(false)
+  // The post's file, opened in the app (the user, 17 Oct).
+  const [file, setFile] = useState(false)
+  useBackCloses(file, () => setFile(false))
   const [comments, setComments] = useState<Comment[] | null>(null)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -801,7 +805,7 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
         {p.body && <Md className="digest-panel-body" text={p.body} />}
         {/* Opened in the browser's own viewer, where a meeting link inside it can be clicked (the user, 17 Oct). */}
         {p.pdf_url && (
-          <a className="digest-sheet-btn" href={p.pdf_url} target="_blank" rel="noreferrer"><FileText size={16} /> {p.pdf_name ?? 'Open file'}</a>
+          <button type="button" className="digest-sheet-btn" onClick={() => setFile(true)}><FileText size={16} /> {p.pdf_name ?? 'Open file'}</button>
         )}
         {p.kind === 'poll' && <PollBody p={p} />}
         {p.kind === 'form' && <FormBody p={p} />}
@@ -855,6 +859,7 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
 
   return (
     <>
+    {file && p.pdf_url && <FileView url={p.pdf_url} name={p.pdf_name ?? 'File'} onClose={() => setFile(false)} />}
     {zoom && p.image_url && <PictureView src={p.image_url} alt={p.title} onClose={() => setZoom(false)} />}
     <Sheet label={p.title} onClose={onClose} wide={!!p.image_url}>
       {p.image_url ? (

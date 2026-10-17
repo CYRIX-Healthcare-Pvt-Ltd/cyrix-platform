@@ -376,3 +376,20 @@ a.digest-sheet-btn { text-decoration: none; }
 .picture-view.full img { max-width: none; max-height: none; cursor: zoom-out; }
 .picture-close { position: fixed; top: 14px; right: 14px; z-index: 1; width: 44px; height: 44px; border-radius: 999px; border: 0; background: rgb(255 255 255 / 0.14); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .picture-close:hover { background: rgb(255 255 255 / 0.24); }
+
+/* A post's file, opened in the app (FileView.tsx; the user, 17 Oct). */
+.file-view { position: fixed; inset: 0; z-index: 2000; background: rgb(15 15 18 / 0.96); display: flex; flex-direction: column; }
+.file-view-bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; color: #fff; border-bottom: 1px solid rgb(255 255 255 / 0.1); }
+.file-view-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 0.95rem; }
+.file-view-btn { width: 40px; height: 40px; border-radius: 999px; border: 0; background: rgb(255 255 255 / 0.12); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.file-view-btn:hover { background: rgb(255 255 255 / 0.22); }
+.file-view-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+.file-view-pages { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px 0 24px; }
+.file-view-page { position: relative; background: #fff; box-shadow: 0 6px 24px rgb(0 0 0 / 0.4); max-width: 100%; }
+.file-view-link { position: absolute; display: block; }
+.file-view-link:hover { background: rgb(124 58 237 / 0.18); }
+.file-view-frame { width: 100%; height: 100%; border: 0; background: #fff; }
+.file-view-img { display: block; max-width: 100%; margin: 12px auto; }
+.file-view-note { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 48px 16px; color: #fff; text-align: center; }
+.file-view-note .spin { animation: file-spin 1s linear infinite; }
+@keyframes file-spin { to { transform: rotate(360deg); } }
