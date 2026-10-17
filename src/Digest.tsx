@@ -3,7 +3,7 @@ import Md, { plain } from './Md'
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   Heart, MessageCircle, Megaphone, Newspaper, Send, Trash2, Video, X, MapPin, Clock, ChevronRight, BarChart3, Check,
-  TriangleAlert, Pin, Briefcase, CalendarClock, ClipboardList, Pencil, PlayCircle, Play,
+  TriangleAlert, Pin, Briefcase, CalendarClock, ClipboardList, Pencil, PlayCircle, Play, FileText,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import './digest.css'
@@ -31,6 +31,8 @@ export interface Post {
   join_early?: number; video_id?: string | null
   /** A draft sent to this person as a test (KPI 0187): only they see it, and Join works at once. */
   is_test?: boolean
+  /** A file on the post (KPI 0215): a PDF opens in the browser's viewer, where its links work. */
+  pdf_url?: string | null; pdf_name?: string | null
 }
 /** Every kind of post (0170; the user: "announcement, alerts, notice, vacancy"). */
 type Kind = 'news' | 'announcement' | 'alert' | 'notice' | 'vacancy' | 'meeting' | 'poll' | 'form' | 'video'
@@ -797,6 +799,10 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
           </div>
         )}
         {p.body && <Md className="digest-panel-body" text={p.body} />}
+        {/* Opened in the browser's own viewer, where a meeting link inside it can be clicked (the user, 17 Oct). */}
+        {p.pdf_url && (
+          <a className="digest-sheet-btn" href={p.pdf_url} target="_blank" rel="noreferrer"><FileText size={16} /> {p.pdf_name ?? 'Open file'}</a>
+        )}
         {p.kind === 'poll' && <PollBody p={p} />}
         {p.kind === 'form' && <FormBody p={p} />}
         {p.kind !== 'meeting' && p.kind !== 'poll' && p.kind !== 'form' && (
