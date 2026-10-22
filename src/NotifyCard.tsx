@@ -59,7 +59,8 @@ export default function NotifyCard() {
   }
 
   return (
-    <div className="sheet-shade" onClick={e => { if (e.target === e.currentTarget) later() }}>
+    // A press outside does not close it (the user, 22 Oct): one of its own buttons is chosen.
+    <div className="sheet-shade">
       <div className="sheet prompt" role="dialog" aria-modal="true" aria-labelledby="prompt-title">
         <div className="sheet-head">
           <h2 id="prompt-title">Get the most out of Cyra</h2>
