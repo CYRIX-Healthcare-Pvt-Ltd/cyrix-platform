@@ -1,3 +1,5 @@
+// First of all: storage the browser refuses must not crash the page (lib/safeStorage).
+import './lib/safeStorage'
 import React from 'react'
 import { startTheme } from './lib/theme'
 import { watchInstallability } from './lib/pwa'
