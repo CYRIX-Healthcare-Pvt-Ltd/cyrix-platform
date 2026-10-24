@@ -500,8 +500,11 @@ function Portal() {
           <div className={arriving ? 'tiles arrive' : 'tiles'}>
             {modules.map((m, i) => {
               const Icon = (m.icon && ICONS[m.icon]) || LayoutGrid
+              // On a phone the tiles go two to a row; with an odd count KPI takes a row of its own
+              // (the user, 24 Oct), or the first tile for somebody without KPI.
+              const wide = modules.length % 2 === 1 && m.code === (modules.find(x => x.code === 'kpi') ?? modules[0]).code
               return (
-                <a key={m.code} className="tile" data-module={m.code} href={m.path} style={{ '--i': i } as CSSProperties}
+                <a key={m.code} className={wide ? 'tile wide' : 'tile'} data-module={m.code} href={m.path} style={{ '--i': i } as CSSProperties}
                   onClick={m.code === 'cyra' ? e => { e.preventDefault(); void openCyra() } : undefined}>
                   <span className="tile-icon"><Icon size={22} /></span>
                   <span className="tile-body">
