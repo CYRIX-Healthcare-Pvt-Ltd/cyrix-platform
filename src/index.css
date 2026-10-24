@@ -487,10 +487,10 @@ body {
  * 2 in single row, so that module description not needed"): icon over name, no arrow — the whole tile
  * is the button. With an odd count one tile (KPI) takes the whole row, laid out as before with its
  * description ("if kpi is stretched we can show the description"); dense keeps the others paired
- * wherever it falls.
+ * wherever it falls. Every row is as tall as the tallest, KPI's too ("same height for kpi also").
  */
 @media (max-width: 639.98px) {
-  .tiles { grid-template-columns: 1fr 1fr; gap: 0.75rem; grid-auto-flow: row dense; }
+  .tiles { grid-template-columns: 1fr 1fr; gap: 0.75rem; grid-auto-flow: row dense; grid-auto-rows: 1fr; }
   .tile { flex-direction: column; align-items: flex-start; gap: 0.75rem; padding: 1rem; }
   .tile:not(.wide) .tile-desc, .tile:not(.wide) .tile-go { display: none; }
   .tile:not(.wide) .tile-name { font-size: 0.98rem; line-height: 1.25; }
