@@ -82,6 +82,14 @@
       "destination": "https://cyrix-task.vercel.app/tasks/:path*"
     },
     {
+      "source": "/inventory/",
+      "destination": "https://cyrix-inventory.vercel.app/inventory/"
+    },
+    {
+      "source": "/inventory/:path*",
+      "destination": "https://cyrix-inventory.vercel.app/inventory/:path*"
+    },
+    {
       "source": "/cyra/",
       "destination": "https://cyrix-cyra.vercel.app/cyra/"
     },

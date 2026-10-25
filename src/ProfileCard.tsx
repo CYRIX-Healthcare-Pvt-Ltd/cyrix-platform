@@ -17,10 +17,28 @@ interface Details {
   date_of_joining: string | null; manager: string | null
 }
 
+/** One thing the company has given this person, from Inventory's inv_my_assets(). */
+interface Asset {
+  assignment_id: string; category_name: string; name: string
+  serial_number: string | null; size: string | null; quantity: number
+}
+
 export default function ProfileCard({ name, avatar }: { name: string; avatar: string | null }) {
   const [open, setOpen] = useState(false)
   const [d, setD] = useState<Details | null>(null)
+  const [assets, setAssets] = useState<Asset[] | null>(null)
   const box = useRef<HTMLSpanElement>(null)
+
+  // My Assets (Inventory). Silent on any failure — before Inventory is on
+  // the live project the function does not exist, and the card is as before.
+  useEffect(() => {
+    if (!open || assets) return
+    let alive = true
+    supabase.rpc('inv_my_assets').then(({ data, error }) => {
+      if (alive) setAssets(error || !Array.isArray(data) ? [] : (data as Asset[]))
+    })
+    return () => { alive = false }
+  }, [open, assets])
 
   useEffect(() => {
     if (!open || d) return
@@ -88,6 +106,26 @@ export default function ProfileCard({ name, avatar }: { name: string; avatar: st
                 </span>
               ))}
             </dl>
+          )}
+          {assets && assets.length > 0 && (
+            <span className="profile-assets">
+              <span className="profile-assets-head">
+                <span>My assets</span>
+                <a href="/inventory/mine">See all</a>
+              </span>
+              <dl className="profile-rows">
+                {assets.slice(0, 6).map(a => (
+                  <span key={a.assignment_id} className="profile-row">
+                    <dt>{a.category_name}</dt>
+                    <dd>
+                      {a.name}{a.size ? ` · ${a.size}` : ''}{a.quantity > 1 ? ` · ${a.quantity}` : ''}
+                      {a.serial_number && <span className="profile-serial">{a.serial_number}</span>}
+                    </dd>
+                  </span>
+                ))}
+              </dl>
+              {assets.length > 6 && <span className="profile-sub">and {assets.length - 6} more</span>}
+            </span>
           )}
         </span>
       )}
