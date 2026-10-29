@@ -14,6 +14,8 @@
   --ink-50:  #f6f7f8;
   --red-600: #ce2434;
   --white:   #ffffff;
+  /* The page a step from the white cards, as in dark (the user, 29 Oct: light "looks blank"). */
+  --page:    #f3f4f7;
   /* SF Pro, the stack every Cyrix module uses. Apple-licensed and so not
      shippable; -apple-system finds it where it exists and Inter is bundled
      as the stand-in everywhere else. */
@@ -73,6 +75,7 @@
   --ink-50:  #111318;
   --red-600: #ff5c6b;
   --white:   #1c1f25;
+  --page:    #1c1f25;
   --error-ink:  #ffb4bd;
   --error-bg:   #2a1216;
   --error-line: #5d2028;
@@ -95,6 +98,7 @@
     --ink-50:  #111318;
     --red-600: #ff5c6b;
     --white:   #1c1f25;
+  --page:    #1c1f25;
     --error-ink:  #ffb4bd;
     --error-bg:   #2a1216;
     --error-line: #5d2028;
@@ -113,7 +117,7 @@ html, body, #root { height: 100%; }
 body {
   margin: 0;
   font-family: var(--sans);
-  background: var(--white);
+  background: var(--page);
   color: var(--ink-950);
   -webkit-font-smoothing: antialiased;
 }
