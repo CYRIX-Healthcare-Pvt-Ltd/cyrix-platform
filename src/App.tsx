@@ -9,10 +9,11 @@ import Digest, { DigestTeaser } from './Digest'
 import { dropPush } from './lib/push'
 import ForgotPassword from './ForgotPassword'
 import DeviceGate from './DeviceGate'
+import Ops from './Ops'
 import { deviceCheck, sessionIdOf, sessionState, type DeviceCheck } from './lib/session'
 import type { Session } from '@supabase/supabase-js'
 import {
-  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, LayoutGrid, LogOut, ArrowRight, Loader2,
+  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, Gauge, LayoutGrid, LogOut, ArrowRight, Loader2,
   Eye, EyeOff,
 } from 'lucide-react'
 import { supabase, ecodeToEmail, type Module } from './lib/supabase'
@@ -29,7 +30,7 @@ import { supabase, ecodeToEmail, type Module } from './lib/supabase'
 
 /** The icon names the registry uses, resolved to real components. */
 const ICONS: Record<string, typeof ClipboardList> = {
-  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope,
+  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, Gauge,
 }
 
 /**
@@ -134,6 +135,8 @@ export default function App() {
   if (device.state === 'pending') {
     return <DeviceGate others={device.others} emailHint={device.email_hint} onDone={() => setDevice({ state: 'ok' })} />
   }
+  // /ops is the portal's own page, not a module behind a rewrite (KPI 0227): it answers only to Ops admins.
+  if (window.location.pathname.replace(/\/+$/, '') === '/ops') return <Ops />
   return <Portal />
 }
 
