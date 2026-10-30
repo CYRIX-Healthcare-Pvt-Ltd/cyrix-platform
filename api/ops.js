@@ -187,7 +187,8 @@ async function errors(days) {
     if (e.route) g.routes.add(e.route)
     if (e.status) g.statuses.add(e.status)
     groups.set(key, g)
-    const day = e.created_at.slice(0, 10)
+    // India days, as the page and ops_overview() count them.
+    const day = new Date(e.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
     byDay.set(day, (byDay.get(day) ?? 0) + 1)
   }
   return {
