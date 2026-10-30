@@ -22,6 +22,13 @@ import './ops.css'
 
 type Days = 7 | 30 | 90
 
+interface Uptime {
+  since: string
+  first_check: string | null
+  targets: { id: string; name: string; group: string; checks: number; up: number; uptime: number | null; avg_ms: number | null; down_now: boolean }[]
+  incidents: { target: string; started_at: string; ended_at: string | null; problem: string | null; minutes: number }[]
+}
+
 interface Overview {
   since: string
   accounts: { total: number; signed_in_1d: number; signed_in_7d: number; signed_in_30d: number; never: number }
@@ -97,6 +104,7 @@ export default function Ops() {
   const [round, setRound] = useState(0)
 
   const [overview, setOverview] = useState<Part<Overview>>({ state: 'loading' })
+  const [uptime, setUptime] = useState<Part<Uptime>>({ state: 'loading' })
   const [health, setHealth] = useState<Part<HealthData>>({ state: 'loading' })
   const [deploys, setDeploys] = useState<Part<DeploysData>>({ state: 'loading' })
   const [changes, setChanges] = useState<Part<ChangesData>>({ state: 'loading' })
@@ -113,6 +121,11 @@ export default function Ops() {
     const set = <T,>(fn: (p: Part<T>) => void) => (p: Part<T>) => { if (alive) fn(p) }
     setOverview({ state: 'loading' }); setDeploys({ state: 'loading' }); setChanges({ state: 'loading' })
     setErrors({ state: 'loading' }); setAi({ state: 'loading' })
+    setUptime({ state: 'loading' })
+    supabase.rpc('ops_uptime', { p_days: Math.min(days, 90) }).then(
+      r => set(setUptime)(r.error ? { state: r.error.code === 'PGRST202' ? 'off' : 'failed', error: r.error.message } as Part<Uptime>
+                                  : { state: 'ok', data: r.data as Uptime }),
+      () => set(setUptime)({ state: 'failed', error: 'Could not reach the database' }))
     supabase.rpc('ops_overview', { p_days: days }).then(
       r => set(setOverview)(r.error ? { state: 'failed', error: r.error.message } : { state: 'ok', data: r.data as Overview }),
       () => set(setOverview)({ state: 'failed', error: 'Could not reach the database' }))
@@ -162,6 +175,7 @@ export default function Ops() {
             </div>
 
             <StatusPanel health={health} deploys={deploys} />
+            <UptimePanel uptime={uptime} days={days} />
             <ErrorsPanel errors={errors} days={days} />
             <UsagePanel overview={overview} days={days} />
             <ChangesPanel changes={changes} deploys={deploys} />
@@ -231,6 +245,59 @@ function StatusPanel({ health, deploys }: { health: Part<HealthData>; deploys: P
                 )
               })}
             </div>
+          </>
+        )}
+      </Waiting>
+    </Panel>
+  )
+}
+
+/**
+ * What happened between visits (KPI 0229): every app is checked every 5 minutes from the database, an outage opens
+ * after two failed checks in a row, and the Ops admins get a push when one opens and when it closes.
+ */
+function UptimePanel({ uptime, days }: { uptime: Part<Uptime>; days: number }) {
+  const fmtWhen = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
+  return (
+    <Panel title="Uptime" note="Checked every 5 minutes. An outage is two failed checks in a row, and the Ops admins get a push.">
+      <Waiting part={uptime} off="Not set up yet: KPI migration 0229 has not been applied.">
+        {u => (
+          <>
+            {u.first_check && new Date(u.first_check) > new Date(u.since) && (
+              <p className="ops-note">Checking since {fmtWhen(u.first_check)} IST, so this covers less than {days} days.</p>
+            )}
+            <div className="ops-table-wrap">
+              <table className="ops-table">
+                <thead><tr><th>App</th><th className="num">Uptime</th><th className="num">Avg answer</th><th className="num">Checks</th></tr></thead>
+                <tbody>
+                  {u.targets.map(t => (
+                    <tr key={t.id}>
+                      <td>
+                        {t.down_now ? <XCircle size={13} className="down" /> : <CheckCircle2 size={13} className="ok" />}{' '}
+                        {t.name}<span className="ops-tag">{t.group}</span>
+                      </td>
+                      <td className="num">{t.uptime === null ? '—' : `${t.uptime}%`}</td>
+                      <td className="num">{t.avg_ms === null ? '—' : `${fmtInt(t.avg_ms)} ms`}</td>
+                      <td className="num">{fmtInt(t.checks)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <h3>Outages, last {Math.min(days, 90)} days</h3>
+            {u.incidents.length === 0 ? <p className="ops-note">None.</p> : (
+              <ul className="ops-feed">
+                {u.incidents.map((i, k) => (
+                  <li key={k} className={i.ended_at ? undefined : 'is-down'}>
+                    <XCircle size={14} className={i.ended_at ? undefined : 'down'} />
+                    <span>
+                      <span>{i.target} · {i.ended_at ? `down ${i.minutes} min` : `down for ${i.minutes} min, still down`}</span>
+                      <span className="ops-check-meta">{fmtWhen(i.started_at)} IST{i.problem ? ` · ${i.problem}` : ''}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </>
         )}
       </Waiting>
