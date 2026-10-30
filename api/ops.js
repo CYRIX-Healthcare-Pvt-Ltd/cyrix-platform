@@ -50,7 +50,6 @@ const TARGETS = [
   { id: 'cyra', name: 'Cyra Assist', group: 'Vercel', url: 'https://cyrix-cyra.vercel.app/cyra/' },
   { id: 'cyra-engine', name: 'Cyra engine', group: 'Render', url: 'https://cyra-diagnostic-chat-1.onrender.com/api/health', timeout: 25_000 },
   { id: 'pulse', name: 'Pulse API', group: 'cyrix-svc01', url: 'https://pulse.cyrix.in/pulse/api/health' },
-  { id: 'oneview', name: 'OneView (Streamlit)', group: 'cyrix-svc01', url: 'https://oneview.cyrix.in/' },
   { id: 'db-shared', name: 'Shared database', group: 'Supabase', url: `${SHARED_URL}/auth/v1/health`, key: SHARED_ANON },
   ...(CYRA_URL ? [{ id: 'db-cyra', name: 'Cyra database', group: 'Supabase', url: `${CYRA_URL}/auth/v1/health`, key: CYRA_KEY }] : []),
 ]
@@ -97,11 +96,13 @@ async function health() {
   const checked = await Promise.all(TARGETS.map(async t => {
     const started = Date.now()
     try {
+      // A page answering 4xx is still up (a login wall, a missing index). A database health check is not: a 401
+      // there means our key is wrong, which is exactly what this row exists to catch.
       const r = await timed(t.url, {
         headers: t.key ? { apikey: t.key } : {},
         redirect: 'follow',
       }, t.timeout ?? 10_000)
-      return { id: t.id, name: t.name, group: t.group, ok: r.status < 500, status: r.status, ms: Date.now() - started }
+      return { id: t.id, name: t.name, group: t.group, ok: r.status < (t.key ? 400 : 500), status: r.status, ms: Date.now() - started }
     } catch (e) {
       const timeout = e?.name === 'AbortError'
       return { id: t.id, name: t.name, group: t.group, ok: false, status: null, ms: Date.now() - started,
