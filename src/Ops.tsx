@@ -76,13 +76,16 @@ const ago = (iso: string) => {
 }
 const shortDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 
-/** Every day in the window, so a day with nothing on it is a gap in the chart and not a missing bar. */
+/**
+ * Every day in the window, so a day with nothing on it is a gap in the chart and not a missing bar.
+ * Days are India days (KPI 0228), whatever the viewer's clock says: the database buckets by Asia/Kolkata too,
+ * and UTC days made "today" read 0 for the first five and a half hours of every morning.
+ */
+const istDay = (ms: number) => new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
 function fillDays(days: number, values: Map<string, number>) {
   const out: { day: string; value: number }[] = []
-  const today = new Date()
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const key = istDay(Date.now() - i * 86_400_000)
     out.push({ day: key, value: values.get(key) ?? 0 })
   }
   return out
