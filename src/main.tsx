@@ -5,6 +5,7 @@ import { startTheme } from './lib/theme'
 import { watchInstallability } from './lib/pwa'
 import { startIdleSignOut } from './lib/idleSignOut'
 import { supabase } from './lib/supabase'
+import { startErrorReporting } from './lib/reportErrors'
 import ReactDOM from 'react-dom/client'
 import '@fontsource-variable/inter'
 import { Boot } from './Boot'
@@ -16,6 +17,8 @@ import Splash from './Splash'
 // Before render, so nobody sees a flash of the wrong palette and a
 // choice made in another module is already in force here.
 startTheme()
+// Before React mounts, so an error during the first render is caught too (0230).
+startErrorReporting(supabase, 'portal', import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA?.slice(0, 7))
 // Before React mounts too: beforeinstallprompt fires once and early, and a
 // button that has not rendered yet cannot catch it.
 watchInstallability()

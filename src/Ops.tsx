@@ -29,6 +29,15 @@ interface Uptime {
   incidents: { target: string; started_at: string; ended_at: string | null; problem: string | null; minutes: number }[]
 }
 
+/** Every app's browser errors (KPI 0230), grouped by message in the database as they arrive. */
+interface AppErrors {
+  total: number
+  by_app: { app: string; errors: number; messages: number; people: number }[]
+  by_day: { day: string; errors: number }[]
+  groups: { app: string; message: string; route: string | null; release: string | null; stack: string | null;
+            count: number; people: number; first: string; last: string }[]
+}
+
 interface Overview {
   since: string
   accounts: { total: number; signed_in_1d: number; signed_in_7d: number; signed_in_30d: number; never: number }
@@ -53,7 +62,7 @@ type AiData = { cost: number; calls: number; unmetered: string[]; by_day: Spend[
 type Part<T> = { state: 'loading' } | { state: 'off' } | { state: 'failed'; error: string } | { state: 'ok'; data: T }
 
 const MODULE_NAMES: Record<string, string> = {
-  kpi: 'KPI', spare: 'Spare Mapping', bemmp: 'BEMMP', revive: 'Revive Lab', travel: 'Travel Expense', tasks: 'My Task',
+  portal: 'Portal', cyra: 'Cyra Assist', pulse: 'Pulse', kpi: 'KPI', spare: 'Spare Mapping', bemmp: 'BEMMP', revive: 'Revive Lab', travel: 'Travel Expense', tasks: 'My Task',
 }
 
 async function api<T>(part: string, days: number): Promise<Part<T>> {
@@ -109,6 +118,7 @@ export default function Ops() {
   const [deploys, setDeploys] = useState<Part<DeploysData>>({ state: 'loading' })
   const [changes, setChanges] = useState<Part<ChangesData>>({ state: 'loading' })
   const [errors, setErrors] = useState<Part<ErrorsData>>({ state: 'loading' })
+  const [appErrors, setAppErrors] = useState<Part<AppErrors>>({ state: 'loading' })
   const [ai, setAi] = useState<Part<AiData>>({ state: 'loading' })
 
   useEffect(() => {
@@ -121,7 +131,11 @@ export default function Ops() {
     const set = <T,>(fn: (p: Part<T>) => void) => (p: Part<T>) => { if (alive) fn(p) }
     setOverview({ state: 'loading' }); setDeploys({ state: 'loading' }); setChanges({ state: 'loading' })
     setErrors({ state: 'loading' }); setAi({ state: 'loading' })
-    setUptime({ state: 'loading' })
+    setUptime({ state: 'loading' }); setAppErrors({ state: 'loading' })
+    supabase.rpc('ops_errors', { p_days: Math.min(days, 90) }).then(
+      r => set(setAppErrors)(r.error ? { state: r.error.code === 'PGRST202' ? 'off' : 'failed', error: r.error.message } as Part<AppErrors>
+                                     : { state: 'ok', data: r.data as AppErrors }),
+      () => set(setAppErrors)({ state: 'failed', error: 'Could not reach the database' }))
     supabase.rpc('ops_uptime', { p_days: Math.min(days, 90) }).then(
       r => set(setUptime)(r.error ? { state: r.error.code === 'PGRST202' ? 'off' : 'failed', error: r.error.message } as Part<Uptime>
                                   : { state: 'ok', data: r.data as Uptime }),
@@ -176,7 +190,7 @@ export default function Ops() {
 
             <StatusPanel health={health} deploys={deploys} />
             <UptimePanel uptime={uptime} days={days} />
-            <ErrorsPanel errors={errors} days={days} />
+            <ErrorsPanel errors={errors} appErrors={appErrors} days={days} />
             <UsagePanel overview={overview} days={days} />
             <ChangesPanel changes={changes} deploys={deploys} />
             <AiPanel ai={ai} days={days} />
@@ -305,35 +319,90 @@ function UptimePanel({ uptime, days }: { uptime: Part<Uptime>; days: number }) {
   )
 }
 
-function ErrorsPanel({ errors, days }: { errors: Part<ErrorsData>; days: number }) {
+/**
+ * Two sources, one panel: every app's browser errors from the shared database (KPI 0230), and Cyra Assist's own
+ * app_error, which lives in Cyra's database and comes through /api/ops. Either can be missing without hiding the other.
+ */
+function ErrorsPanel({ errors, appErrors, days }: { errors: Part<ErrorsData>; appErrors: Part<AppErrors>; days: number }) {
+  if (errors.state === 'loading' || appErrors.state === 'loading') {
+    return <Panel title="Errors"><div className="ops-skeleton" /></Panel>
+  }
+  const cyra = errors.state === 'ok' ? errors.data : null
+  const apps = appErrors.state === 'ok' ? appErrors.data : null
+  const problems = [
+    appErrors.state === 'failed' && `Apps: ${appErrors.error}`,
+    appErrors.state === 'off' && 'The other apps are not reporting yet: KPI migration 0230 is not applied.',
+    errors.state === 'failed' && `Cyra Assist: ${errors.error}`,
+    errors.state === 'off' && 'Cyra Assist is not connected: CYRA_SUPABASE_URL and CYRA_SERVICE_KEY are not on the portal.',
+  ].filter(Boolean) as string[]
+
+  const byDay = new Map<string, number>()
+  for (const d of apps?.by_day ?? []) byDay.set(d.day, (byDay.get(d.day) ?? 0) + d.errors)
+  for (const d of cyra?.by_day ?? []) byDay.set(d.day, (byDay.get(d.day) ?? 0) + d.errors)
+
+  const byApp = [...(apps?.by_app ?? []).map(a => ({ ...a, people: a.people as number | null })),
+                 ...(cyra && cyra.total > 0 ? [{ app: 'cyra', errors: cyra.total, messages: cyra.groups.length, people: null }] : [])]
+    .sort((a, b) => b.errors - a.errors)
+
+  const groups = [
+    ...(apps?.groups ?? []).map(g => ({ app: g.app, message: g.message, where: g.route ?? '', tag: g.release ? `build ${g.release}` : '',
+                                        count: g.count, people: g.people as number | null, last: g.last })),
+    ...(cyra?.groups ?? []).map(g => ({ app: 'cyra', message: g.message,
+                                        where: g.routes.join(', ') + (g.statuses.length ? ` · ${g.statuses.join(', ')}` : ''),
+                                        tag: `${g.source} · ${g.kind}`, count: g.count, people: null, last: g.last })),
+  ].sort((a, b) => b.count - a.count)
+
+  const total = (apps?.total ?? 0) + (cyra?.total ?? 0)
   return (
-    <Panel title="Errors" note="Cyra Assist only. The other apps report errors from Phase 2.">
-      <Waiting part={errors} off="Not set up yet: CYRA_SUPABASE_URL and CYRA_SERVICE_KEY are not on the portal's Vercel project.">
-        {e => (
-          <>
-            <Stats items={[{ label: `Errors, last ${days} days`, value: fmtInt(e.total) + (e.truncated ? '+' : '') },
-                           { label: 'Distinct messages', value: fmtInt(e.groups.length) }]} />
-            <Bars label="Errors per day" data={fillDays(days, new Map(e.by_day.map(d => [d.day, d.errors])))} fmt={fmtInt} />
-            {e.groups.length > 0 && (
-              <div className="ops-table-wrap">
-                <table className="ops-table">
-                  <thead><tr><th>Message</th><th>Where</th><th className="num">Count</th><th>Last</th></tr></thead>
-                  <tbody>
-                    {e.groups.slice(0, 15).map((g, i) => (
-                      <tr key={i}>
-                        <td className="ops-msg">{g.message || <em>(no message)</em>}<span className="ops-tag">{g.source} · {g.kind}</span></td>
-                        <td className="ops-mono">{g.routes.join(', ') || '—'}{g.statuses.length > 0 && ` · ${g.statuses.join(', ')}`}</td>
-                        <td className="num">{fmtInt(g.count)}</td>
-                        <td>{ago(g.last)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
-      </Waiting>
+    <Panel title="Errors" note="What broke in front of somebody, grouped by message. Pulse is not reporting yet.">
+      {problems.map(p => <p key={p} className="ops-off">{p}</p>)}
+      {(apps || cyra) && (
+        <>
+          <Stats items={[{ label: `Errors, last ${days} days`, value: fmtInt(total) + (cyra?.truncated ? '+' : '') },
+                         { label: 'Distinct messages', value: fmtInt(groups.length) },
+                         { label: 'Apps with errors', value: fmtInt(byApp.length) }]} />
+          <Bars label="Errors per day" data={fillDays(days, byDay)} fmt={fmtInt} />
+          {byApp.length > 0 && (
+            <div className="ops-table-wrap">
+              <table className="ops-table">
+                <caption>By app</caption>
+                <thead><tr><th>App</th><th className="num">Errors</th><th className="num">Messages</th><th className="num">People</th></tr></thead>
+                <tbody>
+                  {byApp.map(a => (
+                    <tr key={a.app}>
+                      <td>{MODULE_NAMES[a.app] ?? a.app}</td>
+                      <td className="num">{fmtInt(a.errors)}</td>
+                      <td className="num">{fmtInt(a.messages)}</td>
+                      <td className="num">{a.people == null ? '—' : fmtInt(a.people)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {groups.length > 0 && (
+            <div className="ops-table-wrap">
+              <table className="ops-table">
+                <caption>Top messages</caption>
+                <thead><tr><th>Message</th><th>Where</th><th className="num">Count</th><th className="num">People</th><th>Last</th></tr></thead>
+                <tbody>
+                  {groups.slice(0, 20).map((g, i) => (
+                    <tr key={i}>
+                      <td className="ops-msg">{g.message || <em>(no message)</em>}
+                        <span className="ops-tag">{MODULE_NAMES[g.app] ?? g.app}{g.tag && ` · ${g.tag}`}</span></td>
+                      <td className="ops-mono">{g.where || '—'}</td>
+                      <td className="num">{fmtInt(g.count)}</td>
+                      <td className="num">{g.people == null ? '—' : fmtInt(g.people)}</td>
+                      <td>{ago(g.last)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {total === 0 && <p className="ops-note">No errors in this window.</p>}
+        </>
+      )}
     </Panel>
   )
 }

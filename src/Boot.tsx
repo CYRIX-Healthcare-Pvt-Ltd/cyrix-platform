@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import { reportError } from './lib/reportErrors'
 
 /**
  * The last thing between a mistake and a white rectangle.
@@ -13,7 +14,7 @@ export class Boot extends Component<{ children: ReactNode }, { error: Error | nu
 
   static getDerivedStateFromError(error: Error) { return { error } }
 
-  componentDidCatch(error: Error) { console.error('portal failed to start', error) }
+  componentDidCatch(error: Error) { console.error('portal failed to start', error); reportError(error, 'Crash') }
 
   render() {
     if (!this.state.error) return this.props.children
