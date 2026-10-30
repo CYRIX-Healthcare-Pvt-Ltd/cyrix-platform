@@ -1,0 +1,93 @@
+/* The Ops page (Ops.tsx). Built from the portal's own tokens, so it follows the theme toggle with no palette of
+   its own — except the one chart hue and the two status colours, which are set per theme here. */
+
+.ops {
+  --ops-series: #2a78d6;
+  --ops-good: #15803d;
+  --ops-bad: #c62828;
+}
+:root[data-theme='dark'] .ops { --ops-series: #3987e5; --ops-good: #4ade80; --ops-bad: #ff6b6b; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .ops { --ops-series: #3987e5; --ops-good: #4ade80; --ops-bad: #ff6b6b; }
+}
+
+.ops-back { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--ink-700); text-decoration: none; }
+.ops-main { max-width: 72rem; margin: 0 auto; padding: 2rem 1rem 5rem; }
+@media (min-width: 640px) { .ops-main { padding: 3rem 2rem 6rem; } }
+.ops-main h1 { font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 700; letter-spacing: -0.025em; margin: 0; }
+.ops-main .sub { margin-bottom: 0; }
+
+.ops-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+.ops-controls { display: flex; align-items: center; gap: 0.5rem; }
+.ops-seg, .ops-chips { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; }
+.ops-seg { padding: 0.2rem; background: var(--ink-100); border-radius: 999px; }
+.ops-seg button, .ops-chips button {
+  border: 0; background: transparent; color: var(--ink-700); font: inherit; font-size: 0.8125rem;
+  padding: 0.35rem 0.8rem; border-radius: 999px; cursor: pointer;
+}
+.ops-chips button { background: var(--ink-100); }
+.ops-seg button[aria-pressed='true'], .ops-chips button[aria-pressed='true'] { background: var(--white); color: var(--ink-950); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
+
+.ops-panel {
+  background: var(--white); border: 1px solid var(--ink-200); border-radius: 14px;
+  padding: 1.1rem 1rem 1.25rem; margin-bottom: 1rem; min-width: 0;
+}
+@media (min-width: 640px) { .ops-panel { padding: 1.25rem 1.5rem 1.5rem; } }
+.ops-panel-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 1rem; margin-bottom: 0.9rem; }
+.ops-panel h2 { margin: 0; font-size: 1.15rem; font-weight: 700; letter-spacing: -0.015em; }
+.ops-panel h3 { margin: 0 0 0.6rem; font-size: 0.875rem; font-weight: 650; color: var(--ink-700); }
+.ops-note { font-size: 0.8125rem; color: var(--ink-500); }
+
+.ops-skeleton { height: 6rem; border-radius: 10px; background: var(--ink-100); animation: ops-pulse 1.4s ease-in-out infinite; }
+@keyframes ops-pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .ops-skeleton { animation: none; } }
+.ops-off { margin: 0; padding: 0.9rem 1rem; border: 1px dashed var(--ink-300); border-radius: 10px; color: var(--ink-500); font-size: 0.875rem; }
+.ops-failed { display: flex; align-items: center; gap: 0.5rem; margin: 0; padding: 0.8rem 1rem; border-radius: 10px;
+  background: var(--error-bg); color: var(--error-ink); border: 1px solid var(--error-line); font-size: 0.875rem; }
+
+.ok { color: var(--ops-good); }
+.down { color: var(--ops-bad); }
+.ops-summary { display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.9rem; font-weight: 600; }
+.ops-status { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
+.ops-check { display: flex; gap: 0.6rem; padding: 0.65rem 0.75rem; border: 1px solid var(--ink-200); border-radius: 10px; min-width: 0; }
+.ops-check.is-down { border-color: var(--ops-bad); }
+.ops-check-state { padding-top: 0.1rem; }
+.ops-check-body { display: flex; flex-direction: column; min-width: 0; }
+.ops-check-name { font-weight: 600; font-size: 0.9rem; }
+.ops-check-meta { display: block; font-size: 0.75rem; color: var(--ink-500); overflow-wrap: anywhere; }
+
+.ops-stats { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); margin: 0 0 1rem; }
+.ops-stats div { padding: 0.65rem 0.8rem; background: var(--ink-50); border-radius: 10px; }
+.ops-stats dt { font-size: 0.75rem; color: var(--ink-500); }
+.ops-stats dd { margin: 0.15rem 0 0; font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink-950); }
+
+.ops-bars { margin: 0 0 1rem; }
+.ops-bars figcaption { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.8125rem; color: var(--ink-700); margin-bottom: 0.4rem; }
+.ops-bars-read { color: var(--ink-500); font-variant-numeric: tabular-nums; }
+.ops-bars-read strong { color: var(--ink-950); }
+.ops-bars svg { display: block; width: 100%; height: 7rem; overflow: visible; }
+.ops-bar { fill: var(--ops-series); }
+.ops-bar.is-hover { fill: var(--ink-950); }
+.ops-axis { stroke: var(--ink-300); stroke-width: 0.3; vector-effect: non-scaling-stroke; }
+.ops-bars-x { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--ink-500); margin-top: 0.25rem; }
+
+.ops-two { display: grid; gap: 1rem; grid-template-columns: 1fr; margin-bottom: 0.5rem; }
+@media (min-width: 820px) { .ops-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.ops-table-wrap { overflow-x: auto; margin-bottom: 0.75rem; }
+.ops-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.ops-table caption { text-align: left; font-weight: 650; color: var(--ink-700); padding-bottom: 0.4rem; }
+.ops-table th { text-align: left; font-weight: 600; color: var(--ink-500); border-bottom: 1px solid var(--ink-200); padding: 0.4rem 0.5rem; white-space: nowrap; }
+.ops-table td { border-bottom: 1px solid var(--ink-100); padding: 0.45rem 0.5rem; vertical-align: top; }
+.ops-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ops-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; overflow-wrap: anywhere; }
+.ops-msg { min-width: 14rem; overflow-wrap: anywhere; }
+.ops-tag { display: inline-block; margin-left: 0.4rem; padding: 0 0.4rem; border-radius: 999px; background: var(--ink-100); color: var(--ink-500); font-size: 0.6875rem; }
+
+.ops-chips { margin-bottom: 0.6rem; }
+.ops-feed { list-style: none; margin: 0; padding: 0; max-height: 26rem; overflow-y: auto; }
+.ops-feed li { display: flex; gap: 0.55rem; padding: 0.45rem 0; border-bottom: 1px solid var(--ink-100); font-size: 0.8125rem; min-width: 0; }
+.ops-feed li > svg { flex: none; margin-top: 0.15rem; color: var(--ink-500); }
+.ops-feed li > span { min-width: 0; overflow-wrap: anywhere; }
+.ops-feed a { color: var(--ink-950); text-decoration: none; }
+.ops-feed a:hover { text-decoration: underline; }
