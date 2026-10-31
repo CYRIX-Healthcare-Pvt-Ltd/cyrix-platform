@@ -135,7 +135,14 @@ const fmtBytes = (n: number) => n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Mat
 const fmtAge = (h: number | null) => h === null ? 'never' : h < 1 ? `${Math.round(h * 60)} min ago` : h < 48 ? `${Math.round(h)} h ago` : `${Math.round(h / 24)} d ago`
 
 const fmtInt = (n: number) => n.toLocaleString('en-IN')
-const fmtUsd = (n: number) => `$${n.toFixed(2)}`
+// Rupees beside every dollar. The rate is app_settings.usd_inr, read with the slow tier, so changing it
+// needs no deploy; until it arrives (or if the row is missing) the figure below stands.
+let usdInr = 94.5
+const fmtInr = (n: number) => {
+  const r = n * usdInr
+  return `₹${r < 10 ? r.toFixed(2) : Math.round(r).toLocaleString('en-IN')}`
+}
+const fmtUsd = (n: number) => `$${n.toFixed(2)} (${fmtInr(n)})`
 const ago = (iso: string) => {
   const s = (Date.now() - new Date(iso).getTime()) / 1000
   if (s < 90) return 'just now'
@@ -224,6 +231,10 @@ export default function Ops() {
         pulseSummary().then(keep(setPulse)),
         rpc(setAiApps, 'ops_ai', { p_days: d }),
         rpc(setSecurity, 'ops_security', {}),
+        supabase.from('app_settings').select('value').eq('key', 'usd_inr').maybeSingle().then(r => {
+          const v = Number(r.data?.value)
+          if (v > 0) usdInr = v
+        }),
       )
     }
     return Promise.allSettled(jobs).then(() => { if (daysNow.current === d) setUpdated(Date.now()) })
@@ -878,7 +889,7 @@ function AiPanel({ ai, aiApps, days }: { ai: Part<AiData>; aiApps: Part<AiApps>;
           {apps && apps.unpriced.length > 0 && (
             <p className="ops-note">No price set for {apps.unpriced.join(', ')}: counted, not costed. Add a row to ops_ai_price.</p>
           )}
-          <Bars label="Cost per day (USD)" data={fillDays(days, perDay)} fmt={fmtUsd} />
+          <Bars label={`Cost per day (USD, ₹${usdInr} per $)`} data={fillDays(days, perDay)} fmt={fmtUsd} />
           <SpendTable caption="By app" rows={byApp} />
           <div className="ops-two">
             <SpendTable caption="By model" rows={byModel} />
