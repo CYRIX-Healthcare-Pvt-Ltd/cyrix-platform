@@ -74,6 +74,24 @@ interface PulseData {
   problems: string[]
 }
 
+/** Pulse's and BEMMP's AI calls, metered in the shared database (KPI 0236). Cyra's come from its own meter (/api/ops). */
+interface AiApps {
+  cost: number; calls: number; unpriced: string[]
+  by_day: { day: string; app: string; cost: number; calls: number }[]
+  by_app: { key: string; cost: number; calls: number; tokens: number; people: number }[]
+  by_model: { key: string; cost: number; calls: number; tokens: number; priced: boolean }[]
+  by_feature: { key: string; cost: number; calls: number; tokens: number }[]
+}
+
+/** The 9 Oct audit's findings, measured (KPI 0237). */
+interface SecurityData {
+  testing_mode: unknown
+  accounts: number; checked: number; default_pw: number; must_change: number; last_scan: string | null
+  admins: { code: string; name: string; roles: string[]; default_pw: boolean | null }[]
+  db_bytes: number
+  storage: { bucket: string; files: number; bytes: number }[]
+}
+
 type Part<T> = { state: 'loading' } | { state: 'off' } | { state: 'failed'; error: string } | { state: 'ok'; data: T }
 
 const MODULE_NAMES: Record<string, string> = {
@@ -126,7 +144,7 @@ const ago = (iso: string) => {
   return `${Math.round(s / 86400)} d ago`
 }
 const clock = (ms: number) => new Date(ms).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
-const SECTIONS = [['status', 'Status'], ['uptime', 'Uptime'], ['errors', 'Errors'], ['usage', 'Usage'], ['ai', 'AI cost'], ['pulse', 'Pulse'], ['changes', 'Changes']] as const
+const SECTIONS = [['status', 'Status'], ['uptime', 'Uptime'], ['errors', 'Errors'], ['usage', 'Usage'], ['ai', 'AI cost'], ['pulse', 'Pulse'], ['security', 'Security'], ['changes', 'Changes']] as const
 const shortDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 
 /**
@@ -159,6 +177,8 @@ export default function Ops() {
   const [appErrors, setAppErrors] = useState<Part<AppErrors>>({ state: 'loading' })
   const [ai, setAi] = useState<Part<AiData>>({ state: 'loading' })
   const [pulse, setPulse] = useState<Part<PulseData>>({ state: 'loading' })
+  const [aiApps, setAiApps] = useState<Part<AiApps>>({ state: 'loading' })
+  const [security, setSecurity] = useState<Part<SecurityData>>({ state: 'loading' })
 
   useEffect(() => {
     supabase.rpc('is_ops_admin').then(r => setAllowed(r.data === true), () => setAllowed(false))
@@ -186,7 +206,7 @@ export default function Ops() {
         () => keep(fn)({ state: 'failed', error: 'Could not reach the database' }))
 
     if (reset) {
-      for (const fn of [setOverview, setUptime, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi, setPulse] as
+      for (const fn of [setOverview, setUptime, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi, setPulse, setAiApps, setSecurity] as
                        React.Dispatch<React.SetStateAction<Part<unknown>>>[]) fn({ state: 'loading' })
     }
     const jobs: PromiseLike<unknown>[] = [
@@ -202,6 +222,8 @@ export default function Ops() {
         api<ChangesData>('changes', d).then(keep(setChanges)),
         api<AiData>('ai', d).then(keep(setAi)),
         pulseSummary().then(keep(setPulse)),
+        rpc(setAiApps, 'ops_ai', { p_days: d }),
+        rpc(setSecurity, 'ops_security', {}),
       )
     }
     return Promise.allSettled(jobs).then(() => { if (daysNow.current === d) setUpdated(Date.now()) })
@@ -272,7 +294,7 @@ export default function Ops() {
               {SECTIONS.map(([id, name]) => <a key={id} href={`#${id}`}>{name}</a>)}
             </nav>
 
-            <Attention health={health} uptime={uptime} errors={errors} appErrors={appErrors} deploys={deploys} ai={ai} pulse={pulse} />
+            <Attention health={health} uptime={uptime} errors={errors} appErrors={appErrors} deploys={deploys} ai={ai} pulse={pulse} security={security} />
             <StatusPanel health={health} deploys={deploys} />
             {/* Side by side on a wide screen, one column below that. */}
             <div className="ops-pair">
@@ -281,9 +303,12 @@ export default function Ops() {
             </div>
             <div className="ops-pair">
               <UsagePanel overview={overview} days={days} />
-              <AiPanel ai={ai} days={days} />
+              <AiPanel ai={ai} aiApps={aiApps} days={days} />
             </div>
-            <PulsePanel pulse={pulse} />
+            <div className="ops-pair">
+              <PulsePanel pulse={pulse} />
+              <SecurityPanel security={security} />
+            </div>
             <ChangesPanel changes={changes} deploys={deploys} />
           </>
         )}
@@ -317,11 +342,12 @@ function Waiting<T>({ part, off, children }: { part: Part<T>; off: string; child
  */
 interface Flag { level: 'bad' | 'warn'; text: string; detail?: string; href: string }
 
-function Attention({ health, uptime, errors, appErrors, deploys, ai, pulse }: {
+function Attention({ health, uptime, errors, appErrors, deploys, ai, pulse, security }: {
   health: Part<HealthData>; uptime: Part<Uptime>; errors: Part<ErrorsData>; appErrors: Part<AppErrors>
-  deploys: Part<DeploysData>; ai: Part<AiData>; pulse: Part<PulseData>
+  deploys: Part<DeploysData>; ai: Part<AiData>; pulse: Part<PulseData>; security: Part<SecurityData>
 }) {
-  const flags = useMemo(() => attentionFlags(health, uptime, errors, appErrors, deploys, ai, pulse), [health, uptime, errors, appErrors, deploys, ai, pulse])
+  const flags = useMemo(() => attentionFlags(health, uptime, errors, appErrors, deploys, ai, pulse, security),
+                        [health, uptime, errors, appErrors, deploys, ai, pulse, security])
   const settled = [health, uptime, errors, appErrors].every(p => p.state !== 'loading')
   if (!settled && flags.length === 0) return <div className="ops-attn"><div className="ops-skeleton ops-skeleton-thin" /></div>
   if (flags.length === 0) {
@@ -348,7 +374,8 @@ function Attention({ health, uptime, errors, appErrors, deploys, ai, pulse }: {
 const HOUR = 3_600_000
 
 function attentionFlags(health: Part<HealthData>, uptime: Part<Uptime>, errors: Part<ErrorsData>, appErrors: Part<AppErrors>,
-                               deploys: Part<DeploysData>, ai: Part<AiData>, pulse: Part<PulseData>, now = Date.now()): Flag[] {
+                               deploys: Part<DeploysData>, ai: Part<AiData>, pulse: Part<PulseData>, security: Part<SecurityData>,
+                               now = Date.now()): Flag[] {
   const out: Flag[] = []
   const fmtWhen = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
 
@@ -436,6 +463,18 @@ function attentionFlags(health: Part<HealthData>, uptime: Part<Uptime>, errors: 
     if (d && d.free_pct !== null && d.free_pct < 15) {
       out.push({ level: d.free_pct < 5 ? 'bad' : 'warn', text: `Pulse server disk ${d.free_pct}% free`,
                  detail: `${fmtBytes(d.free_bytes)} left · backups need room every night`, href: '#pulse' })
+    }
+  }
+  // The 9 Oct audit's two critical findings, until they are fixed.
+  if (security.state === 'ok') {
+    const sec = security.data
+    if (sec.testing_mode === true || sec.testing_mode === 'true') {
+      out.push({ level: 'bad', text: 'testing_mode is on in production', detail: 'Lets passwords be reset to the employee code. Turn it off.', href: '#security' })
+    }
+    const admins = sec.admins.filter(a => a.default_pw)
+    if (admins.length) {
+      out.push({ level: 'bad', text: `${admins.length} admin account${admins.length > 1 ? 's' : ''} still on the default password`,
+                 detail: admins.map(a => `${a.code} (${a.roles.join(', ')})`).join(' · '), href: '#security' })
     }
   }
   return out.sort((a, b) => (a.level === b.level ? 0 : a.level === 'bad' ? -1 : 1))
@@ -798,22 +837,100 @@ function ChangesPanel({ changes, deploys }: { changes: Part<ChangesData>; deploy
   )
 }
 
-function AiPanel({ ai, days }: { ai: Part<AiData>; days: number }) {
+/** Cyra's spend from its own meter, Pulse's and BEMMP's from the shared database (KPI 0236), on one bill. */
+function AiPanel({ ai, aiApps, days }: { ai: Part<AiData>; aiApps: Part<AiApps>; days: number }) {
+  if (ai.state === 'loading' || aiApps.state === 'loading') return <Panel id="ai" title="AI cost"><div className="ops-skeleton" /></Panel>
+  const cyra = ai.state === 'ok' ? ai.data : null
+  const apps = aiApps.state === 'ok' ? aiApps.data : null
+  const problems = [
+    ai.state === 'failed' && `Cyra Assist: ${ai.error}`,
+    ai.state === 'off' && 'Cyra Assist is not connected: CYRA_SUPABASE_URL and CYRA_SERVICE_KEY are not on the portal.',
+    aiApps.state === 'failed' && `Pulse and BEMMP: ${aiApps.error}`,
+    aiApps.state === 'off' && 'Pulse and BEMMP are not metered yet: KPI migration 0236 is not applied.',
+  ].filter(Boolean) as string[]
+
+  const perDay = new Map<string, number>()
+  for (const d of cyra?.by_day ?? []) perDay.set(d.key, (perDay.get(d.key) ?? 0) + d.cost)
+  for (const d of apps?.by_day ?? []) perDay.set(d.day, (perDay.get(d.day) ?? 0) + d.cost)
+  const cost = (cyra?.cost ?? 0) + (apps?.cost ?? 0)
+  const calls = (cyra?.calls ?? 0) + (apps?.calls ?? 0)
+  const byApp: Spend[] = [
+    ...(cyra ? [{ key: 'Cyra Assist', calls: cyra.calls, tokens: cyra.by_model.reduce((t, m) => t + m.tokens, 0), cost: cyra.cost }] : []),
+    ...(apps?.by_app ?? []).map(x => ({ key: MODULE_NAMES[x.key] ?? x.key, calls: x.calls, tokens: x.tokens, cost: x.cost })),
+  ].sort((x, y) => y.cost - x.cost)
+  const byModel: Spend[] = [
+    ...(cyra?.by_model ?? []).map(m => ({ ...m, key: `cyra · ${m.key}` })),
+    ...(apps?.by_model ?? []).map(m => ({ key: m.key, calls: m.calls, tokens: m.tokens, cost: m.cost })),
+  ].sort((x, y) => y.cost - x.cost)
+  const byFeature: Spend[] = [
+    ...(cyra?.by_route ?? []).map(m => ({ ...m, key: `cyra · ${m.key}` })),
+    ...(apps?.by_feature ?? []),
+  ].sort((x, y) => y.cost - x.cost)
+
   return (
-    <Panel id="ai" title="AI usage" note="Estimated from CYRA's own meter and its price table. Pulse and BEMMP are not metered yet.">
-      <Waiting part={ai} off="Not set up yet: CYRA_SUPABASE_URL and CYRA_SERVICE_KEY are not on the portal's Vercel project.">
-        {a => (
-          <>
-            <Stats items={[{ label: `Cost, last ${days} days`, value: fmtUsd(a.cost) },
-                           { label: 'Calls', value: fmtInt(a.calls) },
-                           { label: 'Per day, average', value: fmtUsd(a.cost / days) }]} />
-            <Bars label="Cost per day (USD)" data={fillDays(days, new Map(a.by_day.map(d => [d.key, d.cost])))} fmt={fmtUsd} />
-            <div className="ops-two">
-              <SpendTable caption="By model" rows={a.by_model} />
-              <SpendTable caption="By feature" rows={a.by_route} />
-            </div>
-          </>
-        )}
+    <Panel id="ai" title="AI cost" note="Estimated from each app's own meter and the price tables. Speech is not metered.">
+      {problems.map(p => <p key={p} className="ops-off">{p}</p>)}
+      {(cyra || apps) && (
+        <>
+          <Stats items={[{ label: `Cost, last ${days} days`, value: fmtUsd(cost) },
+                         { label: 'Calls', value: fmtInt(calls) },
+                         { label: 'Per day, average', value: fmtUsd(cost / days) }]} />
+          {apps && apps.unpriced.length > 0 && (
+            <p className="ops-note">No price set for {apps.unpriced.join(', ')}: counted, not costed. Add a row to ops_ai_price.</p>
+          )}
+          <Bars label="Cost per day (USD)" data={fillDays(days, perDay)} fmt={fmtUsd} />
+          <SpendTable caption="By app" rows={byApp} />
+          <div className="ops-two">
+            <SpendTable caption="By model" rows={byModel} />
+            <SpendTable caption="By feature" rows={byFeature} />
+          </div>
+        </>
+      )}
+    </Panel>
+  )
+}
+
+/** The 9 Oct audit's findings, measured nightly-ish (KPI 0237): testing_mode, default passwords, what is stored. */
+function SecurityPanel({ security }: { security: Part<SecurityData> }) {
+  return (
+    <Panel id="security" title="Security" note="Passwords are checked against the issued default, about every 3 hours. Only yes or no is kept.">
+      <Waiting part={security} off="Not set up yet: KPI migration 0237 has not been applied.">
+        {sec => {
+          const testing = sec.testing_mode === true || sec.testing_mode === 'true'
+          const storage = sec.storage.reduce((t, b) => t + b.bytes, 0)
+          const pct = sec.checked ? Math.round((100 * sec.default_pw) / sec.checked) : null
+          return (
+            <>
+              <Stats items={[
+                { label: 'testing_mode', value: testing ? 'On' : 'Off' },
+                { label: 'On default password', value: pct === null ? '—' : `${fmtInt(sec.default_pw)} (${pct}%)` },
+                { label: 'Must change at sign-in', value: fmtInt(sec.must_change) },
+                { label: 'Database + files', value: `${fmtBytes(sec.db_bytes)} + ${fmtBytes(storage)}` },
+              ]} />
+              {sec.checked < sec.accounts && (
+                <p className="ops-note">Checked {fmtInt(sec.checked)} of {fmtInt(sec.accounts)} accounts so far; the rest within about 3 hours.</p>
+              )}
+              <div className="ops-table-wrap">
+                <table className="ops-table">
+                  <caption>Admin accounts</caption>
+                  <thead><tr><th>Account</th><th>Roles</th><th>Password</th></tr></thead>
+                  <tbody>
+                    {sec.admins.map(a => (
+                      <tr key={a.code}>
+                        <td>{a.code} · {a.name}</td>
+                        <td className="ops-mono">{a.roles.join(', ')}</td>
+                        <td className={a.default_pw ? 'down' : undefined}>{a.default_pw == null ? 'Not checked yet' : a.default_pw ? 'Default' : 'Changed'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="ops-note">
+                Supabase keeps 7 days of database backups. Uploaded files ({fmtBytes(storage)}) are not backed up anywhere.
+              </p>
+            </>
+          )
+        }}
       </Waiting>
     </Panel>
   )
