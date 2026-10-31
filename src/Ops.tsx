@@ -64,6 +64,16 @@ type ChangesData = { repos: { repo: string; commits: number; failed: string | nu
 type ErrorsData = { total: number; truncated: boolean; by_day: { day: string; errors: number }[]; groups: ErrGroup[] }
 type AiData = { cost: number; calls: number; unmetered: string[]; by_day: Spend[]; by_model: Spend[]; by_route: Spend[] }
 
+/** Pulse's own view of itself (Pulse 1.12.0, GET /pulse/api/ops/summary): what only cyrix-svc01 can see. */
+interface PulseData {
+  sync: { job: string; every_hours: number; age_hours: number | null; late: boolean }[]
+  backups: { count: number; total_bytes: number; newest: { name: string; size_bytes: number } | null; age_hours: number | null; late: boolean; scheduled_hour_ist: number }
+  disk: { total_bytes: number; free_bytes: number; free_pct: number | null } | null
+  ai_chat: { day: string; questions: number; people: number }[]
+  backup_failures: { at: string; by: string; file: string | null }[]
+  problems: string[]
+}
+
 type Part<T> = { state: 'loading' } | { state: 'off' } | { state: 'failed'; error: string } | { state: 'ok'; data: T }
 
 const MODULE_NAMES: Record<string, string> = {
@@ -89,6 +99,23 @@ async function api<T>(part: string, days: number): Promise<Part<T>> {
 const QUICK_MS = 60_000
 const SLOW_MS = 5 * 60_000
 
+/** Same origin: app.cyrix.in/pulse/ is a rewrite to cyrix-svc01, so the portal's own session goes straight through. */
+async function pulseSummary(): Promise<Part<PulseData>> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const r = await fetch('/pulse/api/ops/summary', { headers: { Authorization: `Bearer ${session?.access_token ?? ''}` } })
+    if (r.status === 404) return { state: 'off' }
+    const body = await r.json().catch(() => null)
+    if (!r.ok) return { state: 'failed', error: body?.detail ?? `Pulse answered ${r.status}` }
+    return { state: 'ok', data: body as PulseData }
+  } catch {
+    return { state: 'failed', error: 'Could not reach Pulse' }
+  }
+}
+
+const fmtBytes = (n: number) => n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`
+const fmtAge = (h: number | null) => h === null ? 'never' : h < 1 ? `${Math.round(h * 60)} min ago` : h < 48 ? `${Math.round(h)} h ago` : `${Math.round(h / 24)} d ago`
+
 const fmtInt = (n: number) => n.toLocaleString('en-IN')
 const fmtUsd = (n: number) => `$${n.toFixed(2)}`
 const ago = (iso: string) => {
@@ -99,7 +126,7 @@ const ago = (iso: string) => {
   return `${Math.round(s / 86400)} d ago`
 }
 const clock = (ms: number) => new Date(ms).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
-const SECTIONS = [['status', 'Status'], ['uptime', 'Uptime'], ['errors', 'Errors'], ['usage', 'Usage'], ['changes', 'Changes'], ['ai', 'AI cost']] as const
+const SECTIONS = [['status', 'Status'], ['uptime', 'Uptime'], ['errors', 'Errors'], ['usage', 'Usage'], ['ai', 'AI cost'], ['pulse', 'Pulse'], ['changes', 'Changes']] as const
 const shortDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 
 /**
@@ -131,6 +158,7 @@ export default function Ops() {
   const [errors, setErrors] = useState<Part<ErrorsData>>({ state: 'loading' })
   const [appErrors, setAppErrors] = useState<Part<AppErrors>>({ state: 'loading' })
   const [ai, setAi] = useState<Part<AiData>>({ state: 'loading' })
+  const [pulse, setPulse] = useState<Part<PulseData>>({ state: 'loading' })
 
   useEffect(() => {
     supabase.rpc('is_ops_admin').then(r => setAllowed(r.data === true), () => setAllowed(false))
@@ -158,7 +186,7 @@ export default function Ops() {
         () => keep(fn)({ state: 'failed', error: 'Could not reach the database' }))
 
     if (reset) {
-      for (const fn of [setOverview, setUptime, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi] as
+      for (const fn of [setOverview, setUptime, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi, setPulse] as
                        React.Dispatch<React.SetStateAction<Part<unknown>>>[]) fn({ state: 'loading' })
     }
     const jobs: PromiseLike<unknown>[] = [
@@ -173,6 +201,7 @@ export default function Ops() {
         api<DeploysData>('deploys', d).then(keep(setDeploys)),
         api<ChangesData>('changes', d).then(keep(setChanges)),
         api<AiData>('ai', d).then(keep(setAi)),
+        pulseSummary().then(keep(setPulse)),
       )
     }
     return Promise.allSettled(jobs).then(() => { if (daysNow.current === d) setUpdated(Date.now()) })
@@ -243,7 +272,7 @@ export default function Ops() {
               {SECTIONS.map(([id, name]) => <a key={id} href={`#${id}`}>{name}</a>)}
             </nav>
 
-            <Attention health={health} uptime={uptime} errors={errors} appErrors={appErrors} deploys={deploys} ai={ai} />
+            <Attention health={health} uptime={uptime} errors={errors} appErrors={appErrors} deploys={deploys} ai={ai} pulse={pulse} />
             <StatusPanel health={health} deploys={deploys} />
             {/* Side by side on a wide screen, one column below that. */}
             <div className="ops-pair">
@@ -254,6 +283,7 @@ export default function Ops() {
               <UsagePanel overview={overview} days={days} />
               <AiPanel ai={ai} days={days} />
             </div>
+            <PulsePanel pulse={pulse} />
             <ChangesPanel changes={changes} deploys={deploys} />
           </>
         )}
@@ -287,11 +317,11 @@ function Waiting<T>({ part, off, children }: { part: Part<T>; off: string; child
  */
 interface Flag { level: 'bad' | 'warn'; text: string; detail?: string; href: string }
 
-function Attention({ health, uptime, errors, appErrors, deploys, ai }: {
+function Attention({ health, uptime, errors, appErrors, deploys, ai, pulse }: {
   health: Part<HealthData>; uptime: Part<Uptime>; errors: Part<ErrorsData>; appErrors: Part<AppErrors>
-  deploys: Part<DeploysData>; ai: Part<AiData>
+  deploys: Part<DeploysData>; ai: Part<AiData>; pulse: Part<PulseData>
 }) {
-  const flags = useMemo(() => attentionFlags(health, uptime, errors, appErrors, deploys, ai), [health, uptime, errors, appErrors, deploys, ai])
+  const flags = useMemo(() => attentionFlags(health, uptime, errors, appErrors, deploys, ai, pulse), [health, uptime, errors, appErrors, deploys, ai, pulse])
   const settled = [health, uptime, errors, appErrors].every(p => p.state !== 'loading')
   if (!settled && flags.length === 0) return <div className="ops-attn"><div className="ops-skeleton ops-skeleton-thin" /></div>
   if (flags.length === 0) {
@@ -318,7 +348,7 @@ function Attention({ health, uptime, errors, appErrors, deploys, ai }: {
 const HOUR = 3_600_000
 
 function attentionFlags(health: Part<HealthData>, uptime: Part<Uptime>, errors: Part<ErrorsData>, appErrors: Part<AppErrors>,
-                               deploys: Part<DeploysData>, ai: Part<AiData>, now = Date.now()): Flag[] {
+                               deploys: Part<DeploysData>, ai: Part<AiData>, pulse: Part<PulseData>, now = Date.now()): Flag[] {
   const out: Flag[] = []
   const fmtWhen = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
 
@@ -389,6 +419,23 @@ function attentionFlags(health: Part<HealthData>, uptime: Part<Uptime>, errors: 
     const costToday = ai.data.by_day.find(d => d.key === today)?.cost ?? 0
     if (costToday >= 2 && costToday > 2 * avgCost) {
       out.push({ level: 'warn', text: `AI cost today ${fmtUsd(costToday)}`, detail: `Average ${fmtUsd(avgCost)} a day`, href: '#ai' })
+    }
+  }
+  // Pulse can answer every check and still be showing directors yesterday's numbers.
+  if (pulse.state === 'ok') {
+    const late = pulse.data.sync.filter(j => j.late)
+    if (late.length) {
+      out.push({ level: 'bad', text: `Pulse SAP sync is late: ${late.map(j => j.job.replace(/^cyx/, '')).join(', ')}`,
+                 detail: `Last success ${fmtAge(Math.max(...late.map(j => j.age_hours ?? Infinity)))} · directors see old figures`, href: '#pulse' })
+    }
+    const b = pulse.data.backups
+    if (b.late) {
+      out.push({ level: 'bad', text: 'Pulse backup missed', detail: b.newest ? `Newest is ${fmtAge(b.age_hours)}` : 'No backup file found', href: '#pulse' })
+    }
+    const d = pulse.data.disk
+    if (d && d.free_pct !== null && d.free_pct < 15) {
+      out.push({ level: d.free_pct < 5 ? 'bad' : 'warn', text: `Pulse server disk ${d.free_pct}% free`,
+                 detail: `${fmtBytes(d.free_bytes)} left · backups need room every night`, href: '#pulse' })
     }
   }
   return out.sort((a, b) => (a.level === b.level ? 0 : a.level === 'bad' ? -1 : 1))
@@ -529,7 +576,7 @@ function ErrorsPanel({ errors, appErrors, days }: { errors: Part<ErrorsData>; ap
 
   const total = (apps?.total ?? 0) + (cyra?.total ?? 0)
   return (
-    <Panel id="errors" title="Errors" note="What broke in front of somebody, grouped by message. Pulse is not reporting yet.">
+    <Panel id="errors" title="Errors" note="What broke in front of somebody, grouped by message.">
       {problems.map(p => <p key={p} className="ops-off">{p}</p>)}
       {(apps || cyra) && (
         <>
@@ -635,6 +682,60 @@ function UsagePanel({ overview, days }: { overview: Part<Overview>; days: number
             )}
           </>
         )}
+      </Waiting>
+    </Panel>
+  )
+}
+
+/** What only cyrix-svc01 can see about Pulse: the SAP sync, the nightly backup, the disk under both, the AI chat. */
+function PulsePanel({ pulse }: { pulse: Part<PulseData> }) {
+  return (
+    <Panel id="pulse" title="Pulse" note="From the Pulse server itself: SAP sync, nightly backup, disk, AI chat.">
+      <Waiting part={pulse} off="Not live yet: waiting for Pulse 1.12.0 to be deployed on cyrix-svc01.">
+        {p => {
+          const week = p.ai_chat.filter(d => d.day >= istDay(Date.now() - 6 * 86_400_000))
+          return (
+            <>
+              <Stats items={[
+                { label: 'SAP sync', value: p.sync.some(j => j.late) ? `${p.sync.filter(j => j.late).length} late` : 'On time' },
+                { label: 'Last backup', value: fmtAge(p.backups.age_hours) },
+                { label: 'Disk free', value: p.disk?.free_pct == null ? '—' : `${p.disk.free_pct}%` },
+                { label: 'AI chat, 7 days', value: fmtInt(week.reduce((a, d) => a + d.questions, 0)) },
+              ]} />
+              {p.problems.map(x => <p key={x} className="ops-failed"><AlertTriangle size={15} /> Pulse could not read {x}</p>)}
+              <div className="ops-two">
+                <div className="ops-table-wrap">
+                  <table className="ops-table">
+                    <caption>SAP sync jobs</caption>
+                    <thead><tr><th>Job</th><th>Runs</th><th>Last success</th></tr></thead>
+                    <tbody>
+                      {p.sync.map(j => (
+                        <tr key={j.job}>
+                          <td>{j.late ? <XCircle size={13} className="down" /> : <CheckCircle2 size={13} className="ok" />} {j.job.replace(/^cyx/, '')}</td>
+                          <td>{j.every_hours === 1 ? 'Hourly' : 'Daily'}</td>
+                          <td className={j.late ? 'down' : undefined}>{fmtAge(j.age_hours)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="ops-table-wrap">
+                  <table className="ops-table">
+                    <caption>Backups</caption>
+                    <tbody>
+                      <tr><td>Newest</td><td className={p.backups.late ? 'down' : undefined}>{p.backups.newest ? `${fmtAge(p.backups.age_hours)} · ${fmtBytes(p.backups.newest.size_bytes)}` : 'None found'}</td></tr>
+                      <tr><td>Schedule</td><td>Nightly, {String(p.backups.scheduled_hour_ist).padStart(2, '0')}:00 IST</td></tr>
+                      <tr><td>Kept</td><td>{fmtInt(p.backups.count)} files · {fmtBytes(p.backups.total_bytes)}</td></tr>
+                      <tr><td>Disk</td><td>{p.disk ? `${fmtBytes(p.disk.free_bytes)} free of ${fmtBytes(p.disk.total_bytes)}` : '—'}</td></tr>
+                      <tr><td>Failed, 30 days</td><td className={p.backup_failures.length ? 'down' : undefined}>{p.backup_failures.length || 'None'}</td></tr>
+                    </tbody>
+                  </table>
+                  <p className="ops-note">Backups sit on the same server as the database, so a lost disk loses both.</p>
+                </div>
+              </div>
+            </>
+          )
+        }}
       </Waiting>
     </Panel>
   )
