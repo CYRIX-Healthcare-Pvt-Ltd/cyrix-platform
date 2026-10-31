@@ -4,6 +4,8 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "redirects": [
+    { "source": "/inventory", "destination": "/workplace/", "permanent": false },
+    { "source": "/inventory/:rest*", "destination": "/workplace/:rest*", "permanent": false },
     { "source": "/my-kpi", "destination": "/kpi/my-kpi", "permanent": false },
     { "source": "/my-kpi/:rest*", "destination": "/kpi/my-kpi/:rest*", "permanent": false },
     { "source": "/history", "destination": "/kpi/history", "permanent": false },
@@ -82,12 +84,12 @@
       "destination": "https://cyrix-task.vercel.app/tasks/:path*"
     },
     {
-      "source": "/inventory/",
-      "destination": "https://cyrix-inventory.vercel.app/inventory/"
+      "source": "/workplace/",
+      "destination": "https://cyrix-workplace.vercel.app/workplace/"
     },
     {
-      "source": "/inventory/:path*",
-      "destination": "https://cyrix-inventory.vercel.app/inventory/:path*"
+      "source": "/workplace/:path*",
+      "destination": "https://cyrix-workplace.vercel.app/workplace/:path*"
     },
     {
       "source": "/cyra/",

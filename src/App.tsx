@@ -13,7 +13,7 @@ import Ops from './Ops'
 import { deviceCheck, sessionIdOf, sessionState, type DeviceCheck } from './lib/session'
 import type { Session } from '@supabase/supabase-js'
 import {
-  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, Gauge, LayoutGrid, LogOut, ArrowRight, Loader2,
+  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, Gauge, Briefcase, LayoutGrid, LogOut, ArrowRight, Loader2,
   Eye, EyeOff,
 } from 'lucide-react'
 import { supabase, ecodeToEmail, type Module } from './lib/supabase'
@@ -30,7 +30,7 @@ import { supabase, ecodeToEmail, type Module } from './lib/supabase'
 
 /** The icon names the registry uses, resolved to real components. */
 const ICONS: Record<string, typeof ClipboardList> = {
-  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, Gauge,
+  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, Gauge, Briefcase,
 }
 
 /**
