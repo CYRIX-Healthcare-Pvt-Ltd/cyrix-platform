@@ -13,8 +13,9 @@
 }
 
 .ops-back { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--ink-700); text-decoration: none; }
-.ops-main { max-width: 72rem; margin: 0 auto; padding: 2rem 1rem 5rem; }
-@media (min-width: 640px) { .ops-main { padding: 3rem 2rem 6rem; } }
+.ops-main { max-width: 104rem; margin: 0 auto; padding: 2rem 1rem 5rem; }
+@media (min-width: 640px) { .ops-main { padding: 2rem 2rem 6rem; } }
+@media (min-width: 1280px) { .ops-main { padding: 2rem 2.5rem 6rem; } }
 .ops-main h1 { font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 700; letter-spacing: -0.025em; margin: 0; }
 .ops-main .sub { margin-bottom: 0; }
 
@@ -117,3 +118,9 @@
 .ops-attn a:hover > span:first-child { text-decoration: underline; }
 .ops-skeleton-thin { height: 2.5rem; }
 .ops-attn.is-warn { border-color: var(--ops-warn); }
+
+/* Wide screens (31 Oct, "too much blank space"): the page takes the width and pairs panels that read together. */
+.ops-pair { display: grid; gap: 0 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1280px) { .ops-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ops-pair .ops-two { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1700px) { .ops-pair .ops-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
