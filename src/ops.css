@@ -20,7 +20,11 @@
 .ops-main .sub { margin-bottom: 0; }
 
 .ops-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
-.ops-controls { display: flex; align-items: center; gap: 0.5rem; }
+.ops-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.ops-select {
+  font: inherit; font-size: 0.8125rem; color: var(--ink-950); background: var(--ink-100); border: 0;
+  border-radius: 999px; padding: 0.45rem 0.9rem; cursor: pointer;
+}
 .ops-seg, .ops-chips { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; }
 .ops-seg { padding: 0.2rem; background: var(--ink-100); border-radius: 999px; }
 .ops-seg button, .ops-chips button {
