@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Loader2, RefreshCw, GitCommitHorizontal, Rocket,
+  ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Loader2, RefreshCw, GitCommitHorizontal, Rocket, BellRing,
 } from 'lucide-react'
 import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
@@ -18,6 +18,11 @@ import './ops.css'
  *
  * A source that is not set up yet says so in its own panel rather than leaving it blank, because an empty
  * error list and an error list nobody can read look exactly alike.
+ *
+ * It keeps itself current (the user, 31 Oct: "make it auto"): the quick sources every minute while the tab is
+ * on screen, and everything again when somebody comes back to it. Deploys, commits, usage and AI cost move
+ * slowly and cost a GitHub or Vercel call each, so they ride along every five minutes. A refresh never blanks
+ * a panel, and one that fails keeps what it last showed rather than swapping good figures for an error.
  */
 
 type Days = 7 | 30 | 90
@@ -81,6 +86,9 @@ async function api<T>(part: string, days: number): Promise<Part<T>> {
   }
 }
 
+const QUICK_MS = 60_000
+const SLOW_MS = 5 * 60_000
+
 const fmtInt = (n: number) => n.toLocaleString('en-IN')
 const fmtUsd = (n: number) => `$${n.toFixed(2)}`
 const ago = (iso: string) => {
@@ -90,6 +98,8 @@ const ago = (iso: string) => {
   if (s < 129600) return `${Math.round(s / 3600)} h ago`
   return `${Math.round(s / 86400)} d ago`
 }
+const clock = (ms: number) => new Date(ms).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
+const SECTIONS = [['status', 'Status'], ['uptime', 'Uptime'], ['errors', 'Errors'], ['usage', 'Usage'], ['changes', 'Changes'], ['ai', 'AI cost']] as const
 const shortDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 
 /**
@@ -110,7 +120,8 @@ function fillDays(days: number, values: Map<string, number>) {
 export default function Ops() {
   const [allowed, setAllowed] = useState<boolean | null>(null)
   const [days, setDays] = useState<Days>(30)
-  const [round, setRound] = useState(0)
+  const [updated, setUpdated] = useState<number | null>(null)
+  const [busy, setBusy] = useState(false)
 
   const [overview, setOverview] = useState<Part<Overview>>({ state: 'loading' })
   const [uptime, setUptime] = useState<Part<Uptime>>({ state: 'loading' })
@@ -125,39 +136,73 @@ export default function Ops() {
     supabase.rpc('is_ops_admin').then(r => setAllowed(r.data === true), () => setAllowed(false))
   }, [])
 
-  useEffect(() => {
-    if (!allowed) return
-    let alive = true
-    const set = <T,>(fn: (p: Part<T>) => void) => (p: Part<T>) => { if (alive) fn(p) }
-    setOverview({ state: 'loading' }); setDeploys({ state: 'loading' }); setChanges({ state: 'loading' })
-    setErrors({ state: 'loading' }); setAi({ state: 'loading' })
-    setUptime({ state: 'loading' }); setAppErrors({ state: 'loading' })
-    supabase.rpc('ops_errors', { p_days: Math.min(days, 90) }).then(
-      r => set(setAppErrors)(r.error ? { state: r.error.code === 'PGRST202' ? 'off' : 'failed', error: r.error.message } as Part<AppErrors>
-                                     : { state: 'ok', data: r.data as AppErrors }),
-      () => set(setAppErrors)({ state: 'failed', error: 'Could not reach the database' }))
-    supabase.rpc('ops_uptime', { p_days: Math.min(days, 90) }).then(
-      r => set(setUptime)(r.error ? { state: r.error.code === 'PGRST202' ? 'off' : 'failed', error: r.error.message } as Part<Uptime>
-                                  : { state: 'ok', data: r.data as Uptime }),
-      () => set(setUptime)({ state: 'failed', error: 'Could not reach the database' }))
-    supabase.rpc('ops_overview', { p_days: days }).then(
-      r => set(setOverview)(r.error ? { state: 'failed', error: r.error.message } : { state: 'ok', data: r.data as Overview }),
-      () => set(setOverview)({ state: 'failed', error: 'Could not reach the database' }))
-    void api<DeploysData>('deploys', days).then(set(setDeploys))
-    void api<ChangesData>('changes', days).then(set(setChanges))
-    void api<ErrorsData>('errors', days).then(set(setErrors))
-    void api<AiData>('ai', days).then(set(setAi))
-    return () => { alive = false }
-  }, [allowed, days, round])
+  const daysNow = useRef(days)
+  daysNow.current = days
+  const lastLoad = useRef(0)
+  const lastSlow = useRef(0)
 
-  // Health does not depend on the window, and is the one worth re-asking on its own.
+  /** reset: blank every panel first (a new period). slow: ask the slow sources too. */
+  const load = useCallback((reset: boolean, slow: boolean) => {
+    const d = days
+    lastLoad.current = Date.now()
+    if (slow) lastSlow.current = Date.now()
+    // Drop answers for a period nobody is looking at any more, and never trade good figures for a failed refresh.
+    const keep = <T,>(fn: React.Dispatch<React.SetStateAction<Part<T>>>) => (p: Part<T>) => {
+      if (daysNow.current !== d) return
+      fn(prev => (!reset && p.state === 'failed' && prev.state === 'ok') ? prev : p)
+    }
+    const rpc = <T,>(fn: React.Dispatch<React.SetStateAction<Part<T>>>, name: string, args: Record<string, number>, offWhenMissing = true) =>
+      supabase.rpc(name, args).then(
+        r => keep(fn)(r.error ? { state: offWhenMissing && r.error.code === 'PGRST202' ? 'off' : 'failed', error: r.error.message } as Part<T>
+                              : { state: 'ok', data: r.data as T }),
+        () => keep(fn)({ state: 'failed', error: 'Could not reach the database' }))
+
+    if (reset) {
+      for (const fn of [setOverview, setUptime, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi] as
+                       React.Dispatch<React.SetStateAction<Part<unknown>>>[]) fn({ state: 'loading' })
+    }
+    const jobs: PromiseLike<unknown>[] = [
+      rpc(setAppErrors, 'ops_errors', { p_days: Math.min(d, 90) }),
+      rpc(setUptime, 'ops_uptime', { p_days: Math.min(d, 90) }),
+      api<HealthData>('health', 1).then(keep(setHealth)),
+      api<ErrorsData>('errors', d).then(keep(setErrors)),
+    ]
+    if (slow) {
+      jobs.push(
+        rpc(setOverview, 'ops_overview', { p_days: d }, false),
+        api<DeploysData>('deploys', d).then(keep(setDeploys)),
+        api<ChangesData>('changes', d).then(keep(setChanges)),
+        api<AiData>('ai', d).then(keep(setAi)),
+      )
+    }
+    return Promise.allSettled(jobs).then(() => { if (daysNow.current === d) setUpdated(Date.now()) })
+  }, [days])
+
+  useEffect(() => { if (allowed) void load(true, true) }, [allowed, load])
+
+  // Every minute while the tab is on screen; at once on coming back to it after a while away.
   useEffect(() => {
     if (!allowed) return
-    let alive = true
-    setHealth({ state: 'loading' })
-    void api<HealthData>('health', 1).then(p => { if (alive) setHealth(p) })
-    return () => { alive = false }
-  }, [allowed, round])
+    const due = () => Date.now() - lastSlow.current >= SLOW_MS
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void load(false, due())
+    }, QUICK_MS)
+    const back = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastLoad.current >= 30_000) void load(false, due())
+    }
+    document.addEventListener('visibilitychange', back)
+    window.addEventListener('focus', back)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', back)
+      window.removeEventListener('focus', back)
+    }
+  }, [allowed, load])
+
+  const refreshNow = () => {
+    setBusy(true)
+    void load(false, true).finally(() => setBusy(false))
+  }
 
   if (allowed === null) return <div className="splash"><Loader2 className="spin" size={22} aria-label="Loading" /></div>
 
@@ -184,10 +229,21 @@ export default function Ops() {
                     <button key={d} aria-pressed={days === d} onClick={() => setDays(d)}>{d} days</button>
                   ))}
                 </div>
-                <button className="icon-btn" title="Check again" onClick={() => setRound(r => r + 1)}><RefreshCw size={16} /></button>
+                <button className="icon-btn" title="Check again now" onClick={refreshNow} disabled={busy}>
+                  <RefreshCw size={16} className={busy ? 'spin' : undefined} />
+                </button>
               </div>
             </div>
+            <p className="ops-live" aria-live="polite">
+              <span className="ops-live-dot" aria-hidden="true" />
+              {updated ? `Updated ${clock(updated)}` : 'Loading'} · refreshes every minute while open
+            </p>
 
+            <nav className="ops-jump" aria-label="Sections">
+              {SECTIONS.map(([id, name]) => <a key={id} href={`#${id}`}>{name}</a>)}
+            </nav>
+
+            <Attention health={health} uptime={uptime} errors={errors} appErrors={appErrors} deploys={deploys} ai={ai} />
             <StatusPanel health={health} deploys={deploys} />
             <UptimePanel uptime={uptime} days={days} />
             <ErrorsPanel errors={errors} appErrors={appErrors} days={days} />
@@ -203,9 +259,9 @@ export default function Ops() {
 
 /* ---- panels --------------------------------------------------------------------------------------------- */
 
-function Panel({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+function Panel({ id, title, note, children }: { id?: string; title: string; note?: string; children: React.ReactNode }) {
   return (
-    <section className="ops-panel">
+    <section className="ops-panel" id={id}>
       <div className="ops-panel-head"><h2>{title}</h2>{note && <span className="ops-note">{note}</span>}</div>
       {children}
     </section>
@@ -219,6 +275,120 @@ function Waiting<T>({ part, off, children }: { part: Part<T>; off: string; child
   return <>{children(part.data)}</>
 }
 
+/**
+ * The first thing on the page: what needs somebody now, worked out from the panels below. Without it the page
+ * showed everything and pointed at nothing — Cyra Assist ran out of OpenAI credit for two weeks with every
+ * failure listed in the Errors panel, three screens down, and nobody was told. Each line links to its panel.
+ */
+interface Flag { level: 'bad' | 'warn'; text: string; detail?: string; href: string }
+
+function Attention({ health, uptime, errors, appErrors, deploys, ai }: {
+  health: Part<HealthData>; uptime: Part<Uptime>; errors: Part<ErrorsData>; appErrors: Part<AppErrors>
+  deploys: Part<DeploysData>; ai: Part<AiData>
+}) {
+  const flags = useMemo(() => attentionFlags(health, uptime, errors, appErrors, deploys, ai), [health, uptime, errors, appErrors, deploys, ai])
+  const settled = [health, uptime, errors, appErrors].every(p => p.state !== 'loading')
+  if (!settled && flags.length === 0) return <div className="ops-attn"><div className="ops-skeleton ops-skeleton-thin" /></div>
+  if (flags.length === 0) {
+    return <p className="ops-attn is-clear"><CheckCircle2 size={17} className="ok" /> Nothing needs you right now.</p>
+  }
+  return (
+    <section className={flags.some(f => f.level === 'bad') ? 'ops-attn' : 'ops-attn is-warn'} aria-labelledby="ops-attn-h">
+      <h2 id="ops-attn-h"><BellRing size={16} /> Needs attention</h2>
+      <ul>
+        {flags.map((f, i) => (
+          <li key={i} className={f.level === 'bad' ? 'is-bad' : 'is-warn'}>
+            {f.level === 'bad' ? <XCircle size={15} /> : <AlertTriangle size={15} />}
+            <a href={f.href}>
+              <span>{f.text}</span>
+              {f.detail && <span className="ops-check-meta">{f.detail}</span>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+const HOUR = 3_600_000
+
+function attentionFlags(health: Part<HealthData>, uptime: Part<Uptime>, errors: Part<ErrorsData>, appErrors: Part<AppErrors>,
+                               deploys: Part<DeploysData>, ai: Part<AiData>, now = Date.now()): Flag[] {
+  const out: Flag[] = []
+  const fmtWhen = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
+
+  // Down now: the live check first, the 5-minute history if the live one is not in yet.
+  const down = new Set<string>()
+  if (health.state === 'ok') {
+    for (const c of health.data.checks.filter(c => !c.ok)) {
+      down.add(c.name)
+      out.push({ level: 'bad', text: `${c.name} is not answering`, detail: c.problem ?? (c.status ? `Answered ${c.status}` : undefined), href: '#status' })
+    }
+  }
+  if (uptime.state === 'ok') {
+    for (const t of uptime.data.targets.filter(t => t.down_now && !down.has(t.name))) {
+      out.push({ level: 'bad', text: `${t.name} is down`, detail: 'Failing the 5-minute check', href: '#uptime' })
+    }
+    for (const i of uptime.data.incidents.filter(i => i.ended_at && now - new Date(i.started_at).getTime() < 24 * HOUR)) {
+      out.push({ level: 'warn', text: `${i.target} was down ${i.minutes} min`,
+                 detail: `${fmtWhen(i.started_at)} IST${i.problem ? ` · ${i.problem}` : ''} · back up now`, href: '#uptime' })
+    }
+  }
+
+  // Cyra's errors carry a kind; running out of credit is the one that stops every engineer at once.
+  if (errors.state === 'ok') {
+    const credit = errors.data.groups.filter(g => g.kind === 'ai_credit' && now - new Date(g.last).getTime() < 6 * HOUR)
+    if (credit.length) {
+      const n = credit.reduce((a, g) => a + g.count, 0)
+      out.push({ level: 'bad', text: 'Cyra Assist is out of OpenAI credit',
+                 detail: `Engineers are getting errors · last ${ago(credit[0].last)} · ${fmtInt(n)} in this period. Top up in OpenAI billing.`, href: '#errors' })
+    }
+  }
+
+  // Any other error still happening: seen in the last three hours, biggest first, three at most.
+  const recent = [
+    ...(appErrors.state === 'ok' ? appErrors.data.groups.map(g => ({ app: g.app, message: g.message, count: g.count, last: g.last })) : []),
+    ...(errors.state === 'ok' ? errors.data.groups.filter(g => g.kind !== 'ai_credit').map(g => ({ app: 'cyra', message: g.message, count: g.count, last: g.last })) : []),
+  ].filter(g => now - new Date(g.last).getTime() < 3 * HOUR).sort((a, b) => b.count - a.count).slice(0, 3)
+  for (const g of recent) {
+    out.push({ level: 'warn', text: `${MODULE_NAMES[g.app] ?? g.app}: ${g.message.length > 90 ? g.message.slice(0, 90) + '…' : g.message}`,
+               detail: `Last ${ago(g.last)} · ${fmtInt(g.count)} in this period`, href: '#errors' })
+  }
+
+  // A day far above its own normal is worth a look even when no single message stands out.
+  const today = istDay(now)
+  const perDay = new Map<string, number>()
+  for (const d of appErrors.state === 'ok' ? appErrors.data.by_day : []) perDay.set(d.day, (perDay.get(d.day) ?? 0) + d.errors)
+  for (const d of errors.state === 'ok' ? errors.data.by_day : []) perDay.set(d.day, (perDay.get(d.day) ?? 0) + d.errors)
+  const before = [...perDay].filter(([d]) => d < today).map(([, n]) => n)
+  const avg = before.length ? before.reduce((a, n) => a + n, 0) / Math.max(before.length, 7) : 0
+  const nToday = perDay.get(today) ?? 0
+  if (nToday >= 20 && nToday > 3 * avg) {
+    out.push({ level: 'warn', text: `${fmtInt(nToday)} errors today`, detail: `About ${fmtInt(Math.round(avg))} on a normal day`, href: '#errors' })
+  }
+
+  // The newest production deploy of a project failed: what people see is the build before it.
+  if (deploys.state === 'ok') {
+    const seen = new Set<string>()
+    for (const d of deploys.data.deploys) {
+      if (seen.has(d.project)) continue
+      seen.add(d.project)
+      if (d.state === 'ERROR') out.push({ level: 'bad', text: `Last deploy of ${d.project} failed`, detail: `${d.message || d.sha} · ${ago(d.at)}`, href: '#changes' })
+    }
+  }
+
+  // AI spend running well above its own average.
+  if (ai.state === 'ok') {
+    const days = ai.data.by_day.filter(d => d.key < today)
+    const avgCost = days.length ? days.reduce((a, d) => a + d.cost, 0) / days.length : 0
+    const costToday = ai.data.by_day.find(d => d.key === today)?.cost ?? 0
+    if (costToday >= 2 && costToday > 2 * avgCost) {
+      out.push({ level: 'warn', text: `AI cost today ${fmtUsd(costToday)}`, detail: `Average ${fmtUsd(avgCost)} a day`, href: '#ai' })
+    }
+  }
+  return out.sort((a, b) => (a.level === b.level ? 0 : a.level === 'bad' ? -1 : 1))
+}
+
 function StatusPanel({ health, deploys }: { health: Part<HealthData>; deploys: Part<DeploysData> }) {
   const last = useMemo(() => {
     const m = new Map<string, Deploy>()
@@ -230,7 +400,7 @@ function StatusPanel({ health, deploys }: { health: Part<HealthData>; deploys: P
     revive: 'cyrix-revive-lab', travel: 'cyrix-travel', tasks: 'cyrix-task', cyra: 'cyrix-cyra',
   }
   return (
-    <Panel title="Status" note={health.state === 'ok' ? `Checked ${ago(health.data.at)}` : undefined}>
+    <Panel id="status" title="Status" note={health.state === 'ok' ? `Checked ${ago(health.data.at)}` : undefined}>
       <Waiting part={health} off="">
         {h => (
           <>
@@ -273,7 +443,7 @@ function StatusPanel({ health, deploys }: { health: Part<HealthData>; deploys: P
 function UptimePanel({ uptime, days }: { uptime: Part<Uptime>; days: number }) {
   const fmtWhen = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
   return (
-    <Panel title="Uptime" note="Checked every 5 minutes. An outage is two failed checks in a row, and the Ops admins get a push.">
+    <Panel id="uptime" title="Uptime" note="Checked every 5 minutes. An outage is two failed checks in a row, and the Ops admins get a push.">
       <Waiting part={uptime} off="Not set up yet: KPI migration 0229 has not been applied.">
         {u => (
           <>
@@ -325,7 +495,7 @@ function UptimePanel({ uptime, days }: { uptime: Part<Uptime>; days: number }) {
  */
 function ErrorsPanel({ errors, appErrors, days }: { errors: Part<ErrorsData>; appErrors: Part<AppErrors>; days: number }) {
   if (errors.state === 'loading' || appErrors.state === 'loading') {
-    return <Panel title="Errors"><div className="ops-skeleton" /></Panel>
+    return <Panel id="errors" title="Errors"><div className="ops-skeleton" /></Panel>
   }
   const cyra = errors.state === 'ok' ? errors.data : null
   const apps = appErrors.state === 'ok' ? appErrors.data : null
@@ -354,7 +524,7 @@ function ErrorsPanel({ errors, appErrors, days }: { errors: Part<ErrorsData>; ap
 
   const total = (apps?.total ?? 0) + (cyra?.total ?? 0)
   return (
-    <Panel title="Errors" note="What broke in front of somebody, grouped by message. Pulse is not reporting yet.">
+    <Panel id="errors" title="Errors" note="What broke in front of somebody, grouped by message. Pulse is not reporting yet.">
       {problems.map(p => <p key={p} className="ops-off">{p}</p>)}
       {(apps || cyra) && (
         <>
@@ -409,7 +579,7 @@ function ErrorsPanel({ errors, appErrors, days }: { errors: Part<ErrorsData>; ap
 
 function UsagePanel({ overview, days }: { overview: Part<Overview>; days: number }) {
   return (
-    <Panel title="Usage" note="Sign-ins and actions recorded in each app's own trail. Pulse and Cyra are not in it yet.">
+    <Panel id="usage" title="Usage" note="Sign-ins and actions recorded in each app's own trail. Pulse and Cyra are not in it yet.">
       <Waiting part={overview} off="">
         {o => (
           <>
@@ -468,7 +638,7 @@ function UsagePanel({ overview, days }: { overview: Part<Overview>; days: number
 function ChangesPanel({ changes, deploys }: { changes: Part<ChangesData>; deploys: Part<DeploysData> }) {
   const [repo, setRepo] = useState('')
   return (
-    <Panel title="Changes" note="Commits from GitHub and production deploys from Vercel.">
+    <Panel id="changes" title="Changes" note="Commits from GitHub and production deploys from Vercel.">
       <div className="ops-two">
         <div>
           <h3>Commits</h3>
@@ -524,7 +694,7 @@ function ChangesPanel({ changes, deploys }: { changes: Part<ChangesData>; deploy
 
 function AiPanel({ ai, days }: { ai: Part<AiData>; days: number }) {
   return (
-    <Panel title="AI usage" note="Estimated from CYRA's own meter and its price table. Pulse and BEMMP are not metered yet.">
+    <Panel id="ai" title="AI usage" note="Estimated from CYRA's own meter and its price table. Pulse and BEMMP are not metered yet.">
       <Waiting part={ai} off="Not set up yet: CYRA_SUPABASE_URL and CYRA_SERVICE_KEY are not on the portal's Vercel project.">
         {a => (
           <>
