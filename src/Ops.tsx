@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Loader2, RefreshCw, GitCommitHorizontal, Rocket, BellRing,
+  ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Loader2, RefreshCw, GitCommitHorizontal, Rocket, BellRing, Download,
 } from 'lucide-react'
 import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
 import { supabase } from './lib/supabase'
+import { saveBlob, writeBook, type XlsxSheet } from './lib/xlsx'
 import './ops.css'
 
 /**
@@ -96,7 +97,44 @@ type Part<T> = { state: 'loading' } | { state: 'off' } | { state: 'failed'; erro
 
 const MODULE_NAMES: Record<string, string> = {
   portal: 'Portal', cyra: 'Cyra Assist', pulse: 'Pulse', kpi: 'KPI', spare: 'Spare Mapping', bemmp: 'BEMMP', revive: 'Revive Lab', travel: 'Travel Expense', tasks: 'My Task',
+  workplace: 'Workplace',
 }
+
+/** Where things run and what the database says about itself (/api/ops?part=infra, KPI 0241 ops_db). */
+interface InfraData {
+  function_region: string | null
+  db_ms: number | null
+  supabase: { configured: boolean; region?: string | null; status?: string | null; version?: string | null; failed?: string
+              requests_7d?: { rest: number; auth: number; storage: number; realtime: number } }
+  analytics: { configured: boolean; apps?: { app: string; enabled: boolean; views?: number; visitors?: number | null; reason?: string }[] }
+}
+interface DbData {
+  version: string; started: string; size_bytes: number; max_connections: number
+  connections: Record<string, number>; cache_hit_pct: number | null
+  slow: { query: string; calls: number; mean_ms: number; total_s: number }[]
+  tables: { name: string; bytes: number; rows: number }[]
+}
+
+/**
+ * The app filter. Each source names an app its own way: a health or uptime id, a Vercel project, a GitHub repo, a
+ * module key in the trails. One row per app says all of them, so the filter means the same thing in every panel.
+ */
+const APPS: { key: string; name: string; ids: string[]; project?: string; repo?: string }[] = [
+  { key: 'portal', name: 'Portal', ids: ['portal'], project: 'cyrix-platform', repo: 'cyrix-platform' },
+  { key: 'kpi', name: 'KPI', ids: ['kpi', 'db-shared'], project: 'cyrix-kpi', repo: 'Cyrix-KPI' },
+  { key: 'spare', name: 'Spare Mapping', ids: ['spare'], project: 'cyrix-spare-mapping', repo: 'Cyrix-Spare-Mapping' },
+  { key: 'bemmp', name: 'BEMMP', ids: ['bemmp'], project: 'cyrix-bemmp-dashboard', repo: 'Cyrix-Bemmp-Dashboard' },
+  { key: 'revive', name: 'Revive Lab', ids: ['revive'], project: 'cyrix-revive-lab', repo: 'Cyrix-Revive-Lab' },
+  { key: 'travel', name: 'Travel Expense', ids: ['travel'], project: 'cyrix-travel', repo: 'cyrix-travel' },
+  { key: 'tasks', name: 'My Task', ids: ['tasks'], project: 'cyrix-task', repo: 'cyrix-task' },
+  { key: 'workplace', name: 'Workplace', ids: ['workplace', 'inventory'], project: 'cyrix-workplace' },
+  { key: 'cyra', name: 'Cyra Assist', ids: ['cyra', 'cyra-engine', 'db-cyra'], project: 'cyrix-cyra', repo: 'Cyrix-Cyra' },
+  { key: 'pulse', name: 'Pulse', ids: ['pulse'], repo: 'Cyrix-Pulse' },
+]
+const appOf = (key: string) => APPS.find(a => a.key === key)
+const mapOk = <T,>(p: Part<T>, f: (d: T) => T): Part<T> => p.state === 'ok' ? { state: 'ok', data: f(p.data) } : p
+const NO_ERRORS: ErrorsData = { total: 0, truncated: false, by_day: [], groups: [] }
+const NO_AI: AiData = { cost: 0, calls: 0, unmetered: [], by_day: [], by_model: [], by_route: [] }
 
 async function api<T>(part: string, days: number): Promise<Part<T>> {
   try {
@@ -113,6 +151,33 @@ async function api<T>(part: string, days: number): Promise<Part<T>> {
     return { state: 'failed', error: 'Could not reach /api/ops' }
   }
 }
+
+/**
+ * The round trip users feel: this browser to the shared database and back, median of three. Measured on the auth
+ * health endpoint, which does no work, so the figure is the network and nothing else.
+ */
+async function browserToDb(): Promise<number | null> {
+  const url = import.meta.env.VITE_SUPABASE_URL, key = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !key) return null
+  const ms: number[] = []
+  for (let i = 0; i < 3; i++) {
+    const t0 = performance.now()
+    try {
+      const r = await fetch(`${url}/auth/v1/health`, { headers: { apikey: key }, cache: 'no-store' })
+      if (r.ok) ms.push(performance.now() - t0)
+    } catch { /* a miss */ }
+  }
+  ms.sort((a, b) => a - b)
+  return ms.length ? Math.round(ms[Math.floor(ms.length / 2)]) : null
+}
+
+// AWS region codes as Supabase and Vercel name them. The shared database is in Tokyo (25 Sep cost review).
+const REGIONS: Record<string, string> = {
+  'ap-northeast-1': 'Tokyo', 'ap-south-1': 'Mumbai', 'ap-southeast-1': 'Singapore', 'us-east-1': 'N. Virginia',
+  'us-west-1': 'N. California', 'eu-west-1': 'Ireland', 'eu-central-1': 'Frankfurt',
+  hnd1: 'Tokyo', bom1: 'Mumbai', sin1: 'Singapore', iad1: 'Washington DC', sfo1: 'San Francisco', fra1: 'Frankfurt', dub1: 'Dublin',
+}
+const regionName = (code: string | null | undefined) => code ? (REGIONS[code] ?? code) : '—'
 
 const QUICK_MS = 60_000
 const SLOW_MS = 5 * 60_000
@@ -151,7 +216,7 @@ const ago = (iso: string) => {
   return `${Math.round(s / 86400)} d ago`
 }
 const clock = (ms: number) => new Date(ms).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
-const SECTIONS = [['status', 'Status'], ['uptime', 'Uptime'], ['errors', 'Errors'], ['usage', 'Usage'], ['ai', 'AI cost'], ['pulse', 'Pulse'], ['security', 'Security'], ['changes', 'Changes']] as const
+const SECTIONS = [['status', 'Status'], ['uptime', 'Uptime'], ['errors', 'Errors'], ['usage', 'Usage'], ['ai', 'AI cost'], ['pulse', 'Pulse'], ['security', 'Security'], ['infra', 'Infrastructure'], ['changes', 'Changes']] as const
 const shortDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 
 /**
@@ -186,6 +251,11 @@ export default function Ops() {
   const [pulse, setPulse] = useState<Part<PulseData>>({ state: 'loading' })
   const [aiApps, setAiApps] = useState<Part<AiApps>>({ state: 'loading' })
   const [security, setSecurity] = useState<Part<SecurityData>>({ state: 'loading' })
+  const [infra, setInfra] = useState<Part<InfraData>>({ state: 'loading' })
+  const [db, setDb] = useState<Part<DbData>>({ state: 'loading' })
+  const [browserMs, setBrowserMs] = useState<number | null>(null)
+  const [app, setApp] = useState('all')
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     supabase.rpc('is_ops_admin').then(r => setAllowed(r.data === true), () => setAllowed(false))
@@ -213,7 +283,7 @@ export default function Ops() {
         () => keep(fn)({ state: 'failed', error: 'Could not reach the database' }))
 
     if (reset) {
-      for (const fn of [setOverview, setUptime, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi, setPulse, setAiApps, setSecurity] as
+      for (const fn of [setOverview, setUptime, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi, setPulse, setAiApps, setSecurity, setInfra, setDb] as
                        React.Dispatch<React.SetStateAction<Part<unknown>>>[]) fn({ state: 'loading' })
     }
     const jobs: PromiseLike<unknown>[] = [
@@ -231,6 +301,9 @@ export default function Ops() {
         pulseSummary().then(keep(setPulse)),
         rpc(setAiApps, 'ops_ai', { p_days: d }),
         rpc(setSecurity, 'ops_security', {}),
+        api<InfraData>('infra', d).then(keep(setInfra)),
+        rpc(setDb, 'ops_db', {}),
+        browserToDb().then(ms => { if (ms !== null) setBrowserMs(ms) }),
         supabase.from('app_settings').select('value').eq('key', 'usd_inr').maybeSingle().then(r => {
           const v = Number(r.data?.value)
           if (v > 0) usdInr = v
@@ -266,6 +339,48 @@ export default function Ops() {
     void load(false, true).finally(() => setBusy(false))
   }
 
+  // Everything below reads the scoped copies, so the filter applies to every panel and to the Needs attention box.
+  const sc = useMemo(() => {
+    const a = appOf(app)
+    if (!a) return { health, uptime, appErrors, errors, overview, ai, aiApps, deploys, changes, pulse, security }
+    const k = a.key
+    return {
+      health: mapOk(health, h => ({ ...h, checks: h.checks.filter(c => a.ids.includes(c.id)) })),
+      uptime: mapOk(uptime, u => {
+        const targets = u.targets.filter(t => a.ids.includes(t.id))
+        const names = new Set(targets.map(t => t.name))
+        return { ...u, targets, incidents: u.incidents.filter(i => names.has(i.target)) }
+      }),
+      appErrors: mapOk(appErrors, e => {
+        const by_app = e.by_app.filter(x => x.app === k)
+        return { ...e, by_app, groups: e.groups.filter(g => g.app === k), by_day: [], total: by_app.reduce((n, x) => n + x.errors, 0) }
+      }),
+      errors: k === 'cyra' ? errors : { state: 'ok', data: NO_ERRORS } as Part<ErrorsData>,
+      overview: mapOk(overview, o => ({ ...o, signins_by_day: [], activity_by_day: o.activity_by_day.filter(x => x.module === k),
+        active_by_module: o.active_by_module.filter(x => x.module === k), top_actions: o.top_actions.filter(x => x.module === k),
+        grants: o.grants.filter(g => g.code === k) })),
+      ai: k === 'cyra' ? ai : { state: 'ok', data: NO_AI } as Part<AiData>,
+      aiApps: mapOk(aiApps, x => {
+        const by_app = x.by_app.filter(r => r.key === k)
+        return { ...x, by_app, by_day: x.by_day.filter(r => r.app === k), by_model: x.by_model.filter(r => r.key.startsWith(`${k} · `)),
+                 by_feature: x.by_feature.filter(r => r.key.startsWith(`${k} · `)), unpriced: x.unpriced.filter(u => u.startsWith(k)),
+                 cost: by_app.reduce((n, r) => n + r.cost, 0), calls: by_app.reduce((n, r) => n + r.calls, 0) }
+      }),
+      deploys: mapOk(deploys, d => ({ ...d, deploys: d.deploys.filter(x => x.project === a.project) })),
+      changes: mapOk(changes, c => ({ ...c, repos: c.repos.filter(r => r.repo === a.repo), commits: c.commits.filter(x => x.repo === a.repo) })),
+      pulse: k === 'pulse' ? pulse : { state: 'off' } as Part<PulseData>,
+      security,
+    }
+  }, [app, health, uptime, appErrors, errors, overview, ai, aiApps, deploys, changes, pulse, security])
+  const scoped = app !== 'all'
+
+  const exportReport = () => {
+    setExporting(true)
+    void buildReport({ days, app, ...sc, infra, db, browserMs })
+      .then(blob => saveBlob(blob, `ops-report-${app}-${days}d-${istDay(Date.now())}.xlsx`))
+      .finally(() => setExporting(false))
+  }
+
   if (allowed === null) return <div className="splash"><Loader2 className="spin" size={22} aria-label="Loading" /></div>
 
   return (
@@ -286,11 +401,18 @@ export default function Ops() {
                 <p className="sub">Every Cyrix app: up or down, what broke, who used it, what shipped, and what the AI cost.</p>
               </div>
               <div className="ops-controls">
+                <select className="ops-select" aria-label="App" value={app} onChange={e => setApp(e.target.value)}>
+                  <option value="all">All apps</option>
+                  {APPS.map(a => <option key={a.key} value={a.key}>{a.name}</option>)}
+                </select>
                 <div className="ops-seg" role="group" aria-label="Period">
                   {([7, 30, 90] as Days[]).map(d => (
                     <button key={d} aria-pressed={days === d} onClick={() => setDays(d)}>{d} days</button>
                   ))}
                 </div>
+                <button className="icon-btn" title="Download this view as an Excel report" onClick={exportReport} disabled={exporting}>
+                  {exporting ? <Loader2 size={16} className="spin" /> : <Download size={16} />}
+                </button>
                 <button className="icon-btn" title="Check again now" onClick={refreshNow} disabled={busy}>
                   <RefreshCw size={16} className={busy ? 'spin' : undefined} />
                 </button>
@@ -305,22 +427,28 @@ export default function Ops() {
               {SECTIONS.map(([id, name]) => <a key={id} href={`#${id}`}>{name}</a>)}
             </nav>
 
-            <Attention health={health} uptime={uptime} errors={errors} appErrors={appErrors} deploys={deploys} ai={ai} pulse={pulse} security={security} />
-            <StatusPanel health={health} deploys={deploys} />
+            {scoped && (
+              <p className="ops-note">Showing {appOf(app)?.name} only. Charts that the sources cannot split by app are hidden; Security and Infrastructure stay company-wide.</p>
+            )}
+            <Attention health={sc.health} uptime={sc.uptime} errors={sc.errors} appErrors={sc.appErrors} deploys={sc.deploys} ai={sc.ai} pulse={sc.pulse} security={sc.security} />
+            <StatusPanel health={sc.health} deploys={sc.deploys} />
             {/* Side by side on a wide screen, one column below that. */}
             <div className="ops-pair">
-              <UptimePanel uptime={uptime} days={days} />
-              <ErrorsPanel errors={errors} appErrors={appErrors} days={days} />
+              <UptimePanel uptime={sc.uptime} days={days} />
+              <ErrorsPanel errors={sc.errors} appErrors={sc.appErrors} days={days} scoped={scoped} />
             </div>
             <div className="ops-pair">
-              <UsagePanel overview={overview} days={days} />
-              <AiPanel ai={ai} aiApps={aiApps} days={days} />
+              <UsagePanel overview={sc.overview} days={days} scoped={scoped} />
+              <AiPanel ai={sc.ai} aiApps={sc.aiApps} days={days} />
             </div>
-            <div className="ops-pair">
-              <PulsePanel pulse={pulse} />
-              <SecurityPanel security={security} />
-            </div>
-            <ChangesPanel changes={changes} deploys={deploys} />
+            {(!scoped || app === 'pulse') ? (
+              <div className="ops-pair">
+                <PulsePanel pulse={sc.pulse} />
+                <SecurityPanel security={sc.security} />
+              </div>
+            ) : <SecurityPanel security={sc.security} />}
+            <InfraPanel infra={infra} db={db} browserMs={browserMs} />
+            <ChangesPanel changes={sc.changes} deploys={sc.deploys} />
           </>
         )}
       </main>
@@ -480,7 +608,7 @@ function attentionFlags(health: Part<HealthData>, uptime: Part<Uptime>, errors: 
   if (security.state === 'ok') {
     const sec = security.data
     if (sec.testing_mode === true || sec.testing_mode === 'true') {
-      out.push({ level: 'bad', text: 'testing_mode is on in production', detail: 'Lets passwords be reset to the employee code. Turn it off.', href: '#security' })
+      out.push({ level: 'bad', text: 'testing_mode is on in production', detail: 'Lets SW Admin wipe one employee\'s KPI history outright. Turn it off once nobody needs that.', href: '#security' })
     }
     const admins = sec.admins.filter(a => a.default_pw)
     if (admins.length) {
@@ -595,12 +723,13 @@ function UptimePanel({ uptime, days }: { uptime: Part<Uptime>; days: number }) {
  * Two sources, one panel: every app's browser errors from the shared database (KPI 0230), and Cyra Assist's own
  * app_error, which lives in Cyra's database and comes through /api/ops. Either can be missing without hiding the other.
  */
-function ErrorsPanel({ errors, appErrors, days }: { errors: Part<ErrorsData>; appErrors: Part<AppErrors>; days: number }) {
+function ErrorsPanel({ errors, appErrors, days, scoped = false }: { errors: Part<ErrorsData>; appErrors: Part<AppErrors>; days: number; scoped?: boolean }) {
   if (errors.state === 'loading' || appErrors.state === 'loading') {
     return <Panel id="errors" title="Errors"><div className="ops-skeleton" /></Panel>
   }
   const cyra = errors.state === 'ok' ? errors.data : null
   const apps = appErrors.state === 'ok' ? appErrors.data : null
+  const showDays = !scoped || (cyra !== null && (apps?.total ?? 0) === 0)
   const problems = [
     appErrors.state === 'failed' && `Apps: ${appErrors.error}`,
     appErrors.state === 'off' && 'The other apps are not reporting yet: KPI migration 0230 is not applied.',
@@ -633,7 +762,7 @@ function ErrorsPanel({ errors, appErrors, days }: { errors: Part<ErrorsData>; ap
           <Stats items={[{ label: `Errors, last ${days} days`, value: fmtInt(total) + (cyra?.truncated ? '+' : '') },
                          { label: 'Distinct messages', value: fmtInt(groups.length) },
                          { label: 'Apps with errors', value: fmtInt(byApp.length) }]} />
-          <Bars label="Errors per day" data={fillDays(days, byDay)} fmt={fmtInt} />
+          {showDays && <Bars label="Errors per day" data={fillDays(days, byDay)} fmt={fmtInt} />}
           {byApp.length > 0 && (
             <div className="ops-table-wrap">
               <table className="ops-table">
@@ -679,7 +808,7 @@ function ErrorsPanel({ errors, appErrors, days }: { errors: Part<ErrorsData>; ap
   )
 }
 
-function UsagePanel({ overview, days }: { overview: Part<Overview>; days: number }) {
+function UsagePanel({ overview, days, scoped = false }: { overview: Part<Overview>; days: number; scoped?: boolean }) {
   return (
     <Panel id="usage" title="Usage" note="Sign-ins and actions recorded in each app's own trail. Pulse and Cyra are not in it yet.">
       <Waiting part={overview} off="">
@@ -692,7 +821,9 @@ function UsagePanel({ overview, days }: { overview: Part<Overview>; days: number
               { label: 'Signed in, 30 days', value: fmtInt(o.accounts.signed_in_30d) },
               { label: 'Never signed in', value: fmtInt(o.accounts.never) },
             ]} />
-            <Bars label="People signing in per day" data={fillDays(days, new Map(o.signins_by_day.map(d => [d.day, d.users])))} fmt={fmtInt} />
+            {scoped
+              ? <Bars label="Actions per day" data={fillDays(days, o.activity_by_day.reduce((m, d) => m.set(d.day, (m.get(d.day) ?? 0) + d.events), new Map<string, number>()))} fmt={fmtInt} />
+              : <Bars label="People signing in per day" data={fillDays(days, new Map(o.signins_by_day.map(d => [d.day, d.users])))} fmt={fmtInt} />}
             <div className="ops-two">
               <div className="ops-table-wrap">
                 <table className="ops-table">
@@ -866,7 +997,7 @@ function AiPanel({ ai, aiApps, days }: { ai: Part<AiData>; aiApps: Part<AiApps>;
   const cost = (cyra?.cost ?? 0) + (apps?.cost ?? 0)
   const calls = (cyra?.calls ?? 0) + (apps?.calls ?? 0)
   const byApp: Spend[] = [
-    ...(cyra ? [{ key: 'Cyra Assist', calls: cyra.calls, tokens: cyra.by_model.reduce((t, m) => t + m.tokens, 0), cost: cyra.cost }] : []),
+    ...(cyra && cyra.calls > 0 ? [{ key: 'Cyra Assist', calls: cyra.calls, tokens: cyra.by_model.reduce((t, m) => t + m.tokens, 0), cost: cyra.cost }] : []),
     ...(apps?.by_app ?? []).map(x => ({ key: MODULE_NAMES[x.key] ?? x.key, calls: x.calls, tokens: x.tokens, cost: x.cost })),
   ].sort((x, y) => y.cost - x.cost)
   const byModel: Spend[] = [
@@ -945,6 +1076,138 @@ function SecurityPanel({ security }: { security: Part<SecurityData> }) {
       </Waiting>
     </Panel>
   )
+}
+
+/**
+ * Where things run and how the shared database is holding up. Region and request counts need SUPABASE_ACCESS_TOKEN on
+ * the portal; page views need Web Analytics switched on per Vercel project. Everything else needs nothing.
+ */
+function InfraPanel({ infra, db, browserMs }: { infra: Part<InfraData>; db: Part<DbData>; browserMs: number | null }) {
+  const i = infra.state === 'ok' ? infra.data : null
+  const d = db.state === 'ok' ? db.data : null
+  const conns = d ? Object.values(d.connections).reduce((n, x) => n + x, 0) : 0
+  const views = i?.analytics.apps?.filter(a => a.enabled) ?? []
+  const notOn = i?.analytics.apps?.filter(a => !a.enabled) ?? []
+  return (
+    <Panel id="infra" title="Infrastructure" note="Where each part runs, how far the database is from you, and what is costing it time.">
+      {infra.state === 'failed' && <p className="ops-off">Portal: {infra.error}</p>}
+      {db.state === 'failed' && <p className="ops-off">Database: {db.error}</p>}
+      {db.state === 'off' && <p className="ops-off">Database figures need KPI migration 0241.</p>}
+      <Stats items={[
+        { label: 'Database region', value: regionName(i?.supabase.region ?? 'ap-northeast-1') },
+        { label: 'You to database', value: browserMs === null ? '—' : `${fmtInt(browserMs)} ms` },
+        { label: 'Portal server', value: regionName(i?.function_region) },
+        { label: 'Server to database', value: i?.db_ms == null ? '—' : `${fmtInt(i.db_ms)} ms` },
+        ...(d ? [
+          { label: 'Connections', value: `${fmtInt(conns)} of ${fmtInt(d.max_connections)}` },
+          { label: 'Cache hit', value: d.cache_hit_pct == null ? '—' : `${d.cache_hit_pct}%` },
+          { label: 'Database size', value: fmtBytes(d.size_bytes) },
+          { label: 'Last restart', value: ago(d.started) },
+        ] : []),
+      ]} />
+      {(i?.supabase.region ?? 'ap-northeast-1') !== 'ap-south-1' && (
+        <p className="ops-note">The database is outside India, so every request makes the round trip above. Mumbai (ap-south-1) would cut it, but moving means a new project.</p>
+      )}
+      {i && !i.supabase.configured && (
+        <p className="ops-note">Supabase request counts need SUPABASE_ACCESS_TOKEN on the portal's Vercel project (Supabase, Account, Access tokens).</p>
+      )}
+      {i?.supabase.failed && <p className="ops-off">Supabase API: {i.supabase.failed}</p>}
+      {i?.supabase.requests_7d && (
+        <Stats items={[
+          { label: 'API requests, 7 days', value: fmtInt(i.supabase.requests_7d.rest) },
+          { label: 'Auth requests', value: fmtInt(i.supabase.requests_7d.auth) },
+          { label: 'Storage requests', value: fmtInt(i.supabase.requests_7d.storage) },
+          { label: 'Realtime', value: fmtInt(i.supabase.requests_7d.realtime) },
+        ]} />
+      )}
+      {d && d.slow.length > 0 && (
+        <div className="ops-table-wrap">
+          <table className="ops-table">
+            <caption>What costs the database the most time, since its last restart</caption>
+            <thead><tr><th>Query</th><th className="num">Calls</th><th className="num">Average</th><th className="num">Total</th></tr></thead>
+            <tbody>
+              {d.slow.map((q, k) => (
+                <tr key={k}><td className="ops-mono">{q.query}</td><td className="num">{fmtInt(q.calls)}</td>
+                  <td className={q.mean_ms >= 1000 ? 'num down' : 'num'}>{fmtInt(Math.round(q.mean_ms))} ms</td>
+                  <td className="num">{fmtInt(Math.round(q.total_s / 60))} min</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {d && d.tables.length > 0 && (
+        <div className="ops-table-wrap">
+          <table className="ops-table">
+            <caption>Largest tables</caption>
+            <thead><tr><th>Table</th><th className="num">Rows</th><th className="num">Size</th></tr></thead>
+            <tbody>{d.tables.map(t => <tr key={t.name}><td className="ops-mono">{t.name}</td><td className="num">{fmtInt(t.rows)}</td><td className="num">{fmtBytes(t.bytes)}</td></tr>)}</tbody>
+          </table>
+        </div>
+      )}
+      {views.length > 0 && (
+        <div className="ops-table-wrap">
+          <table className="ops-table">
+            <caption>Page views (Vercel Web Analytics)</caption>
+            <thead><tr><th>App</th><th className="num">Views</th><th className="num">Visitors</th></tr></thead>
+            <tbody>{views.map(a => <tr key={a.app}><td>{MODULE_NAMES[a.app] ?? a.app}</td><td className="num">{fmtInt(a.views ?? 0)}</td><td className="num">{a.visitors == null ? '—' : fmtInt(a.visitors)}</td></tr>)}</tbody>
+          </table>
+        </div>
+      )}
+      {notOn.length > 0 && (
+        <p className="ops-note">Vercel Web Analytics is off for {notOn.map(a => MODULE_NAMES[a.app] ?? a.app).join(', ')}. Sign-ins and actions are under Usage.</p>
+      )}
+    </Panel>
+  )
+}
+
+/** One workbook, a sheet per section, of exactly what the page is showing (filter and period included). */
+async function buildReport(r: {
+  days: number; app: string; health: Part<HealthData>; uptime: Part<Uptime>; appErrors: Part<AppErrors>; errors: Part<ErrorsData>
+  overview: Part<Overview>; ai: Part<AiData>; aiApps: Part<AiApps>; deploys: Part<DeploysData>; changes: Part<ChangesData>
+  pulse: Part<PulseData>; security: Part<SecurityData>; infra: Part<InfraData>; db: Part<DbData>; browserMs: number | null
+}): Promise<Blob> {
+  const ok = <T,>(p: Part<T>) => p.state === 'ok' ? p.data : null
+  const col = (header: string, key: string, numeric = false) => ({ header, key, numeric })
+  const sheets: XlsxSheet[] = [{
+    name: 'About', columns: [col('Field', 'k'), col('Value', 'v')],
+    rows: [{ k: 'Report', v: 'Cyrix Ops' }, { k: 'App', v: r.app === 'all' ? 'All apps' : (appOf(r.app)?.name ?? r.app) },
+           { k: 'Period', v: `Last ${r.days} days` }, { k: 'Exported (IST)', v: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) },
+           { k: 'USD to INR', v: String(usdInr) }],
+  }]
+  const h = ok(r.health)
+  if (h) sheets.push({ name: 'Status', columns: [col('App', 'name'), col('Group', 'group'), col('Up', 'up'), col('HTTP', 'status', true), col('ms', 'ms', true), col('Problem', 'problem')],
+    rows: h.checks.map(c => ({ ...c, up: c.ok ? 'yes' : 'no' })) })
+  const u = ok(r.uptime)
+  if (u) {
+    sheets.push({ name: 'Uptime', columns: [col('App', 'name'), col('Group', 'group'), col('Uptime %', 'uptime', true), col('Checks', 'checks', true), col('Down now', 'down')],
+      rows: u.targets.map(t => ({ ...t, down: t.down_now ? 'yes' : 'no' })) })
+    sheets.push({ name: 'Outages', columns: [col('App', 'target'), col('Started', 'started_at'), col('Ended', 'ended_at'), col('Minutes', 'minutes', true), col('Problem', 'problem')],
+      rows: u.incidents })
+  }
+  const e = ok(r.appErrors), ce = ok(r.errors)
+  sheets.push({ name: 'Errors', columns: [col('App', 'app'), col('Message', 'message'), col('Where', 'where'), col('Count', 'count', true), col('People', 'people', true), col('Last', 'last')],
+    rows: [...(e?.groups ?? []).map(g => ({ app: MODULE_NAMES[g.app] ?? g.app, message: g.message, where: g.route, count: g.count, people: g.people, last: g.last })),
+           ...(ce?.groups ?? []).map(g => ({ app: 'Cyra Assist', message: g.message, where: g.routes.join(', '), count: g.count, last: g.last }))] })
+  const o = ok(r.overview)
+  if (o) sheets.push({ name: 'Usage', columns: [col('Module', 'module'), col('People', 'users', true), col('Actions', 'events', true)],
+    rows: o.active_by_module.map(m => ({ ...m, module: MODULE_NAMES[m.module] ?? m.module })) })
+  const ca = ok(r.ai), aa = ok(r.aiApps)
+  sheets.push({ name: 'AI cost', columns: [col('Item', 'key'), col('Calls', 'calls', true), col('Tokens', 'tokens', true), col('USD', 'usd', true), col('INR', 'inr', true)],
+    rows: [...(ca?.by_model ?? []).map(m => ({ ...m, key: `cyra · ${m.key}` })), ...(aa?.by_model ?? [])]
+      .map(m => ({ key: m.key, calls: m.calls, tokens: m.tokens, usd: Number(m.cost.toFixed(4)), inr: Math.round(m.cost * usdInr * 100) / 100 })) })
+  const p = ok(r.pulse)
+  if (p) sheets.push({ name: 'Pulse sync', columns: [col('Job', 'job'), col('Every (h)', 'every_hours', true), col('Age (h)', 'age_hours', true), col('Late', 'late')],
+    rows: p.sync.map(j => ({ ...j, late: j.late ? 'yes' : 'no' })) })
+  const s = ok(r.security)
+  if (s) sheets.push({ name: 'Security', columns: [col('Account', 'code'), col('Name', 'name'), col('Roles', 'roles'), col('Default password', 'pw')],
+    rows: s.admins.map(a => ({ code: a.code, name: a.name, roles: a.roles.join(', '), pw: a.default_pw == null ? 'not checked' : a.default_pw ? 'YES' : 'no' })) })
+  const d = ok(r.db)
+  if (d) sheets.push({ name: 'Database', columns: [col('Query', 'query'), col('Calls', 'calls', true), col('Average ms', 'mean_ms', true), col('Total s', 'total_s', true)], rows: d.slow })
+  const dep = ok(r.deploys)
+  if (dep) sheets.push({ name: 'Deploys', columns: [col('Project', 'project'), col('State', 'state'), col('At', 'at'), col('Commit', 'sha'), col('Message', 'message')], rows: dep.deploys })
+  const ch = ok(r.changes)
+  if (ch) sheets.push({ name: 'Commits', columns: [col('Repo', 'repo'), col('At', 'at'), col('Author', 'author'), col('Message', 'message'), col('Commit', 'sha')], rows: ch.commits })
+  return writeBook(sheets)
 }
 
 function SpendTable({ caption, rows }: { caption: string; rows: Spend[] }) {

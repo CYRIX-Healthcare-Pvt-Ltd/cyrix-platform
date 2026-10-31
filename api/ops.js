@@ -6,6 +6,8 @@
  *   GET /api/ops?part=changes&days=N  commits across the repos, newest first
  *   GET /api/ops?part=errors&days=N   CYRA's app_error, grouped by message
  *   GET /api/ops?part=ai&days=N       CYRA's metered AI usage and cost
+ *   GET /api/ops?part=infra&days=N    where things run, this function's round trip to the database, and, when
+ *                                     their keys are set, Supabase's request counts and Vercel Web Analytics
  *
  * Usage figures from the shared database do not come through here: the page asks ops_overview() with its own
  * session, and the database refuses anyone who is not an Ops admin.
@@ -17,6 +19,7 @@
  *   VERCEL_TOKEN (+ VERCEL_TEAM_ID)  a read-only token for team cyrix4
  *   GITHUB_TOKEN                     a fine-grained, read-only (contents + metadata) token for the repos
  *   CYRA_SUPABASE_URL, CYRA_SERVICE_KEY  CYRA's own project, read with Accept-Profile: cyra_v2
+ *   SUPABASE_ACCESS_TOKEN            optional: a Supabase account token, for the project's region and request counts
  * A part whose key is missing answers { configured: false } rather than failing, so the page can say so.
  *
  * Every answer is counts, names of apps and commit messages. No ticket, score, prompt or stack trace leaves here.
@@ -29,6 +32,11 @@ const CYRA_KEY = process.env.CYRA_SERVICE_KEY || ''
 const VERCEL_TOKEN = process.env.VERCEL_TOKEN || ''
 const VERCEL_TEAM = process.env.VERCEL_TEAM_ID || 'team_yvvPM8g0ikIafJ2RCnZGMga3'
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || ''
+const SUPABASE_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || ''
+const SHARED_REF = (SHARED_URL.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/) ?? [])[1] ?? ''
+// Vercel project per app, for Web Analytics. Workplace was cyrix-inventory until it was renamed.
+const VERCEL_PROJECTS = { portal: 'cyrix-platform', kpi: 'cyrix-kpi', spare: 'cyrix-spare-mapping', bemmp: 'cyrix-bemmp-dashboard',
+  revive: 'cyrix-revive-lab', travel: 'cyrix-travel', tasks: 'cyrix-task', workplace: 'cyrix-workplace', cyra: 'cyrix-cyra' }
 const ORG = 'CYRIX-Healthcare-Pvt-Ltd'
 const REPOS = (process.env.OPS_REPOS ||
   'cyrix-platform,Cyrix-KPI,Cyrix-Spare-Mapping,Cyrix-Bemmp-Dashboard,Cyrix-Revive-Lab,cyrix-travel,cyrix-task,Cyrix-Cyra,Cyrix-Pulse')
@@ -47,6 +55,7 @@ const TARGETS = [
   { id: 'revive', name: 'Revive Lab', group: 'Vercel', url: 'https://cyrix-revive-lab.vercel.app/revive/' },
   { id: 'travel', name: 'Travel Expense', group: 'Vercel', url: 'https://cyrix-travel.vercel.app/travel/' },
   { id: 'tasks', name: 'My Task', group: 'Vercel', url: 'https://cyrix-task.vercel.app/tasks/' },
+  { id: 'workplace', name: 'Workplace', group: 'Vercel', url: 'https://cyrix-workplace.vercel.app/workplace/' },
   { id: 'cyra', name: 'Cyra Assist', group: 'Vercel', url: 'https://cyrix-cyra.vercel.app/cyra/' },
   { id: 'cyra-engine', name: 'Cyra engine', group: 'Render', url: 'https://cyra-diagnostic-chat-1.onrender.com/api/health', timeout: 25_000 },
   { id: 'pulse', name: 'Pulse API', group: 'cyrix-svc01', url: 'https://pulse.cyrix.in/pulse/api/health' },
@@ -236,9 +245,72 @@ async function ai(days) {
   }
 }
 
+/**
+ * Where everything runs and how far apart it is. The database round trip is measured from this function, which runs
+ * in Vercel's region and not in India, so the page measures its own from the viewer's browser as well.
+ */
+async function infra(days) {
+  const pings = []
+  for (let i = 0; i < 3; i++) {
+    const t0 = Date.now()
+    try {
+      const r = await timed(`${SHARED_URL}/auth/v1/health`, { headers: { apikey: SHARED_ANON } }, 5_000)
+      if (r.ok) pings.push(Date.now() - t0)
+    } catch { /* counted as missing */ }
+  }
+  pings.sort((a, b) => a - b)
+  const out = {
+    configured: true,
+    function_region: process.env.VERCEL_REGION || null,
+    db_ms: pings.length ? pings[Math.floor(pings.length / 2)] : null,
+    supabase: { configured: Boolean(SUPABASE_TOKEN && SHARED_REF) },
+    analytics: { configured: Boolean(VERCEL_TOKEN) },
+  }
+
+  if (out.supabase.configured) {
+    const h = { headers: { Authorization: `Bearer ${SUPABASE_TOKEN}` } }
+    try {
+      const [p, u] = await Promise.all([
+        timed(`https://api.supabase.com/v1/projects/${SHARED_REF}`, h),
+        timed(`https://api.supabase.com/v1/projects/${SHARED_REF}/analytics/endpoints/usage.api-counts?interval=7day`, h),
+      ])
+      if (p.ok) {
+        const b = await p.json()
+        Object.assign(out.supabase, { region: b.region ?? null, status: b.status ?? null, version: b.database?.version ?? null })
+      } else out.supabase.failed = `Supabase answered ${p.status}`
+      if (u.ok) {
+        const rows = (await u.json())?.result ?? []
+        const sum = k => rows.reduce((n, r) => n + (Number(r[k]) || 0), 0)
+        out.supabase.requests_7d = { rest: sum('total_rest_requests'), auth: sum('total_auth_requests'),
+                                     storage: sum('total_storage_requests'), realtime: sum('total_realtime_requests') }
+      }
+    } catch {
+      out.supabase.failed = 'Could not reach the Supabase API'
+    }
+  }
+
+  if (out.analytics.configured) {
+    const since = sinceDays(days).toISOString(), until = new Date().toISOString()
+    out.analytics.apps = await Promise.all(Object.entries(VERCEL_PROJECTS).map(async ([app, project]) => {
+      const q = new URLSearchParams({ projectId: project, teamId: VERCEL_TEAM, since, until })
+      try {
+        const r = await timed(`https://api.vercel.com/v1/query/web-analytics/visits/count?${q}`,
+                              { headers: { Authorization: `Bearer ${VERCEL_TOKEN}` } }, 8_000)
+        const b = await r.json().catch(() => null)
+        if (!r.ok) return { app, enabled: false, reason: b?.error?.code === 'web_analytics_not_enabled' ? 'Not enabled' : `Vercel answered ${r.status}` }
+        const d = b?.data ?? b ?? {}
+        return { app, enabled: true, views: Number(d.total ?? d.pageViews ?? d.count ?? 0), visitors: Number(d.devices ?? d.visitors ?? 0) || null }
+      } catch {
+        return { app, enabled: false, reason: 'No answer' }
+      }
+    }))
+  }
+  return out
+}
+
 /* ---- handler ------------------------------------------------------------------------------------------- */
 
-const PARTS = { health, deploys, changes, errors, ai }
+const PARTS = { health, deploys, changes, errors, ai, infra }
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return send(res, 405, { error: 'GET only' })
