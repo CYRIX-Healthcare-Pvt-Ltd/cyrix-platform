@@ -354,6 +354,12 @@ body {
 .profile-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.4rem 0; font-size: 0.8125rem; }
 .profile-row dt { color: var(--ink-500); flex: none; }
 .profile-row dd { margin: 0; color: var(--ink-900); text-align: right; overflow-wrap: anywhere; }
+/* My assets, from Inventory: below the details, only when there are some. */
+.profile-assets { display: block; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--ink-200); }
+.profile-assets .profile-rows { padding-top: 0.25rem; }
+.profile-assets-head { display: flex; justify-content: space-between; align-items: baseline; padding: 0.2rem 0; font-size: 0.75rem; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-500); }
+.profile-assets-head a { font-size: 0.75rem; font-weight: 550; letter-spacing: 0; text-transform: none; color: var(--ink-700); text-decoration: underline; }
+.profile-serial { display: block; font-size: 0.75rem; color: var(--ink-500); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .who-name {
   display: none;
   font-size: 0.8125rem; font-weight: 550; color: var(--ink-700);
