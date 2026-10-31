@@ -245,11 +245,16 @@ export default function Ops() {
 
             <Attention health={health} uptime={uptime} errors={errors} appErrors={appErrors} deploys={deploys} ai={ai} />
             <StatusPanel health={health} deploys={deploys} />
-            <UptimePanel uptime={uptime} days={days} />
-            <ErrorsPanel errors={errors} appErrors={appErrors} days={days} />
-            <UsagePanel overview={overview} days={days} />
+            {/* Side by side on a wide screen, one column below that. */}
+            <div className="ops-pair">
+              <UptimePanel uptime={uptime} days={days} />
+              <ErrorsPanel errors={errors} appErrors={appErrors} days={days} />
+            </div>
+            <div className="ops-pair">
+              <UsagePanel overview={overview} days={days} />
+              <AiPanel ai={ai} days={days} />
+            </div>
             <ChangesPanel changes={changes} deploys={deploys} />
-            <AiPanel ai={ai} days={days} />
           </>
         )}
       </main>
@@ -452,7 +457,7 @@ function UptimePanel({ uptime, days }: { uptime: Part<Uptime>; days: number }) {
             )}
             <div className="ops-table-wrap">
               <table className="ops-table">
-                <thead><tr><th>App</th><th className="num">Uptime</th><th className="num">Avg answer</th><th className="num">Checks</th></tr></thead>
+                <thead><tr><th>App</th><th className="num">Uptime</th><th className="num">Outages</th><th className="num">Checks</th></tr></thead>
                 <tbody>
                   {u.targets.map(t => (
                     <tr key={t.id}>
@@ -461,7 +466,7 @@ function UptimePanel({ uptime, days }: { uptime: Part<Uptime>; days: number }) {
                         {t.name}<span className="ops-tag">{t.group}</span>
                       </td>
                       <td className="num">{t.uptime === null ? '—' : `${t.uptime}%`}</td>
-                      <td className="num">{t.avg_ms === null ? '—' : `${fmtInt(t.avg_ms)} ms`}</td>
+                      <td className="num">{fmtInt(u.incidents.filter(i => i.target === t.name).length)}</td>
                       <td className="num">{fmtInt(t.checks)}</td>
                     </tr>
                   ))}
