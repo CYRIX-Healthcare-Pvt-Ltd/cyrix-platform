@@ -432,6 +432,7 @@ body {
 .tile[data-module='tasks'] .tile-icon { background: #65a30d; --glow: rgba(101, 163, 13, 0.7); }  /* lime */
 /* CYRA (12 Oct) takes red, its own mark's colour, between the pink and the amber. */
 .tile[data-module='cyra'] .tile-icon { background: #dc2626; --glow: rgba(220, 38, 38, 0.7); }  /* red */
+.tile[data-module='digest'] .tile-icon { background: #7c3aed; --glow: rgba(124, 58, 237, 0.7); }  /* violet */
 
 /*
  * Roughly a third of the wheel apart, deliberately.

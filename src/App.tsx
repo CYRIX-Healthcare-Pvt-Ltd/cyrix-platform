@@ -13,7 +13,7 @@ import Ops from './Ops'
 import { deviceCheck, sessionIdOf, sessionState, type DeviceCheck } from './lib/session'
 import type { Session } from '@supabase/supabase-js'
 import {
-  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, Gauge, Briefcase, LayoutGrid, LogOut, ArrowRight, Loader2,
+  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, Gauge, Briefcase, Newspaper, LayoutGrid, LogOut, ArrowRight, Loader2,
   Eye, EyeOff,
 } from 'lucide-react'
 import { supabase, ecodeToEmail, type Module } from './lib/supabase'
@@ -30,7 +30,7 @@ import { supabase, ecodeToEmail, type Module } from './lib/supabase'
 
 /** The icon names the registry uses, resolved to real components. */
 const ICONS: Record<string, typeof ClipboardList> = {
-  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, Gauge, Briefcase,
+  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, Gauge, Briefcase, Newspaper,
 }
 
 /**
@@ -318,6 +318,8 @@ function Portal() {
   const [me, setMe] = useState<{ full_name: string; avatar: string | null } | null>(null)
   /** HR, SW, IT and Marketing admin logins: no Cyrix Digest on their home page (the user, 10 Oct). */
   const [adminLogin, setAdminLogin] = useState<boolean | null>(null)
+  /** HR, IT and Marketing post to Cyrix Digest, from a tile here rather than a KPI tab (the user, 2 Nov). */
+  const [digestDesk, setDigestDesk] = useState(false)
   const [failed, setFailed] = useState(false)
   /** A retry is in flight, so the button says so rather than doing nothing. */
   const [retrying, setRetrying] = useState(false)
@@ -388,7 +390,7 @@ function Portal() {
               // avatar comes along for the ride. It is a data URL on the
               // row itself rather than a file to go and fetch, so the
               // photo costs this query nothing extra to carry.
-              .select('id, full_name, ecode, avatar')
+              .select('id, full_name, ecode, avatar, account_type')
               .eq('auth_user_id', uid).maybeSingle()
           : Promise.resolve({ data: null }),
         loadModules(),
@@ -417,9 +419,13 @@ function Portal() {
       const roles = await supabase.from('user_roles')
         .select('role').eq('employee_id', me.data.id)
       if (!alive) return
-      const isAdmin = (roles.data ?? []).some(
-        // Marketing too (KPI 0164): its whole KPI is the Cyrix Digest page.
-        r => r.role === 'hr_admin' || r.role === 'sw_admin' || r.role === 'it_admin' || r.role === 'mkt_admin')
+      const roleNames = (roles.data ?? []).map(r => r.role as string)
+      const posts = roleNames.some(r => r === 'hr_admin' || r === 'it_admin' || r === 'mkt_admin')
+      setDigestDesk(posts)
+      // A shared desk login only: a person given a desk role is appraised too, and reads the Digest
+      // like everyone else (the user, 2 Nov).
+      const isAdmin = me.data.account_type === 'admin' && roleNames.some(
+        r => r === 'hr_admin' || r === 'sw_admin' || r === 'it_admin' || r === 'mkt_admin')
       setAdminLogin(isAdmin)
       if (!isAdmin) return
 
@@ -432,7 +438,8 @@ function Portal() {
         // beats a redirect that cannot remember it already happened.
         return
       }
-      window.location.assign('/kpi')
+      // Marketing's whole desk is the Digest.
+      window.location.assign(roleNames.some(r => r === 'hr_admin' || r === 'sw_admin' || r === 'it_admin') ? '/kpi' : '/kpi/digest')
     })()
     return () => { alive = false }
   }, [])
@@ -501,11 +508,13 @@ function Portal() {
 
         {modules && modules.length > 0 && (
           <div className={arriving ? 'tiles arrive' : 'tiles'}>
-            {modules.map((m, i) => {
+            {(digestDesk
+              ? [...modules, { code: 'digest', name: 'Cyrix Digest', description: 'Post news, meetings and polls', path: '/kpi/digest', icon: 'Newspaper', sort_order: 999, is_active: true }]
+              : modules).map((m, i, shown) => {
               const Icon = (m.icon && ICONS[m.icon]) || LayoutGrid
               // On a phone the tiles go two to a row; with an odd count KPI takes a row of its own
               // (the user, 24 Oct), or the first tile for somebody without KPI.
-              const wide = modules.length % 2 === 1 && m.code === (modules.find(x => x.code === 'kpi') ?? modules[0]).code
+              const wide = shown.length % 2 === 1 && m.code === (shown.find(x => x.code === 'kpi') ?? shown[0]).code
               return (
                 <a key={m.code} className={wide ? 'tile wide' : 'tile'} data-module={m.code} href={m.path} style={{ '--i': i } as CSSProperties}
                   onClick={m.code === 'cyra' ? e => { e.preventDefault(); void openCyra() } : undefined}>
