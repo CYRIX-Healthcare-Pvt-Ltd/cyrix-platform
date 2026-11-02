@@ -420,8 +420,10 @@ function Portal() {
         .select('role').eq('employee_id', me.data.id)
       if (!alive) return
       const roleNames = (roles.data ?? []).map(r => r.role as string)
-      const posts = roleNames.some(r => r === 'hr_admin' || r === 'it_admin' || r === 'mkt_admin')
-      setDigestDesk(posts)
+      // Digest ticked for their desk by SW Admin, or a shared desk login (KPI 0246).
+      const posts = await supabase.rpc('digest_can_post')
+      if (!alive) return
+      setDigestDesk(!!posts.data)
       // A shared desk login only: a person given a desk role is appraised too, and reads the Digest
       // like everyone else (the user, 2 Nov).
       const isAdmin = me.data.account_type === 'admin' && roleNames.some(
