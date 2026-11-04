@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "in.cyrix.cyra",
+        "sha256_cert_fingerprints": ["0B:8F:A3:8F:98:ED:89:0F:5E:73:A5:0F:3C:E3:26:7F:07:9B:91:E3:4C:BC:38:4D:94:39:A7:2C:3C:29:BF:FB"]
+      }
+    }]
