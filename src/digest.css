@@ -425,3 +425,6 @@ a.digest-sheet-btn { text-decoration: none; }
 .digest-quiz-clock.low { background: #dc2626; animation: digest-clock-pulse 1s ease-in-out infinite; }
 @keyframes digest-clock-pulse { 50% { transform: scale(1.06); } }
 @media (prefers-reduced-motion: reduce) { .digest-quiz-clock.low { animation: none; } }
+
+/* A pop-up's own scrolling stops at its ends instead of carrying on into the page behind (the user, 5 Nov). */
+.sheet-shade, .sheet.digest-sheet { overscroll-behavior: contain; }

@@ -726,7 +726,7 @@ function useOrder(postId: string, on: boolean) {
     return [...items].sort((x, y) => key(x) - key(y))
   }
 }
-const norm = (t: string) => t.trim().replace(/\s+/g, ' ').toLowerCase()
+const norm = (t: string) => t.replace(/\s+/g, '').toLowerCase()
 /** Whether one answer earned its marks, the way the server counted it. */
 const isRight = (q: QuizQ, v: string | string[] | undefined) => {
   const c = q.correct ?? []
@@ -976,6 +976,12 @@ function VideoPlayer({ postId, videoId }: { postId: string; videoId: string }) {
 }
 
 function Sheet({ label, onClose, children, wide, video }: { label: string; onClose: () => void; children: React.ReactNode; wide?: boolean; video?: boolean }) {
+  useEffect(() => {
+    const html = document.documentElement, body = document.body
+    const was = [html.style.overflow, body.style.overflow]
+    html.style.overflow = 'hidden'; body.style.overflow = 'hidden'
+    return () => { html.style.overflow = was[0]; body.style.overflow = was[1] }
+  }, [])
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', esc)
