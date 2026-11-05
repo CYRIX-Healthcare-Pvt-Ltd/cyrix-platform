@@ -22,7 +22,7 @@ import './digest.css'
 export interface Post {
   id: string; kind: Kind; title: string; body: string; image_url: string | null; color: Hue
   meet_at: string | null; meet_minutes: number | null; meet_link: string | null; meet_place: string | null
-  posted_as: 'hr' | 'it' | 'mkt'; author: string | null; created_at: string
+  posted_as: 'hr' | 'it' | 'mkt' | 'mgmt'; author: string | null; created_at: string
   likes: number; liked: boolean; comments: number
   /** A vacancy (0170): where, apply by, and how to apply. */
   vac_location: string | null; apply_by: string | null; apply_link: string | null
@@ -119,7 +119,8 @@ const when = (p: Post) => {
   const t = (d: Date) => d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase()
   return `${s.toLocaleDateString('en-GB', { weekday: 'short' })} · ${t(s)} – ${t(e)}`
 }
-const desk = (p: Post) => (p.posted_as === 'it' ? 'IT' : p.posted_as === 'mkt' ? 'Marketing' : 'HR')
+const DESK_WORD: Record<string, string> = { hr: 'HR', it: 'IT', mkt: 'Marketing', mgmt: 'Management' }
+const desk = (p: Post) => DESK_WORD[p.posted_as] ?? 'HR'
 /** Where the meeting is: what was typed, else read off the link (the user: "what if it is Google Meet"). */
 const where = (p: Post) => {
   if (p.meet_place) return p.meet_place
@@ -326,7 +327,7 @@ export default function Digest() {
             <span className="digest-sheet-art" aria-hidden><Newspaper size={120} /></span>
             <span className="digest-sheet-kind"><Newspaper size={14} /> All posts</span>
             <h2>Cyrix Digest</h2>
-            <p>News, meetings and polls from HR, IT and Marketing.</p>
+            <p>News, meetings and polls from HR, IT, Marketing and Management.</p>
           </div>
           <div className="digest-list">
             {posts.map(p => (
@@ -826,7 +827,7 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
                 {/* The posting desk's reply (KPI 0202). */}
                 {c.reply && (
                   <div className="digest-reply">
-                    <p><strong>{({ hr: 'HR', it: 'IT', mkt: 'Marketing' } as Record<string, string>)[c.reply_desk ?? ''] ?? 'Reply'}</strong>{c.reply_at && <span> {ago(c.reply_at)}</span>}</p>
+                    <p><strong>{DESK_WORD[c.reply_desk ?? ''] ?? 'Reply'}</strong>{c.reply_at && <span> {ago(c.reply_at)}</span>}</p>
                     <p>{c.reply}</p>
                   </div>
                 )}
