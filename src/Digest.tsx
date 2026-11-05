@@ -756,7 +756,12 @@ function QuizCard({ p, onOpen }: { p: Post; onOpen: (p: Post) => void }) {
         {sent
           ? <button type="button" className="digest-quiz-mini" onClick={() => onOpen(p)}><Trophy size={15} /> You scored {qs![0].score} of {qs![0].max_score}</button>
           : closed ? <p className="digest-poll-meta">This quiz has closed.</p>
-          : <button type="button" className="digest-vote digest-form-go" onClick={() => onOpen(p)}><Pencil size={15} /> Take the quiz</button>}
+          : settings?.seconds
+            ? <div className="digest-quiz-timed">
+                <span><Timer size={15} /> {timerWords(settings.seconds)}</span>
+                <button type="button" className="digest-vote digest-form-go" onClick={() => onOpen(p)}><Play size={15} /> Start quiz</button>
+              </div>
+            : <button type="button" className="digest-vote digest-form-go" onClick={() => onOpen(p)}><Pencil size={15} /> Take the quiz</button>}
         <div className="digest-news-foot">
           <button type="button" className="digest-like" onClick={() => onOpen(p)}><MessageCircle size={16} /> {p.comments}</button>
           <span className="digest-ago">{ago(p.created_at)}</span>
@@ -855,8 +860,9 @@ function QuizBody({ p }: { p: Post }) {
         <div className="digest-quiz-start">
           <p><Timer size={18} /> <strong>{clock(settings.seconds)}</strong></p>
           <p className="digest-poll-meta">{qs.length} {qs.length === 1 ? 'question' : 'questions'} · {total} marks</p>
+          <p className="digest-quiz-start-note">The timer starts when you press Start quiz.</p>
           {err && <p className="digest-poll-err">{err}</p>}
-          <button type="button" className="digest-vote" disabled={busy} onClick={start}><Play size={15} /> Start</button>
+          <button type="button" className="digest-vote" disabled={busy} onClick={start}><Play size={15} /> Start quiz</button>
         </div>
       </div>
     )
@@ -874,8 +880,16 @@ function QuizBody({ p }: { p: Post }) {
   }
   return (
     <div className="digest-form">
+      {/* Pinned at the top while the questions scroll; amber in the last 30 seconds, red and beating in the last 10 (the user, 5 Nov). */}
       {left != null && (
-        <p className={left <= 10 ? 'digest-quiz-clock low' : 'digest-quiz-clock'} role="timer" aria-live="off"><Timer size={16} /> {clock(left)}</p>
+        <div className={['digest-quiz-clock', left <= 30 ? 'warn' : '', left <= 10 ? 'low' : '', left === 0 ? 'out' : ''].join(' ').trim()} role="timer" aria-live="off"
+          style={{ '--left': settings.seconds ? left / settings.seconds : 0 } as React.CSSProperties}>
+          <Timer size={16} /> <span key={left <= 10 ? left : 'n'} className="digest-quiz-clock-n">{clock(left)}</span>
+          <i aria-hidden />
+        </div>
+      )}
+      {left === 0 && (
+        <div className="digest-quiz-up" role="status"><Timer size={30} /><strong>Time's up</strong><span>Sending your answers</span></div>
       )}
       {list.map((q, i) => {
         const v = a[q.id]
