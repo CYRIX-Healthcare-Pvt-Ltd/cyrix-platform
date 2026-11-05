@@ -4,7 +4,7 @@ import FileView from './FileView'
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   Heart, MessageCircle, Megaphone, Newspaper, Send, Trash2, Video, X, MapPin, Clock, ChevronRight, BarChart3, Check,
-  TriangleAlert, Pin, Briefcase, CalendarClock, ClipboardList, Pencil, PlayCircle, Play, FileText, Trophy, EyeOff,
+  TriangleAlert, Pin, Briefcase, CalendarClock, ClipboardList, Pencil, PlayCircle, Play, FileText, Trophy, EyeOff, Timer,
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import './digest.css'
@@ -421,6 +421,7 @@ let previewOptions: Option[] = []
 let previewForm: FormQ[] = []
 let previewAnonymous = false
 let previewAgain = false
+let previewQuiz: { shuffle: boolean; seconds: number | null } = { shuffle: false, seconds: null }
 
 /** The question's options, and this person's answer. */
 function usePoll(id: string) {
@@ -682,25 +683,48 @@ interface QuizQ {
   closes_at: string | null; mine: Record<string, string | string[]> | null; sent_at: string | null
   score: number | null; max_score: number | null
 }
+interface QuizSettings { shuffle: boolean; seconds: number | null; left: number | null }
 function useQuiz(id: string) {
   const [qs, setQs] = useState<QuizQ[] | null>(null)
   const [again, setAgain] = useState(false)
+  const [settings, setSettings] = useState<QuizSettings | null>(null)
   const load = useCallback(async () => {
     if (id === PREVIEW_ID) {
       setAgain(previewAgain)
+      setSettings({ shuffle: previewQuiz.shuffle, seconds: previewQuiz.seconds, left: null })
       setQs(previewForm.map(q => ({ id: q.id, label: q.label, qtype: (q.qtype === 'many' || q.qtype === 'short' ? q.qtype : 'one'), options: q.options,
         points: 1, correct: null, closes_at: q.closes_at, mine: null, sent_at: null, score: null, max_score: null })))
       return
     }
-    const [{ data }, { data: ag }] = await Promise.all([
+    const [{ data }, { data: ag }, { data: set }] = await Promise.all([
       supabase.rpc('digest_quiz', { p_id: id }),
       supabase.rpc('digest_allow_again', { p_id: id }),
+      supabase.rpc('digest_quiz_settings', { p_id: id }),
     ])
     setAgain(!!ag)
+    setSettings((set as QuizSettings | null) ?? { shuffle: false, seconds: null, left: null })
     setQs((data ?? []) as QuizQ[])
   }, [id])
   useEffect(() => { void load() }, [load])
-  return { qs, load, again }
+  return { qs, load, again, settings }
+}
+/** 90 → "1:30". */
+const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
+/** The quiz's timer in words on its card: 1 min 30 sec. */
+const timerWords = (sec: number) => [Math.floor(sec / 60) && `${Math.floor(sec / 60)} min`, sec % 60 && `${sec % 60} sec`].filter(Boolean).join(' ')
+/**
+ * A shuffled quiz (KPI 0258; the user, 5 Nov: "for some user question 1 will be question 2 of others"): an order of the
+ * person's own, from the post and who they are, so it is the same each time they open it.
+ */
+function useOrder(postId: string, on: boolean) {
+  const [who, setWho] = useState('')
+  useEffect(() => { if (on) void supabase.auth.getSession().then(({ data }) => setWho(data.session?.user.id ?? '')) }, [on])
+  const hash = (t: string) => { let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) } return h >>> 0 }
+  return function order<T>(items: T[], salt = ''): T[] {
+    if (!on) return items
+    const key = (x: T) => hash(`${postId}|${who}|${salt}|${typeof x === 'string' ? x : (x as { id: string }).id}`)
+    return [...items].sort((x, y) => key(x) - key(y))
+  }
 }
 const norm = (t: string) => t.trim().replace(/\s+/g, ' ').toLowerCase()
 /** Whether one answer earned its marks, the way the server counted it. */
@@ -712,7 +736,7 @@ const isRight = (q: QuizQ, v: string | string[] | undefined) => {
 }
 
 function QuizCard({ p, onOpen }: { p: Post; onOpen: (p: Post) => void }) {
-  const { qs } = useQuiz(p.id)
+  const { qs, settings } = useQuiz(p.id)
   const closes = qs?.[0]?.closes_at ?? null
   const closed = !!closes && new Date(closes).getTime() < Date.now()
   const sent = !!qs?.[0]?.sent_at
@@ -726,7 +750,7 @@ function QuizCard({ p, onOpen }: { p: Post; onOpen: (p: Post) => void }) {
           <span className="digest-by">{desk(p)}</span>
         </div>
         <button type="button" className="digest-pollcard-q" onClick={() => onOpen(p)}>{p.title}</button>
-        {qs && <p className="digest-form-sub">{qs.length} {qs.length === 1 ? 'question' : 'questions'} · {total} marks{closes ? ` · ${closed ? 'closed' : 'closes ' + closesOn(closes)}` : ''}</p>}
+        {qs && <p className="digest-form-sub">{qs.length} {qs.length === 1 ? 'question' : 'questions'} · {total} marks{settings?.seconds ? ` · ${timerWords(settings.seconds)}` : ''}{closes ? ` · ${closed ? 'closed' : 'closes ' + closesOn(closes)}` : ''}</p>}
       </div>
       <div className="digest-pollcard-body">
         {sent
@@ -742,20 +766,53 @@ function QuizCard({ p, onOpen }: { p: Post; onOpen: (p: Post) => void }) {
   )
 }
 
-/** Answer every question, send once, and see the result straight away. */
+/** Answer every question, send once, and see the result straight away; with a timer, Start first (KPI 0258). */
 function QuizBody({ p }: { p: Post }) {
-  const { qs, load, again } = useQuiz(p.id)
+  const { qs, load, again, settings } = useQuiz(p.id)
   const [a, setA] = useState<Record<string, string | string[]>>({})
   const [retake, setRetake] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  if (!qs) return <div className="digest-poll-skel" />
+  // The moment time runs out, by this phone's clock, from the seconds the server says are left.
+  const [deadline, setDeadline] = useState<number | null>(null)
+  const [now, setNow] = useState(Date.now())
+  const order = useOrder(p.id, !!settings?.shuffle)
+  const answers = useRef(a); answers.current = a
+  const sentAuto = useRef(false)
+
+  // A start already running (the page was closed and opened again) carries on where the server's clock is.
+  useEffect(() => {
+    if (settings?.left != null && deadline == null) setDeadline(Date.now() + settings.left * 1000)
+  }, [settings, deadline])
+  useEffect(() => {
+    if (deadline == null) return
+    const t = window.setInterval(() => setNow(Date.now()), 250)
+    return () => window.clearInterval(t)
+  }, [deadline])
+
+  const send = useCallback(async (auto: boolean) => {
+    if (p.id === PREVIEW_ID) return
+    setBusy(true); setErr(null)
+    const { error } = await supabase.rpc('digest_quiz_submit', { p_id: p.id, p_answers: answers.current })
+    setBusy(false)
+    if (error) { if (!auto) setErr(error.message); return }
+    setRetake(false); setDeadline(null); sentAuto.current = false
+    void load()
+  }, [p.id, load])
+  // Time up: what is answered goes, the rest counts as wrong.
+  const left = deadline == null ? null : Math.max(0, Math.ceil((deadline - now) / 1000))
+  useEffect(() => {
+    if (left === 0 && !sentAuto.current && p.id !== PREVIEW_ID) { sentAuto.current = true; void send(true) }
+  }, [left, send, p.id])
+
+  if (!qs || !settings) return <div className="digest-poll-skel" />
   const closes = qs[0]?.closes_at ?? null
   const closed = !!closes && new Date(closes).getTime() < Date.now()
   const sent = !!qs[0]?.sent_at
   const show = (v: string | string[] | undefined) => (Array.isArray(v) ? v.join(', ') : v) || '—'
+  const list = order(qs)
 
-  if (sent && !retake) {
+  if (sent && !retake && deadline == null) {
     const got = qs[0].score ?? 0, of = qs[0].max_score ?? 0
     return (
       <div className="digest-form">
@@ -763,7 +820,7 @@ function QuizBody({ p }: { p: Post }) {
           <Trophy size={22} />
           <div><strong>{got} of {of}</strong><span>{of ? Math.round((got / of) * 100) : 0}% · {qs.filter(q => isRight(q, qs[0].mine?.[q.id])).length} of {qs.length} correct</span></div>
         </div>
-        {qs.map((q, i) => {
+        {list.map((q, i) => {
           const v = qs[0].mine?.[q.id]
           const ok = isRight(q, v)
           return (
@@ -775,32 +832,52 @@ function QuizBody({ p }: { p: Post }) {
           )
         })}
         {again && !closed && (
-          <p className="digest-poll-meta"><button type="button" onClick={() => { setA({}); setErr(null); setRetake(true) }}>Take it again</button>{closes ? ` · until ${closesOn(closes)}` : ''}</p>
+          <p className="digest-poll-meta"><button type="button" onClick={() => { setA({}); setErr(null); setRetake(true); void load() }}>Take it again</button>{closes ? ` · until ${closesOn(closes)}` : ''}</p>
         )}
       </div>
     )
   }
-  if (closed) return <div className="digest-form"><p className="digest-poll-meta">This quiz has closed.</p></div>
+  if (closed && deadline == null) return <div className="digest-form"><p className="digest-poll-meta">This quiz has closed.</p></div>
+
+  // With a timer: nothing shows until Start (the user, 5 Nov: "should have start then on start time should tick").
+  if (settings.seconds && deadline == null) {
+    const total = qs.reduce((t, q) => t + q.points, 0)
+    const start = async () => {
+      if (p.id === PREVIEW_ID) { setDeadline(Date.now() + settings.seconds! * 1000); return }
+      setBusy(true); setErr(null)
+      const { data, error } = await supabase.rpc('digest_quiz_start', { p_id: p.id })
+      setBusy(false)
+      if (error) { setErr(error.message); return }
+      setA({}); setDeadline(Date.now() + Number(data ?? 0) * 1000)
+    }
+    return (
+      <div className="digest-form">
+        <div className="digest-quiz-start">
+          <p><Timer size={18} /> <strong>{clock(settings.seconds)}</strong></p>
+          <p className="digest-poll-meta">{qs.length} {qs.length === 1 ? 'question' : 'questions'} · {total} marks</p>
+          {err && <p className="digest-poll-err">{err}</p>}
+          <button type="button" className="digest-vote" disabled={busy} onClick={start}><Play size={15} /> Start</button>
+        </div>
+      </div>
+    )
+  }
 
   const put = (id: string, v: string | string[]) => { setErr(null); setA(x => ({ ...x, [id]: v })) }
   const toggle = (id: string, o: string) => {
     const cur = Array.isArray(a[id]) ? (a[id] as string[]) : []
     put(id, cur.includes(o) ? cur.filter(x => x !== o) : [...cur, o])
   }
-  const send = async () => {
-    if (p.id === PREVIEW_ID) return
-    const gap = qs.find(q => !a[q.id] || (Array.isArray(a[q.id]) ? !(a[q.id] as string[]).length : !String(a[q.id]).trim()))
+  const submit = () => {
+    const gap = deadline == null && qs.find(q => !a[q.id] || (Array.isArray(a[q.id]) ? !(a[q.id] as string[]).length : !String(a[q.id]).trim()))
     if (gap) { setErr(`Answer "${gap.label}" first`); return }
-    setBusy(true); setErr(null)
-    const { error } = await supabase.rpc('digest_quiz_submit', { p_id: p.id, p_answers: a })
-    setBusy(false)
-    if (error) { setErr(error.message); return }
-    setRetake(false)
-    void load()
+    void send(false)
   }
   return (
     <div className="digest-form">
-      {qs.map((q, i) => {
+      {left != null && (
+        <p className={left <= 10 ? 'digest-quiz-clock low' : 'digest-quiz-clock'} role="timer" aria-live="off"><Timer size={16} /> {clock(left)}</p>
+      )}
+      {list.map((q, i) => {
         const v = a[q.id]
         return (
           <div key={q.id} className="digest-field">
@@ -808,7 +885,7 @@ function QuizBody({ p }: { p: Post }) {
             {q.qtype === 'short' && <input value={(v as string) ?? ''} maxLength={300} onChange={e => put(q.id, e.target.value)} />}
             {q.qtype === 'one' && (
               <div className="digest-field-choices">
-                {q.options.map(o => (
+                {order(q.options, q.id).map(o => (
                   <button key={o} type="button" className={v === o ? 'digest-option on' : 'digest-option'} onClick={() => put(q.id, o)}>
                     <span className="digest-tick">{v === o && <Check size={12} />}</span>{o}
                   </button>
@@ -817,7 +894,7 @@ function QuizBody({ p }: { p: Post }) {
             )}
             {q.qtype === 'many' && (
               <div className="digest-field-choices">
-                {q.options.map(o => {
+                {order(q.options, q.id).map(o => {
                   const on = Array.isArray(v) && v.includes(o)
                   return (
                     <button key={o} type="button" className={on ? 'digest-option on' : 'digest-option'} onClick={() => toggle(q.id, o)}>
@@ -832,8 +909,8 @@ function QuizBody({ p }: { p: Post }) {
       })}
       {err && <p className="digest-poll-err">{err}</p>}
       <div className="digest-poll-go">
-        <span className="digest-poll-meta">{closes ? `Closes ${closesOn(closes)}` : ''}</span>
-        <button type="button" className="digest-vote" disabled={busy} onClick={send}><Send size={15} /> Submit</button>
+        <span className="digest-poll-meta">{closes && left == null ? `Closes ${closesOn(closes)}` : ''}</span>
+        <button type="button" className="digest-vote" disabled={busy || left === 0} onClick={submit}><Send size={15} /> Submit</button>
       </div>
     </div>
   )
@@ -1090,7 +1167,8 @@ export function DigestPreview() {
   useEffect(() => {
     const on = (e: MessageEvent) => {
       const d = e.data as { type?: string; post?: Post; options?: string[]; multi?: boolean; closes?: string | null
-        questions?: Array<{ label: string; qtype: QType; options: string[]; required: boolean }>; anonymous?: boolean; again?: boolean } | null
+        questions?: Array<{ label: string; qtype: QType; options: string[]; required: boolean }>; anonymous?: boolean; again?: boolean
+        quiz?: { shuffle: boolean; seconds: number | null } } | null
       if (!d || d.type !== 'cyrix-digest-preview' || !d.post) return
       previewOptions = (d.options ?? []).map((label, i) => ({
         id: 'o' + i, label, votes: 0, mine: false, closes_at: d.closes ?? null, multi: !!d.multi, voters: 0,
@@ -1101,6 +1179,7 @@ export function DigestPreview() {
       }))
       previewAnonymous = !!d.anonymous
       previewAgain = !!d.again
+      previewQuiz = d.quiz ?? { shuffle: false, seconds: null }
       setPost({ ...d.post, id: PREVIEW_ID })
     }
     window.addEventListener('message', on)
@@ -1118,7 +1197,7 @@ export function DigestPreview() {
       </div>
       {view === 'card' ? (
         <section className="digest">
-          <div className="digest-grid digest-preview-grid" key={JSON.stringify(post) + previewOptions.length + JSON.stringify(previewForm)}>
+          <div className="digest-grid digest-preview-grid" key={JSON.stringify(post) + previewOptions.length + JSON.stringify(previewForm) + JSON.stringify(previewQuiz)}>
             {post.kind === 'meeting' ? <MeetingCard p={post} onJoin={noop} onOpen={() => setView('open')} />
               : post.kind === 'poll' ? <PollCard p={post} onOpen={() => setView('open')} />
               : post.kind === 'form' ? <FormCard p={post} onOpen={() => setView('open')} />
@@ -1127,7 +1206,7 @@ export function DigestPreview() {
           </div>
         </section>
       ) : (
-        <PostSheet key={JSON.stringify(post) + previewOptions.length + JSON.stringify(previewForm)} p={post} onClose={() => setView('card')} onLike={noop} onJoin={noop} />
+        <PostSheet key={JSON.stringify(post) + previewOptions.length + JSON.stringify(previewForm) + JSON.stringify(previewQuiz)} p={post} onClose={() => setView('card')} onLike={noop} onJoin={noop} />
       )}
     </div>
   )

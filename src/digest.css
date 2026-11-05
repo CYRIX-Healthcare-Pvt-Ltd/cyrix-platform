@@ -414,3 +414,14 @@ a.digest-sheet-btn { text-decoration: none; }
 .digest-quiz-q.wrong .digest-quiz-mine { color: #b91c1c; text-decoration: line-through; }
 .digest-quiz-right { color: #15803d; font-weight: 600; }
 .digest-quiz-mine svg, .digest-quiz-right svg { flex-shrink: 0; margin-top: 0.15rem; }
+
+/* A timed quiz (KPI 0258): the start, and the clock that ticks while it is answered. */
+.digest-quiz-start { display: grid; justify-items: center; gap: 0.6rem; padding: 1.25rem 1rem; border-radius: 14px; background: var(--soft); text-align: center; }
+.digest-quiz-start p { margin: 0; display: inline-flex; align-items: center; gap: 0.45rem; }
+.digest-quiz-start strong { font-size: 1.75rem; color: var(--hue); font-variant-numeric: tabular-nums; }
+.digest-quiz-clock { position: sticky; top: 0.5rem; z-index: 2; justify-self: end; margin: 0 0 0.5rem auto; width: max-content;
+  display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem; border-radius: 999px; background: var(--hue); color: #fff;
+  font-weight: 700; font-variant-numeric: tabular-nums; box-shadow: 0 4px 14px rgb(0 0 0 / 0.18); }
+.digest-quiz-clock.low { background: #dc2626; animation: digest-clock-pulse 1s ease-in-out infinite; }
+@keyframes digest-clock-pulse { 50% { transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .digest-quiz-clock.low { animation: none; } }
