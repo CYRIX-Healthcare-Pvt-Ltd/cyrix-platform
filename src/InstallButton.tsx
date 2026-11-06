@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download, MonitorDown, Share, PlusSquare, Check, X, Loader2 } from 'lucide-react'
+import { Download, MonitorDown, Share, PlusSquare, Check, X, Loader2, FolderDown, ShieldCheck, Smartphone } from 'lucide-react'
 import {
   installRoute, alreadyInstalled, hasNativePrompt, promptInstall,
   subscribeToInstallability, type InstallRoute,
@@ -47,7 +47,7 @@ export default function InstallButton() {
         <Icon size={17} className={busy ? 'spin' : undefined} aria-hidden />
         <span className="sr">Install the app</span>
       </button>
-      {steps && <Steps ios={route === 'ios'} onClose={() => setSteps(false)} />}
+      {steps && (route === 'android' ? <AndroidSheet onClose={() => setSteps(false)} /> : <Steps ios={route === 'ios'} onClose={() => setSteps(false)} />)}
     </>
   )
 }
@@ -93,6 +93,47 @@ export function Steps({ ios, onClose }: { ios: boolean; onClose: () => void }) {
           One app with all your modules inside. It opens from your home screen,
           fills the whole screen, and keeps you signed in.
         </p>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Android: our own Cyra app, served from public/Cyra.apk (the user, 6 Nov: "for andriod users, can you
+ * attach the apk here?"). It opens app.cyrix.in, so it never needs downloading again after a change.
+ */
+export function AndroidSheet({ onClose }: { onClose: () => void }) {
+  const close = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    close.current?.focus()
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', esc)
+    return () => document.removeEventListener('keydown', esc)
+  }, [onClose])
+
+  return (
+    <div className="sheet-shade" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="apk-title">
+        <div className="sheet-head">
+          <h2 id="apk-title">Install the Cyra app</h2>
+          <button ref={close} type="button" className="icon-btn sheet-close" onClick={onClose} title="Close">
+            <X size={16} />
+            <span className="sr">Close</span>
+          </button>
+        </div>
+
+        <a className="primary apk-get" href="/Cyra.apk" download="Cyra.apk">
+          <Download size={18} aria-hidden /> Download the app <span className="apk-size">1 MB</span>
+        </a>
+
+        <ol className="sheet-steps">
+          <li><span className="sheet-n">1</span><FolderDown size={16} aria-hidden />
+            <span>Open <strong>Cyra.apk</strong> from your notifications or Downloads</span></li>
+          <li><span className="sheet-n">2</span><ShieldCheck size={16} aria-hidden />
+            <span>If asked, allow <strong>Install unknown apps</strong>, then press <strong>Install</strong></span></li>
+          <li><span className="sheet-n">3</span><Smartphone size={16} aria-hidden />
+            <span>Open <strong>Cyra</strong> from your home screen</span></li>
+        </ol>
       </div>
     </div>
   )

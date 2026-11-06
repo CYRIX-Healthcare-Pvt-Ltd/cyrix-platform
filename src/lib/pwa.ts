@@ -13,6 +13,8 @@ import { local } from './storage'
  *
  *   prompt          Chrome/Edge has handed over its install dialog.
  *   ios             Safari never does. Share → Add to Home Screen, by hand.
+ *   android         Any Android phone: our own Cyra app, public/Cyra.apk (the user, 6 Nov: "for
+ *                   andriod users, can you attach the apk here?"), not Chrome's install.
  *   desktop-manual  Installable, but the browser keeps its own button in
  *                   the address bar rather than handing one over.
  *   unsupported     Firefox and anything locked down: no button at all.
@@ -24,7 +26,7 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
-export type InstallRoute = 'installed' | 'prompt' | 'ios' | 'desktop-manual' | 'unsupported'
+export type InstallRoute = 'installed' | 'prompt' | 'ios' | 'android' | 'desktop-manual' | 'unsupported'
 
 export function installRoute(opts: {
   standalone: boolean
@@ -34,9 +36,10 @@ export function installRoute(opts: {
   touchPoints?: number
 }): InstallRoute {
   if (opts.standalone) return 'installed'
+  const ua = opts.ua
+  if (/Android/.test(ua)) return 'android'
   if (opts.hasPrompt) return 'prompt'
 
-  const ua = opts.ua
   const iPhone = /iPad|iPhone|iPod/.test(ua)
   const iPadPretendingToBeAMac = /Macintosh/.test(ua) && (opts.touchPoints ?? 0) > 1
   if (iPhone || iPadPretendingToBeAMac) {
@@ -46,7 +49,7 @@ export function installRoute(opts: {
     return realSafari ? 'ios' : 'unsupported'
   }
 
-  // On a phone, no captured event means it is installed already or Chrome
+  // On another phone, no captured event means it is installed already or Chrome
   // has decided not to offer yet. Neither is worth a button.
   if (/Android|Mobile/.test(ua)) return 'unsupported'
 
@@ -82,7 +85,9 @@ async function askTheBrowserWhatIsInstalled(): Promise<void> {
   if (typeof nav.getInstalledRelatedApps !== 'function') return
   try {
     const apps = await nav.getInstalledRelatedApps()
-    if (apps.some(a => a.platform === 'webapp')) { installed = true; announce() }
+    if (apps.some(a => a.platform === 'webapp' || a.platform === 'play')) { installed = true; announce() }
+    // Android names the Cyra app when it is on the phone; not named any more means it was removed.
+    else if (/Android/.test(navigator.userAgent) && !isInstalled() && !fromCyraApp() && local.getItem(APK) === '1') { local.removeItem(APK); installed = isInstalled(); announce() }
   } catch { /* not supported here; offering it is the safe failure */ }
 }
 
@@ -93,18 +98,24 @@ async function askTheBrowserWhatIsInstalled(): Promise<void> {
 */
 const SEEN_INSTALLED = 'cyra.installed'
 
+/* The Cyra app (a Trusted Web Activity) opens its first page with the app as the referrer. It shares
+   Chrome's storage, so a Chrome tab on the same phone knows the app is there. */
+const APK = 'cyra.apk'
+const fromCyraApp = () => { try { return document.referrer.startsWith('android-app://in.cyrix.cyra') } catch { return false } }
+
 /** Call once, before React mounts: beforeinstallprompt fires early and once. */
 export function watchInstallability(): void {
+  if (fromCyraApp()) local.setItem(APK, '1')
   installed = isInstalled()
   if (installed) local.setItem(SEEN_INSTALLED, '1')
-  else if (local.getItem(SEEN_INSTALLED) === '1') installed = true
-  if (!installed) void askTheBrowserWhatIsInstalled()
+  else if (local.getItem(SEEN_INSTALLED) === '1' || local.getItem(APK) === '1') installed = true
+  void askTheBrowserWhatIsInstalled()
 
   window.addEventListener('beforeinstallprompt', e => {
     // Keeps Chrome's own mini-infobar away and the event for the button.
     e.preventDefault()
     deferred = e as BeforeInstallPromptEvent
-    if (!isInstalled()) { local.removeItem(SEEN_INSTALLED); installed = false }
+    if (!isInstalled()) { local.removeItem(SEEN_INSTALLED); installed = local.getItem(APK) === '1' }
     announce()
   })
   window.addEventListener('appinstalled', () => {
