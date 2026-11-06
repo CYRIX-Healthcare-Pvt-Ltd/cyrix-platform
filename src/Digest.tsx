@@ -684,6 +684,7 @@ interface QuizQ {
   score: number | null; max_score: number | null
 }
 interface QuizSettings { shuffle: boolean; seconds: number | null; left: number | null }
+const QUIZ_SENT = 'digest-quiz-sent'
 function useQuiz(id: string) {
   const [qs, setQs] = useState<QuizQ[] | null>(null)
   const [again, setAgain] = useState(false)
@@ -706,6 +707,12 @@ function useQuiz(id: string) {
     setQs((data ?? []) as QuizQ[])
   }, [id])
   useEffect(() => { void load() }, [load])
+  // Sent in the pop-up: the card behind it shows the score straight away, not Start quiz (the user, 6 Nov).
+  useEffect(() => {
+    const on = (e: Event) => { if ((e as CustomEvent<string>).detail === id) void load() }
+    window.addEventListener(QUIZ_SENT, on)
+    return () => window.removeEventListener(QUIZ_SENT, on)
+  }, [id, load])
   return { qs, load, again, settings }
 }
 /** 90 → "1:30". */
@@ -802,7 +809,7 @@ function QuizBody({ p }: { p: Post }) {
     setBusy(false)
     if (error) { if (!auto) setErr(error.message); return }
     setRetake(false); setDeadline(null); sentAuto.current = false
-    void load()
+    window.dispatchEvent(new CustomEvent(QUIZ_SENT, { detail: p.id }))
   }, [p.id, load])
   // Time up: what is answered goes, the rest counts as wrong.
   const left = deadline == null ? null : Math.max(0, Math.ceil((deadline - now) / 1000))
