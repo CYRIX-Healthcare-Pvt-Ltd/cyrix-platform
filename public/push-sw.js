@@ -21,6 +21,8 @@ self.addEventListener('push', (event) => {
       icon: '/icon-192.png',
       // The status-bar mark: Android draws only its shape in one colour, so it is the C of the Cyrix logo in white on nothing (the user, 12 Oct).
       badge: '/icon-badge-96.png',
+      // A message's picture, shown large on Android and computers (KPI 0271); iPhone shows the text only.
+      image: d.image || undefined,
       tag: d.tag || undefined,
       renotify: !!d.tag,
       data: { url: d.url || '/' },
