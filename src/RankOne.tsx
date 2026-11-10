@@ -18,25 +18,28 @@ function assessed(today = new Date()) {
   return { iso, label: `${MONTHS[d.getMonth()]}-${String(d.getFullYear() % 100).padStart(2, '0')}`, fy: `${start}-${String((start + 1) % 100).padStart(2, '0')}` }
 }
 
-/** The month label ("Oct-26") when the person signed in is rank 1 in their team for the month being assessed. */
+/** The month ("Oct-26") and team ("Saranya's team") when the person signed in is rank 1 in their team for the month being assessed. */
 export function useRankOne(on: boolean) {
-  const [month, setMonth] = useState<string | null>(null)
+  const [month, setMonth] = useState<{ month: string; team: string } | null>(null)
   useEffect(() => {
     if (!on) { setMonth(null); return }
     const a = assessed()
     let alive = true
     void supabase.rpc('kpi_team_standing', { p_fy: a.fy }).then(({ data }) => {
       if (!alive) return
-      const rows = (data ?? []) as Array<{ is_me: boolean; period_month: string | null; team_rank: number | null; team_of: number | null }>
-      setMonth(rows.some(r => r.is_me && r.period_month?.slice(0, 10) === a.iso && r.team_rank === 1 && (r.team_of ?? 0) > 1) ? a.label : null)
+      const rows = (data ?? []) as Array<{ is_me: boolean; period_month: string | null; team_rank: number | null; team_of: number | null; manager_name: string | null }>
+      const mine = rows.find(r => r.is_me && r.period_month?.slice(0, 10) === a.iso && r.team_rank === 1 && (r.team_of ?? 0) > 1)
+      // The team as KPI's gold header names it: the manager's first name.
+      setMonth(mine ? { month: a.label, team: `${(mine.manager_name ?? '').split(' ')[0]}'s team` } : null)
     }, () => {})
     return () => { alive = false }
   }, [on])
   return month
 }
 
-export function RankOneChip({ month }: { month: string }) {
-  return <span className="r1-chip"><Crown size={13} aria-hidden /> Rank 1 · {month}</span>
+/** After the name (the user, 10 Nov: "after kevin, rank 1 - oct 26 in saranya teams"). */
+export function RankOneChip({ month, team }: { month: string; team: string }) {
+  return <span className="r1-chip"><Crown size={14} aria-hidden /><span className="r1-chip-words">Rank 1 · {month} <span className="r1-chip-team">in {team}</span></span></span>
 }
 
 /**
@@ -46,7 +49,7 @@ export function RankOneChip({ month }: { month: string }) {
 export function RankOneDust() {
   const dust = useMemo(() => Array.from({ length: 34 }, (_, i) => {
     const r = (n: number) => { const x = Math.sin(i * 9301 + n * 49297) * 233280; return x - Math.floor(x) }
-    return { left: 2 + r(1) * 96, dx: r(2) * 50 - 25, dur: 9 + r(3) * 7, delay: -r(4) * 16, size: 2 + r(5) * 2 }
+    return { left: 2 + r(1) * 96, dx: r(2) * 50 - 25, dur: 12 + r(3) * 9, delay: -r(4) * 21, /* a little slower everywhere (the user, 10 Nov) */ size: 2 + r(5) * 2 }
   }), [])
   return (
     <>

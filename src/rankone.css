@@ -14,13 +14,25 @@
 /* Light mode: a deeper gold so it shows on white (the user, 10 Nov); dark mode the pale gold. */
 :root[data-theme='dark'] .r1-dust { background: #ffe08a; box-shadow: none; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .r1-dust { background: #ffe08a; box-shadow: none; } }
-@keyframes r1-up { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 0.9; } 85% { opacity: 0.6; } 100% { transform: translate(var(--dx), -100vh); opacity: 0; } }
+@keyframes r1-up { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 0.9; } 85% { opacity: 0.6; } 100% { transform: translate(calc(var(--dx) * var(--dxs, 1)), -100vh); opacity: 0; } }
+/* A phone: half the specks and half the sideways drift, so the narrow screen is calmer (the user, 10 Nov: "is dust speed more in mobile than desktop?"). */
+@media (max-width: 639px) { .r1-sky { --dxs: 0.5; } .r1-dust:nth-child(even) { display: none; } }
 
+/* No border or pill: the words themselves in metallic gold, a shine passing (the user, 10 Nov: "do we need that border? what about gold shining?"). */
 .r1-chip {
-  display: inline-flex; align-items: center; gap: 0.35rem; margin-bottom: 0.6rem; padding: 0.2rem 0.65rem; border-radius: 999px;
-  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
-  color: #8f5d06; background: #fff7dc; box-shadow: inset 0 0 0 1px #e6a817b3;
+  display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.6rem; vertical-align: middle;
+  font-size: 0.75rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; line-height: 1.4; white-space: nowrap; position: relative; top: -0.15em;
+  --m: linear-gradient(100deg, #8f5d06 0%, #e6a817 20%, #fff7d6 34%, #e6a817 46%, #b9820b 60%, #e6a817 76%, #8f5d06 100%);
 }
+.r1-chip-words {
+  background: var(--m); background-size: 240% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: r1-metal 6s linear 1s infinite;
+}
+@keyframes r1-metal { from { background-position: 130% 0; } to { background-position: -110% 0; } }
+.r1-chip svg { flex: none; color: #b9820b; }
+.r1-chip-team { font-weight: 600; letter-spacing: 0.1em; }
+/* On a phone the chip goes under the name, whole. */
+@media (max-width: 639px) { .r1-chip { display: flex; width: max-content; margin: 0.5rem 0 0; top: 0; } }
 /* "Hello," a size under the name, for everybody (the user, 10 Nov: "for all hello should be 20 px"). */
 .portal-main h1 .r1-hello { font-size: 0.85em; }
 .r1-gold, .r1-name {
@@ -50,12 +62,76 @@
 :root[data-theme='dark'] .r1-gold, :root[data-theme='dark'] .r1-name { --g: linear-gradient(180deg, #fffaf0 0%, #fff1b8 45%, #ffcf40 100%); }
 :root[data-theme='dark'] .r1-gold { background-image: var(--g); }
 :root[data-theme='dark'] .r1-name { background-image: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.95) 48%, rgba(255, 255, 255, 0.95) 52%, transparent 62%), var(--g); }
-:root[data-theme='dark'] .r1-chip { color: #fff1b8; background: #8f5d0626; }
+:root[data-theme='dark'] .r1-chip { --m: linear-gradient(100deg, #8f5d06 0%, #ffcf40 20%, #ffffff 34%, #ffcf40 46%, #e6a817 60%, #fff1b8 76%, #8f5d06 100%); }
+:root[data-theme='dark'] .r1-chip svg { color: #ffcf40; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .r1-gold, :root:not([data-theme='light']) .r1-name { --g: linear-gradient(180deg, #fffaf0 0%, #fff1b8 45%, #ffcf40 100%); }
   :root:not([data-theme='light']) .r1-gold { background-image: var(--g); }
   :root:not([data-theme='light']) .r1-name { background-image: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.95) 48%, rgba(255, 255, 255, 0.95) 52%, transparent 62%), var(--g); }
-  :root:not([data-theme='light']) .r1-chip { color: #fff1b8; background: #8f5d0626; }
+  :root:not([data-theme='light']) .r1-chip { --m: linear-gradient(100deg, #8f5d06 0%, #ffcf40 20%, #ffffff 34%, #ffcf40 46%, #e6a817 60%, #fff1b8 76%, #8f5d06 100%); }
+  :root:not([data-theme='light']) .r1-chip svg { color: #ffcf40; }
 }
 
-@media (prefers-reduced-motion: reduce) { .r1-dust { display: none; } .r1-name, .digest-teaser.r1-ring { animation: none; } }
+/* The Digest bar and every team's Rank 1 (Leaders.tsx) on one row; on a phone the Rank 1s bar is its gold tag alone. */
+.home-bars { display: flex; gap: 0.6rem; margin: -1.4rem 0 1.8rem; }
+.home-bars:empty { display: none; }
+.home-bars > .digest-teaser { margin: 0; flex: 1 1 0; min-width: 0; }
+.leaders-bar {
+  position: relative; display: flex; align-items: center; gap: 0.7rem; flex: 1 1 0; min-width: 0; padding: 0.55rem 0.9rem 0.55rem 0.55rem;
+  border-radius: 999px; cursor: pointer; font: inherit; text-align: left; color: var(--ink-900);
+  border: 2px solid transparent;
+  background: linear-gradient(var(--white), var(--white)) padding-box,
+              conic-gradient(from var(--r1a), #e6a81740 0deg, #e6a81780 60deg, #fff1b8 80deg, #ffffff 88deg, #ffcf40 96deg, #e6a81780 120deg, #e6a81740 180deg,
+                #e6a81780 240deg, #fff1b8 260deg, #ffffff 268deg, #ffcf40 276deg, #e6a81780 300deg, #e6a81740 360deg) border-box;
+  animation: r1-spin 4s linear infinite; transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 200ms ease;
+}
+.leaders-bar:hover { transform: translateY(-2px); box-shadow: 0 12px 28px -16px rgb(230 168 23 / 0.7); }
+.leaders-tag { flex: none; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; border-radius: 999px;
+  background: linear-gradient(135deg, #ffcf40, #e6a817 55%, #b9820b); color: #3d2600; font-size: 0.8rem; font-weight: 800; white-space: nowrap; }
+.leaders-line { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 0.4rem; overflow: hidden; white-space: nowrap;
+  font-size: 0.9rem; font-weight: 600; animation: digest-ticker 420ms cubic-bezier(0.23, 1, 0.32, 1); }
+.leaders-line svg { flex: none; color: #e6a817; }
+.leaders-team { color: var(--ink-500); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+.leaders-go { flex: none; color: var(--ink-500); transition: transform 180ms ease; }
+.leaders-bar:hover .leaders-go { transform: translateX(3px); color: var(--ink-950); }
+@media (max-width: 767px) {
+  .leaders-bar { flex: none; padding: 0.3rem; }
+  .leaders-line, .leaders-go { display: none; }
+}
+
+/* The list: its gold top and close button stay while the names scroll; a phone's whole screen, a card on a computer. */
+.leaders-shade { position: fixed; inset: 0; z-index: 50; display: flex; align-items: stretch; justify-content: center; background: rgb(11 13 16 / 0.6);
+  animation: leaders-fade 200ms ease-out; }
+@keyframes leaders-fade { from { opacity: 0; } }
+.leaders-panel { display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--white); color: var(--ink-950); overflow: hidden;
+  animation: sheet-in 220ms cubic-bezier(0.23, 1, 0.32, 1); }
+@media (min-width: 640px) {
+  .leaders-shade { align-items: center; padding: 1.5rem; }
+  .leaders-panel { max-width: 32rem; height: auto; max-height: min(44rem, 88vh); border-radius: 18px; box-shadow: 0 24px 60px rgb(0 0 0 / 0.35); }
+}
+.leaders-head { position: relative; flex: none; overflow: hidden; padding: calc(1.2rem + env(safe-area-inset-top, 0px)) 1.3rem 1.1rem; color: #3d2600;
+  background: linear-gradient(135deg, #fff1b8, #ffcf40 40%, #e6a817 75%, #b9820b); }
+.leaders-head h2 { position: relative; margin: 0.45rem 0 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
+.leaders-art { position: absolute; right: 3.4rem; top: -0.4rem; color: rgb(255 255 255 / 0.4); transform-origin: 50% 90%;
+  animation: leaders-crown 3.2s ease-in-out infinite; filter: drop-shadow(0 4px 10px rgb(143 93 6 / 0.35)); }
+/* The crown rocks and rises a little, as if settling on a head (the user, 10 Nov: "not trophy, a crown moving"). */
+@keyframes leaders-crown {
+  0%, 100% { transform: rotate(-14deg) translateY(0); }
+  50% { transform: rotate(-4deg) translateY(-6px); }
+}
+.leaders-count { position: relative; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.65rem; border-radius: 99px;
+  background: rgb(255 255 255 / 0.45); font-size: 0.75rem; font-weight: 800; }
+.leaders-close { position: absolute; top: calc(0.9rem + env(safe-area-inset-top, 0px)); right: 0.9rem; display: grid; place-items: center; width: 2.25rem; height: 2.25rem;
+  border-radius: 99px; border: 0; background: rgb(61 38 0 / 0.18); color: #3d2600; cursor: pointer; transition: transform 160ms ease, background 160ms ease; }
+.leaders-close:hover { background: rgb(61 38 0 / 0.3); transform: rotate(90deg); }
+.leaders-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; list-style: none; margin: 0;
+  padding: 0.3rem 1.1rem calc(1rem + env(safe-area-inset-bottom, 0px)); }
+.leaders-list li { display: grid; gap: 0.15rem; padding: 0.75rem 0.2rem; border-bottom: 1px solid var(--ink-100); }
+.leaders-list li:last-child { border-bottom: 0; }
+.leaders-mgr { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; color: var(--ink-500); text-transform: uppercase; }
+.leaders-who { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; font-size: 0.95rem; color: var(--ink-950); }
+.leaders-who svg { color: #e6a817; flex: none; }
+.leaders-who span { font-size: 0.8rem; color: var(--ink-500); }
+
+@media (prefers-reduced-motion: reduce) { .leaders-bar, .leaders-line, .leaders-shade, .leaders-panel, .leaders-art { animation: none; }
+ .r1-dust { display: none; } .r1-name, .r1-chip-words, .digest-teaser.r1-ring { animation: none; } }

@@ -7,6 +7,7 @@ import InstallButton from './InstallButton'
 import NotifyCard from './NotifyCard'
 import Digest, { DigestTeaser } from './Digest'
 import { RankOneChip, RankOneDust, useRankOne } from './RankOne'
+import Leaders, { useRankOnes } from './Leaders'
 import { dropPush } from './lib/push'
 import ForgotPassword from './ForgotPassword'
 import DeviceGate from './DeviceGate'
@@ -321,6 +322,7 @@ function Portal() {
   const [adminLogin, setAdminLogin] = useState<boolean | null>(null)
   // Team rank 1 this month: gold greeting, dust and a gold Digest ring (the user, 10 Nov).
   const rankOne = useRankOne(!!me && adminLogin === false)
+  const rankOnes = useRankOnes(!!me && adminLogin === false)
   /** HR, IT and Marketing post to Cyrix Digest, from a tile here rather than a KPI tab (the user, 2 Nov). */
   const [digestDesk, setDigestDesk] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -480,16 +482,21 @@ function Portal() {
 
       <main className={rankOne ? 'portal-main r1' : 'portal-main'}>
         {rankOne && <RankOneDust />}
-        {rankOne && me && <RankOneChip month={rankOne} />}
         {rankOne && me
-          ? <h1><span className="r1-gold r1-hello">Hello, </span><span className="r1-name">{me.full_name.split(/\s+/)[0]}</span></h1>
+          ? <h1><span className="r1-gold r1-hello">Hello, </span><span className="r1-name">{me.full_name.split(/\s+/)[0]}</span> <RankOneChip month={rankOne.month} team={rankOne.team} /></h1>
           : <h1>{me ? <><span className="r1-hello">Hello, </span>{me.full_name.split(/\s+/)[0]}</> : 'Hello'}</h1>}
         {/* States what the set is rather than instructing somebody to click
             one of three large obvious cards. It also answers the question
             the page actually raises — why this person sees three tiles and
             the colleague beside them sees one. */}
         <p className="sub">The modules assigned to you.</p>
-        {me && adminLogin === false && <DigestTeaser gold={!!rankOne} />}
+        {/* The Digest bar and the Rank 1s bar on one row, ranking first (the user, 10 Nov: "2 rows in bad, but need both", "first ranking then digest"). */}
+        {me && adminLogin === false && (
+          <div className="home-bars">
+            {!!rankOnes?.length && <Leaders ones={rankOnes} />}
+            <DigestTeaser gold={!!rankOne} />
+          </div>
+        )}
 
         {me && <NotifyCard />}
 

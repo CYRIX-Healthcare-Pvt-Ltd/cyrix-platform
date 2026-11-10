@@ -194,7 +194,7 @@ export function DigestTeaser({ gold = false }: { gold?: boolean }) {
   app is going back"). Opening pushes a history step; back pops it and closes the sheet. Closing with the
   X takes the step back off. Nested sheets each hold their own step, so back closes the top one first.
 */
-function useBackCloses(open: boolean, close: () => void) {
+export function useBackCloses(open: boolean, close: () => void) {
   const closeRef = useRef(close)
   closeRef.current = close
   useEffect(() => {
@@ -996,7 +996,7 @@ function VideoPlayer({ postId, videoId }: { postId: string; videoId: string }) {
   return <div className="digest-video"><div ref={box} /></div>
 }
 
-function Sheet({ label, onClose, children, wide, video }: { label: string; onClose: () => void; children: React.ReactNode; wide?: boolean; video?: boolean }) {
+export function Sheet({ label, onClose, children, wide, video }: { label: string; onClose: () => void; children: React.ReactNode; wide?: boolean; video?: boolean }) {
   useEffect(() => {
     const html = document.documentElement, body = document.body
     const was = [html.style.overflow, body.style.overflow]
