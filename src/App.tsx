@@ -494,7 +494,7 @@ function Portal() {
         {me && adminLogin === false && (
           <div className="home-bars">
             {!!rankOnes?.length && <Leaders ones={rankOnes} />}
-            <DigestTeaser gold={!!rankOne} />
+            <DigestTeaser />
           </div>
         )}
 
