@@ -1,0 +1,61 @@
+/* Team rank 1 on the portal home (RankOne.tsx). The gold is KPI's (LegendCrest GOLD). */
+.portal-main.r1 { position: relative; }
+/* The dust runs the page's whole width (the user, 10 Nov: "need full page, see it is cutted"). */
+.portal.r1 { overflow-x: clip; }
+.portal-main.r1 > :not(.r1-stage):not(.r1-sky) { position: relative; z-index: 1; }
+/* The dust layer stays on the screen while the page scrolls under it, behind the cards. */
+.r1-sky { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+
+.r1-stage { position: absolute; top: 0; left: calc(50% - 50vw); width: 100vw; height: 34rem; pointer-events: none; overflow: hidden; z-index: 0;
+  -webkit-mask-image: linear-gradient(#000 75%, transparent); mask-image: linear-gradient(#000 75%, transparent); }
+/* The glow stays behind the greeting and Digest bar, not across a wide screen (the user, 10 Nov). */
+.r1-cloud { position: absolute; left: 50%; width: min(84vw, 40rem); transform: translateX(-62%); top: 11rem; height: 5rem; border-radius: 50%; background: #ffcf40; opacity: 0.1; filter: blur(36px); }
+.r1-dust { position: absolute; bottom: 0; border-radius: 50%; background: #d4940a; box-shadow: 0 0 4px #f0b42a; opacity: 0; animation: r1-up linear infinite; }
+/* Light mode: a deeper gold so it shows on white (the user, 10 Nov); dark mode the pale gold. */
+:root[data-theme='dark'] .r1-dust { background: #ffe08a; box-shadow: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .r1-dust { background: #ffe08a; box-shadow: none; } }
+@keyframes r1-up { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 0.9; } 85% { opacity: 0.6; } 100% { transform: translate(var(--dx), -100vh); opacity: 0; } }
+
+.r1-chip {
+  display: inline-flex; align-items: center; gap: 0.35rem; margin-bottom: 0.6rem; padding: 0.2rem 0.65rem; border-radius: 999px;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #8f5d06; background: #fff7dc; box-shadow: inset 0 0 0 1px #e6a817b3;
+}
+/* "Hello," a size under the name, for everybody (the user, 10 Nov: "for all hello should be 20 px"). */
+.portal-main h1 .r1-hello { font-size: 0.85em; }
+.r1-gold, .r1-name {
+  background: linear-gradient(180deg, #e6a817 0%, #b9820b 55%, #8f5d06 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.r1-name {
+  background: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.9) 48%, rgba(255, 255, 255, 0.9) 52%, transparent 62%) no-repeat,
+              linear-gradient(180deg, #e6a817 0%, #b9820b 55%, #8f5d06 100%);
+  background-size: 250% 100%, 100% 100%; background-position: 160% 0, 0 0;
+  -webkit-background-clip: text; background-clip: text; animation: r1-shine 5s ease-in-out 1.5s infinite;
+}
+@keyframes r1-shine { 0% { background-position: 160% 0, 0 0; } 40%, 100% { background-position: -60% 0, 0 0; } }
+
+/* The Digest bar: two gold sparkles travelling round its border. */
+@property --r1a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.digest-teaser.r1-ring {
+  background: linear-gradient(var(--white), var(--white)) padding-box,
+              conic-gradient(from var(--r1a), #e6a81740 0deg, #e6a81780 60deg, #fff1b8 80deg, #ffffff 88deg, #ffcf40 96deg, #e6a81780 120deg, #e6a81740 180deg,
+                #e6a81780 240deg, #fff1b8 260deg, #ffffff 268deg, #ffcf40 276deg, #e6a81780 300deg, #e6a81740 360deg) border-box;
+  background-size: 100% 100%, 100% 100%; animation: r1-spin 4s linear infinite;
+}
+@keyframes r1-spin { to { --r1a: 360deg; } }
+.digest-teaser.r1-ring:hover { box-shadow: 0 12px 28px -16px rgb(230 168 23 / 0.7); }
+
+/* Dark: KPI's light golds on the dark page. */
+:root[data-theme='dark'] .r1-gold, :root[data-theme='dark'] .r1-name { --g: linear-gradient(180deg, #fffaf0 0%, #fff1b8 45%, #ffcf40 100%); }
+:root[data-theme='dark'] .r1-gold { background-image: var(--g); }
+:root[data-theme='dark'] .r1-name { background-image: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.95) 48%, rgba(255, 255, 255, 0.95) 52%, transparent 62%), var(--g); }
+:root[data-theme='dark'] .r1-chip { color: #fff1b8; background: #8f5d0626; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .r1-gold, :root:not([data-theme='light']) .r1-name { --g: linear-gradient(180deg, #fffaf0 0%, #fff1b8 45%, #ffcf40 100%); }
+  :root:not([data-theme='light']) .r1-gold { background-image: var(--g); }
+  :root:not([data-theme='light']) .r1-name { background-image: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.95) 48%, rgba(255, 255, 255, 0.95) 52%, transparent 62%), var(--g); }
+  :root:not([data-theme='light']) .r1-chip { color: #fff1b8; background: #8f5d0626; }
+}
+
+@media (prefers-reduced-motion: reduce) { .r1-dust { display: none; } .r1-name, .digest-teaser.r1-ring { animation: none; } }

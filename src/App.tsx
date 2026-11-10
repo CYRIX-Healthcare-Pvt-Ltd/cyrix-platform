@@ -6,6 +6,7 @@ import ThemeToggle from './ThemeToggle'
 import InstallButton from './InstallButton'
 import NotifyCard from './NotifyCard'
 import Digest, { DigestTeaser } from './Digest'
+import { RankOneChip, RankOneDust, useRankOne } from './RankOne'
 import { dropPush } from './lib/push'
 import ForgotPassword from './ForgotPassword'
 import DeviceGate from './DeviceGate'
@@ -318,6 +319,8 @@ function Portal() {
   const [me, setMe] = useState<{ full_name: string; avatar: string | null } | null>(null)
   /** HR, SW, IT and Marketing admin logins: no Cyrix Digest on their home page (the user, 10 Oct). */
   const [adminLogin, setAdminLogin] = useState<boolean | null>(null)
+  // Team rank 1 this month: gold greeting, dust and a gold Digest ring (the user, 10 Nov).
+  const rankOne = useRankOne(!!me && adminLogin === false)
   /** HR, IT and Marketing post to Cyrix Digest, from a tile here rather than a KPI tab (the user, 2 Nov). */
   const [digestDesk, setDigestDesk] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -447,7 +450,7 @@ function Portal() {
   }, [])
 
   return (
-    <div className="portal">
+    <div className={rankOne ? 'portal r1' : 'portal'}>
       <header className="bar">
         <Logo height={30} />
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -475,14 +478,18 @@ function Portal() {
         </div>
       </header>
 
-      <main className="portal-main">
-        <h1>{me ? `Hello, ${me.full_name.split(/\s+/)[0]}` : 'Hello'}</h1>
+      <main className={rankOne ? 'portal-main r1' : 'portal-main'}>
+        {rankOne && <RankOneDust />}
+        {rankOne && me && <RankOneChip month={rankOne} />}
+        {rankOne && me
+          ? <h1><span className="r1-gold r1-hello">Hello, </span><span className="r1-name">{me.full_name.split(/\s+/)[0]}</span></h1>
+          : <h1>{me ? <><span className="r1-hello">Hello, </span>{me.full_name.split(/\s+/)[0]}</> : 'Hello'}</h1>}
         {/* States what the set is rather than instructing somebody to click
             one of three large obvious cards. It also answers the question
             the page actually raises — why this person sees three tiles and
             the colleague beside them sees one. */}
         <p className="sub">The modules assigned to you.</p>
-        {me && adminLogin === false && <DigestTeaser />}
+        {me && adminLogin === false && <DigestTeaser gold={!!rankOne} />}
 
         {me && <NotifyCard />}
 

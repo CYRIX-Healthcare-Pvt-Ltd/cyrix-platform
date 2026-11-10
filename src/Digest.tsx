@@ -159,7 +159,7 @@ const looked = () => { try { local.setItem(LAST_LOOK, String(Date.now())) } catc
  * how many are new since this browser last looked, and a click that
  * scrolls down to it.
  */
-export function DigestTeaser() {
+export function DigestTeaser({ gold = false }: { gold?: boolean }) {
   const [posts, setPosts] = useState<Post[] | null>(null)
   const [i, setI] = useState(0)
   const [since] = useState(lastLook)
@@ -180,7 +180,7 @@ export function DigestTeaser() {
     document.getElementById('digest-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
   return (
-    <button type="button" className="digest-teaser" onClick={go}>
+    <button type="button" className={gold ? 'digest-teaser r1-ring' : 'digest-teaser'} onClick={go}>
       <span className="digest-teaser-tag"><Newspaper size={15} /> Cyrix Digest</span>
       {fresh > 0 && <span className="digest-teaser-new">{fresh} new</span>}
       <span key={p.id} className="digest-teaser-line"><KindIcon p={p} size={14} /> {line}</span>
