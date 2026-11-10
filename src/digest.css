@@ -315,6 +315,9 @@ a.digest-sheet-btn { text-decoration: none; }
 .digest-form-sent { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-weight: 600; color: var(--ok-ink, #14532d); }
 .digest-form { display: grid; gap: 0.9rem; margin: 0.5rem 0 1rem; }
 .digest-field { display: grid; gap: 0.4rem; }
+/* A sub-question sits under its question, set in with a violet line (KPI 0278). */
+.digest-field.digest-sub { margin: -0.4rem 0 0 0.35rem; padding-left: 0.85rem; border-left: 2px solid #8b5cf6; }
+.digest-form-a.digest-sub { padding-left: 1rem; border-top-style: dashed; }
 .digest-field-label { font-size: 0.875rem; font-weight: 600; color: var(--ink-900); }
 .digest-field-label i { color: var(--red-600); font-style: normal; }
 .digest-field input, .digest-field textarea { width: 100%; padding: 0.6rem 0.75rem; border-radius: 12px; border: 1.5px solid var(--ink-200);

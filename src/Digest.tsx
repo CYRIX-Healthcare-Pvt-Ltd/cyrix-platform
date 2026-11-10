@@ -524,6 +524,16 @@ type QType = 'short' | 'long' | 'one' | 'many' | 'yesno' | 'number' | 'date' | '
 interface FormQ {
   id: string; label: string; qtype: QType; options: string[]; required: boolean
   closes_at: string | null; mine: Record<string, string | string[]> | null; sent_at: string | null; answered: number
+  /** A long-text sub-question under its question (KPI 0278), required always, never, or when the rating is below N or the answer is No. */
+  parent_id?: string | null; required_if?: string | null
+}
+/** Whether a question must be answered now, a sub-question going by its question's answer (KPI 0278). */
+const needed = (q: FormQ, a: Record<string, string | string[]>) => {
+  if (!q.parent_id || !q.required_if) return q.required
+  const pa = a[q.parent_id]
+  if (q.required_if === 'no') return pa === 'No'
+  const below = Number(q.required_if.slice(6))
+  return typeof pa === 'string' && /^[1-5]$/.test(pa) && Number(pa) < below
 }
 /** The questions, the closing time and this person's answers. */
 function useForm(id: string) {
@@ -562,7 +572,7 @@ function FormCard({ p, onOpen }: { p: Post; onOpen: (p: Post) => void }) {
           <span className="digest-by">{desk(p)}</span>
         </div>
         <button type="button" className="digest-pollcard-q" onClick={() => onOpen(p)}>{p.title}</button>
-        {qs && <p className="digest-form-sub">{qs.length} {qs.length === 1 ? 'question' : 'questions'}{anonymous ? ' · anonymous' : ''}{closes ? ` · ${closed ? 'closed' : 'closes ' + closesOn(closes)}` : ''}</p>}
+        {qs && <p className="digest-form-sub">{qs.filter(q => !q.parent_id).length} {qs.filter(q => !q.parent_id).length === 1 ? 'question' : 'questions'}{anonymous ? ' · anonymous' : ''}{closes ? ` · ${closed ? 'closed' : 'closes ' + closesOn(closes)}` : ''}</p>}
       </div>
       <div className="digest-pollcard-body">
         {sent
@@ -599,9 +609,9 @@ function FormBody({ p }: { p: Post }) {
           ? <p className="digest-form-sent"><Check size={15} /> Submitted {new Date(qs[0].sent_at!).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
           : <p className="digest-poll-meta">This form has closed.</p>}
         {sent && anonymous && <AnonNote />}
-        {sent && !anonymous && qs.map(q => (
-          <div key={q.id} className="digest-form-a"><span>{q.label}</span><strong>{show(qs[0].mine?.[q.id])}</strong></div>
-        ))}
+        {sent && !anonymous && qs.map(q => (q.parent_id && !qs[0].mine?.[q.id] ? null : (
+          <div key={q.id} className={q.parent_id ? 'digest-form-a digest-sub' : 'digest-form-a'}><span>{q.label}</span><strong>{show(qs[0].mine?.[q.id])}</strong></div>
+        )))}
         {sent && !closed && again && !anonymous && <p className="digest-poll-meta"><button type="button" onClick={() => setEditing(true)}>Change answers</button>{closes ? ` · until ${closesOn(closes)}` : ''}</p>}
       </div>
     )
@@ -614,7 +624,7 @@ function FormBody({ p }: { p: Post }) {
   }
   const send = async () => {
     if (p.id === PREVIEW_ID) return
-    const gap = qs.find(q => q.required && (!a[q.id] || (Array.isArray(a[q.id]) ? !(a[q.id] as string[]).length : !String(a[q.id]).trim())))
+    const gap = qs.find(q => needed(q, a) && (!a[q.id] || (Array.isArray(a[q.id]) ? !(a[q.id] as string[]).length : !String(a[q.id]).trim())))
     if (gap) { setErr(`Answer "${gap.label}" first`); return }
     setBusy(true); setErr(null)
     const { error } = await supabase.rpc('digest_form_submit', { p_id: p.id, p_answers: a })
@@ -628,8 +638,8 @@ function FormBody({ p }: { p: Post }) {
       {qs.map(q => {
         const v = a[q.id]
         return (
-          <div key={q.id} className="digest-field">
-            <span className="digest-field-label">{q.label}{q.required && <i aria-hidden> *</i>}</span>
+          <div key={q.id} className={q.parent_id ? 'digest-field digest-sub' : 'digest-field'}>
+            <span className="digest-field-label">{q.label}{needed(q, a) && <i aria-hidden> *</i>}</span>
             {q.qtype === 'short' && <input value={(v as string) ?? ''} maxLength={300} onChange={e => put(q.id, e.target.value)} />}
             {q.qtype === 'long' && <textarea rows={3} value={(v as string) ?? ''} maxLength={3000} onChange={e => put(q.id, e.target.value)} />}
             {q.qtype === 'number' && <input type="number" inputMode="decimal" value={(v as string) ?? ''} onChange={e => put(q.id, e.target.value)} />}
@@ -1194,16 +1204,20 @@ export function DigestPreview() {
   useEffect(() => {
     const on = (e: MessageEvent) => {
       const d = e.data as { type?: string; post?: Post; options?: string[]; multi?: boolean; closes?: string | null
-        questions?: Array<{ label: string; qtype: QType; options: string[]; required: boolean }>; anonymous?: boolean; again?: boolean
+        questions?: Array<{ label: string; qtype: QType; options: string[]; required: boolean; subs?: Array<{ label: string; need: string; below?: number }> }>; anonymous?: boolean; again?: boolean
         quiz?: { shuffle: boolean; seconds: number | null } } | null
       if (!d || d.type !== 'cyrix-digest-preview' || !d.post) return
       previewOptions = (d.options ?? []).map((label, i) => ({
         id: 'o' + i, label, votes: 0, mine: false, closes_at: d.closes ?? null, multi: !!d.multi, voters: 0,
       }))
-      previewForm = (d.questions ?? []).map((q, i) => ({
+      previewForm = (d.questions ?? []).flatMap((q, i): FormQ[] => [{
         id: 'q' + i, label: q.label.trim() || 'Your question', qtype: q.qtype, options: q.options.filter(o => o.trim()),
         required: q.required, closes_at: d.closes ?? null, mine: null, sent_at: null, answered: 0,
-      }))
+      }, ...(q.subs ?? []).map((sq, k): FormQ => ({
+        id: `q${i}s${k}`, label: sq.label.trim() || 'Your sub-question', qtype: 'long', options: [], closes_at: d.closes ?? null, mine: null, sent_at: null, answered: 0,
+        parent_id: 'q' + i, required: sq.need === 'always',
+        required_if: sq.need === 'below' && q.qtype === 'rating' ? `below:${sq.below ?? 3}` : sq.need === 'no' && q.qtype === 'yesno' ? 'no' : null,
+      }))])
       previewAnonymous = !!d.anonymous
       previewAgain = !!d.again
       previewQuiz = d.quiz ?? { shuffle: false, seconds: null }
