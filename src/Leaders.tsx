@@ -111,6 +111,8 @@ export default function Leaders({ ones, me }: { ones: One[]; me?: { ecode: strin
   const [open, setOpen] = useState(() => takeR1('list'))
   // One Rank 1's photo, large; a press anywhere closes it (the user, 11 Nov: "just a click again will close it").
   const [face, setFace] = useState<One | null>(null)
+  // Closing the list also lets go of the large photo, so the next press on the bar opens the list, not the photo (the user, 11 Nov).
+  useEffect(() => { if (!open) setFace(null) }, [open])
   useBackCloses(open, () => { if (face) setFace(null); else setOpen(false) })
   // One name after another, in a fresh order each visit.
   const order = useMemo(() => ones.map((_, k) => k).sort(() => Math.random() - 0.5), [ones])
