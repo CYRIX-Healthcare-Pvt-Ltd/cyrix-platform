@@ -12,7 +12,7 @@ import { useBackCloses } from './Digest'
   the list scrolls, fills a phone's screen, and has no search ("no search needed"). Names, designation, function and the manager
   only, no scores (kpi_rank_ones, KPI 0276).
 */
-interface One { manager_name: string; manager_ecode: string; full_name: string; ecode: string; designation: string | null; function_name: string | null; period_month: string }
+interface One { manager_name: string; manager_ecode: string; full_name: string; ecode: string; designation: string | null; function_name: string | null; period_month: string; avatar?: string | null }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const label = (iso: string) => `${MONTHS[Number(iso.slice(5, 7)) - 1]}-${iso.slice(2, 4)}`
@@ -22,6 +22,8 @@ const DUST = Array.from({ length: 22 }, (_, i) => {
   const r = (n: number) => { const x = Math.sin(i * 7919 + n * 104729) * 233280; return x - Math.floor(x) }
   return { left: 3 + r(1) * 94, dx: r(2) * 24 - 12, dur: 10 + r(3) * 8, delay: -r(4) * 18, size: 2 + r(5) * 2 }
 })
+
+const SPARKS = Array.from({ length: 12 }, (_, k) => k)
 
 export function useRankOnes(on: boolean) {
   const [ones, setOnes] = useState<One[] | null>(null)
@@ -35,7 +37,9 @@ export function useRankOnes(on: boolean) {
 export default function Leaders({ ones }: { ones: One[] }) {
   const [i, setI] = useState(0)
   const [open, setOpen] = useState(false)
-  useBackCloses(open, () => setOpen(false))
+  // One Rank 1's photo, large; a press anywhere closes it (the user, 11 Nov: "just a click again will close it").
+  const [face, setFace] = useState<One | null>(null)
+  useBackCloses(open, () => { if (face) setFace(null); else setOpen(false) })
   // One name after another, in a fresh order each visit.
   const order = useMemo(() => ones.map((_, k) => k).sort(() => Math.random() - 0.5), [ones])
   useEffect(() => {
@@ -48,7 +52,7 @@ export default function Leaders({ ones }: { ones: One[] }) {
     const html = document.documentElement, body = document.body
     const was = [html.style.overflow, body.style.overflow]
     html.style.overflow = 'hidden'; body.style.overflow = 'hidden'
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { setFace(f => { if (!f) setOpen(false); return null }) } }
     document.addEventListener('keydown', esc)
     return () => { html.style.overflow = was[0]; body.style.overflow = was[1]; document.removeEventListener('keydown', esc) }
   }, [open])
@@ -79,11 +83,33 @@ export default function Leaders({ ones }: { ones: One[] }) {
             <ul className="leaders-list">
               {ones.map(x => (
                 <li key={x.manager_ecode + x.ecode}>
-                  <span className="leaders-mgr">{x.manager_name}&rsquo;s team{x.function_name && ` · ${x.function_name}`}</span>
-                  <span className="leaders-who"><Crown size={14} /> <b>{x.full_name}</b> <span>{x.ecode}{x.designation ? ` · ${x.designation}` : ''}</span></span>
+                  <button type="button" className="leaders-face" onClick={() => setFace(x)} aria-label={`${x.full_name}'s photo`}>
+                    {x.avatar ? <img src={x.avatar} alt="" loading="lazy" draggable={false} /> : <Crown size={18} />}
+                  </button>
+                  <span className="leaders-text">
+                    <span className="leaders-mgr">{x.manager_name}&rsquo;s team{x.function_name && ` · ${x.function_name}`}</span>
+                    <span className="leaders-who"><b>{x.full_name}</b> <span>{x.ecode}{x.designation ? ` · ${x.designation}` : ''}</span></span>
+                  </span>
                 </li>
               ))}
             </ul>
+            {face && (
+              <div className="leaders-zoom" onClick={() => setFace(null)} role="dialog" aria-modal="true" aria-label={face.full_name}>
+                <div className="leaders-zoom-card">
+                  {/* Royal arrival (the user, 11 Nov): the card rises, a gold ring turns round the photo, a crown drops on it and gold sparks burst once. */}
+                  <span className="leaders-zoom-halo">
+                    <span className="leaders-zoom-ring" aria-hidden />
+                    <span className="leaders-zoom-face">{face.avatar ? <img src={face.avatar} alt="" draggable={false} /> : <Crown size={54} />}</span>
+                    <span className="leaders-zoom-crown" aria-hidden><Crown size={34} strokeWidth={2.2} /></span>
+                    <span className="leaders-zoom-burst" aria-hidden>{SPARKS.map(k => <i key={k} style={{ ['--a' as string]: `${k * 30}deg`, ['--d' as string]: `${(k % 3) * 40}ms` }} />)}</span>
+                  </span>
+                  <b className="leaders-zoom-name" key={face.ecode}>{face.full_name}</b>
+                  <span className="leaders-zoom-role">{face.ecode}{face.designation ? ` · ${face.designation}` : ''}</span>
+                  <span className="leaders-zoom-rank">{month} Rank 1 in {face.manager_name}&rsquo;s team</span>
+                  {face.function_name && <span className="leaders-zoom-fn">{face.function_name}</span>}
+                </div>
+              </div>
+            )}
           </div>
         </div>,
         document.body,

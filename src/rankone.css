@@ -141,3 +141,83 @@
 
 @media (prefers-reduced-motion: reduce) { .leaders-bar, .leaders-line, .leaders-shade, .leaders-panel, .leaders-art { animation: none; } .leaders-sky { display: none; }
  .r1-dust { display: none; } .r1-name, .r1-chip-words, .digest-teaser.r1-ring { animation: none; } }
+
+/* Each Rank 1's round photo in front of the name, the crown in a round when there is none; a press shows it large
+   with "Oct-26 Rank 1 in X's team", and another press anywhere closes it (the user, 11 Nov). */
+.leaders-list li { grid-template-columns: auto minmax(0, 1fr); column-gap: 0.8rem; align-items: center; }
+.leaders-text { display: grid; gap: 0.15rem; min-width: 0; }
+.leaders-face { width: 42px; height: 42px; border-radius: 50%; padding: 0; overflow: hidden; flex: none; cursor: pointer;
+  display: grid; place-items: center; border: 2px solid #e6a817; background: color-mix(in srgb, #e6a817 16%, var(--white)); color: #b9820b;
+  transition: transform 0.15s ease; }
+.leaders-face:active { transform: scale(0.94); }
+.leaders-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.leaders-zoom { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 1.5rem;
+  background: rgb(0 0 0 / 0.55); cursor: pointer; animation: leaders-zoom-in 0.18s ease-out; }
+.leaders-zoom-card { width: min(100%, 20rem); display: grid; justify-items: center; gap: 0.3rem; text-align: center;
+  padding: 1.6rem 1.25rem 1.4rem; border-radius: 20px; background: var(--white); color: var(--ink-950);
+  border: 1px solid color-mix(in srgb, #e6a817 45%, transparent); box-shadow: 0 24px 60px rgb(0 0 0 / 0.4); }
+.leaders-zoom-face { width: 128px; height: 128px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; margin-bottom: 0.6rem;
+  border: 3px solid #e6a817; background: color-mix(in srgb, #e6a817 16%, var(--white)); color: #b9820b; }
+.leaders-zoom-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.leaders-zoom-name { font-size: 1.15rem; }
+.leaders-zoom-role { font-size: 0.82rem; color: var(--ink-500); }
+.leaders-zoom-rank { display: inline-flex; align-items: center; gap: 0.35rem; margin-top: 0.75rem; padding: 0.4rem 0.9rem; border-radius: 999px;
+  font-size: 0.88rem; font-weight: 600; color: #7a4f04; background: color-mix(in srgb, #e6a817 22%, var(--white)); }
+.leaders-zoom-rank svg { color: #b9820b; flex: none; }
+.leaders-zoom-fn { font-size: 0.78rem; color: var(--ink-500); }
+:root[data-theme='dark'] .leaders-zoom-rank { color: #ffd76a; }
+:root[data-theme='dark'] :is(.leaders-face, .leaders-zoom-face, .leaders-zoom-rank svg) { color: #ffcf40; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .leaders-zoom-rank { color: #ffd76a; }
+  :root:not([data-theme='light']) :is(.leaders-face, .leaders-zoom-face, .leaders-zoom-rank svg) { color: #ffcf40; }
+}
+@keyframes leaders-zoom-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .leaders-zoom { animation: none; } }
+
+/* Royal setup for the large photo (the user, 11 Nov). */
+.leaders-zoom-card { position: relative; overflow: hidden; isolation: isolate;
+  border: 1.5px solid transparent;
+  background: linear-gradient(var(--white), var(--white)) padding-box,
+              linear-gradient(160deg, #fff1b8, #e6a817 35%, #8f5d06 60%, #ffcf40 85%, #fff1b8) border-box;
+  animation: lz-rise 0.5s cubic-bezier(0.2, 1.3, 0.35, 1) both; }
+.leaders-zoom-card::before { content: ''; position: absolute; inset: -40% -20% auto; height: 70%; z-index: -1; pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, #ffcf40 28%, transparent), transparent); animation: lz-glow 3.2s ease-in-out infinite; }
+.leaders-zoom-halo { position: relative; width: 148px; height: 148px; display: grid; place-items: center; margin: 1rem 0 0.7rem; }
+.leaders-zoom-halo .leaders-zoom-face { margin: 0; border-width: 0; width: 130px; height: 130px; box-shadow: 0 10px 30px -10px rgb(185 130 11 / 0.7);
+  animation: lz-face-in 0.55s 0.08s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.leaders-zoom-ring { position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from 0deg, #8f5d06, #e6a817, #fff7d6, #ffcf40, #b9820b, #8f5d06, #e6a817, #fff7d6, #8f5d06);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+  animation: lz-spin 5s linear infinite, lz-fade 0.4s ease-out both; }
+.leaders-zoom-crown { position: absolute; top: -22px; left: 50%; color: #e6a817; z-index: 2;
+  filter: drop-shadow(0 3px 4px rgb(143 93 6 / 0.55)); animation: lz-crown 0.7s 0.35s cubic-bezier(0.25, 1.5, 0.45, 1) both; }
+.leaders-zoom-crown svg { display: block; fill: color-mix(in srgb, #ffcf40 55%, transparent); }
+.leaders-zoom-burst { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.leaders-zoom-burst i { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%;
+  background: #ffcf40; box-shadow: 0 0 8px 2px rgb(255 207 64 / 0.7); opacity: 0;
+  animation: lz-spark 0.9s calc(0.3s + var(--d)) ease-out both; }
+.leaders-zoom-name { animation: lz-up 0.45s 0.3s ease-out both; }
+.leaders-zoom-role { animation: lz-up 0.45s 0.38s ease-out both; }
+.leaders-zoom-fn { animation: lz-up 0.45s 0.5s ease-out both; }
+.leaders-zoom-rank { position: relative; overflow: hidden; border: 1px solid color-mix(in srgb, #e6a817 55%, transparent);
+  animation: lz-up 0.45s 0.45s ease-out both; }
+.leaders-zoom-rank::after { content: ''; position: absolute; inset: 0; transform: translateX(-120%);
+  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.65) 50%, transparent 70%); animation: lz-sheen 3.4s 1s ease-in-out infinite; }
+@keyframes lz-rise { from { opacity: 0; transform: translateY(24px) scale(0.86); } to { opacity: 1; transform: none; } }
+@keyframes lz-face-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+@keyframes lz-spin { to { transform: rotate(360deg); } }
+@keyframes lz-fade { from { opacity: 0; } }
+@keyframes lz-crown { 0% { opacity: 0; transform: translate(-50%, -46px) rotate(-18deg) scale(0.6); } 70% { opacity: 1; transform: translate(-50%, 3px) rotate(-8deg) scale(1.08); } 100% { opacity: 1; transform: translate(-50%, 0) rotate(-8deg); } }
+@keyframes lz-spark { 0% { opacity: 0; transform: rotate(var(--a)) translateY(0) scale(0.4); } 25% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-104px) scale(1); } }
+@keyframes lz-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes lz-sheen { 0%, 55% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+@keyframes lz-glow { 50% { opacity: 0.55; } }
+:root[data-theme='dark'] .leaders-zoom-rank::after { background: linear-gradient(105deg, transparent 30%, rgb(255 241 184 / 0.35) 50%, transparent 70%); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .leaders-zoom-rank::after { background: linear-gradient(105deg, transparent 30%, rgb(255 241 184 / 0.35) 50%, transparent 70%); } }
+@media (prefers-reduced-motion: reduce) {
+  .leaders-zoom-card, .leaders-zoom-card::before, .leaders-zoom-halo .leaders-zoom-face, .leaders-zoom-ring, .leaders-zoom-crown,
+  .leaders-zoom-name, .leaders-zoom-role, .leaders-zoom-fn, .leaders-zoom-rank, .leaders-zoom-rank::after { animation: none; }
+  .leaders-zoom-crown { transform: translate(-50%, 0) rotate(-8deg); }
+  .leaders-zoom-burst { display: none; }
+}
