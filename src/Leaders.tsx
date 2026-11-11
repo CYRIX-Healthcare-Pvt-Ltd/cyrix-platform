@@ -97,11 +97,21 @@ function RoyalCrown() {
 
 const SPARKS = Array.from({ length: 12 }, (_, k) => k)
 
+// The last list this tab saw shows at once on the next visit home, then the fresh one replaces it.
+const CACHE = 'cyrix.rank1s'
+function cached(): One[] | null {
+  try { const v = sessionStorage.getItem(CACHE); return v ? (JSON.parse(v) as One[]) : null } catch { return null }
+}
+
 export function useRankOnes(on: boolean) {
-  const [ones, setOnes] = useState<One[] | null>(null)
+  const [ones, setOnes] = useState<One[] | null>(cached)
   useEffect(() => {
     if (!on) return
-    void supabase.rpc('kpi_rank_ones').then(({ data }) => setOnes((data ?? []) as One[]), () => setOnes([]))
+    void supabase.rpc('kpi_rank_ones').then(({ data }) => {
+      const list = (data ?? []) as One[]
+      setOnes(list)
+      try { sessionStorage.setItem(CACHE, JSON.stringify(list)) } catch { /* full or refused: fine, it is only a head start */ }
+    }, () => setOnes(o => o ?? []))
   }, [on])
   return ones
 }

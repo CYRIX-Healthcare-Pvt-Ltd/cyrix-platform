@@ -322,7 +322,8 @@ function Portal() {
   const [adminLogin, setAdminLogin] = useState<boolean | null>(null)
   // Team rank 1 this month: gold greeting, dust and a gold Digest ring (the user, 10 Nov).
   const rankOne = useRankOne(!!me && adminLogin === false)
-  const rankOnes = useRankOnes(!!me && adminLogin === false)
+  // Asked for the moment the portal opens, not after the name lookup, so the Rank 1s bar is not left behind the Digest bar (the user, 11 Nov).
+  const rankOnes = useRankOnes(true)
   /** HR, IT and Marketing post to Cyrix Digest, from a tile here rather than a KPI tab (the user, 2 Nov). */
   const [digestDesk, setDigestDesk] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -491,7 +492,8 @@ function Portal() {
             the colleague beside them sees one. */}
         <p className="sub">The modules assigned to you.</p>
         {/* The Digest bar and the Rank 1s bar on one row, ranking first (the user, 10 Nov: "2 rows in bad, but need both", "first ranking then digest"). */}
-        {me && adminLogin === false && (
+        {/* Both bars together, once the Rank 1s are known, so neither arrives first and pushes the other (the user, 11 Nov). */}
+        {me && adminLogin === false && rankOnes !== null && (
           <div className="home-bars">
             {!!rankOnes?.length && <Leaders ones={rankOnes} me={me} />}
             <DigestTeaser />
