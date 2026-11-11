@@ -116,7 +116,7 @@ export function useRankOnes(on: boolean) {
   return ones
 }
 
-export default function Leaders({ ones, me }: { ones: One[]; me?: { ecode: string; mgrId: string | null } | null }) {
+export default function Leaders({ ones, me }: { ones: One[]; me?: { id: string; ecode: string; mgrId: string | null } | null }) {
   const [i, setI] = useState(0)
   const [open, setOpen] = useState(() => takeR1('list'))
   // One Rank 1's photo, large; a press anywhere closes it (the user, 11 Nov: "just a click again will close it").
@@ -153,20 +153,30 @@ export default function Leaders({ ones, me }: { ones: One[]; me?: { ecode: strin
       .then(({ data }) => { if (alive && data?.ecode) setMgr(String(data.ecode).toUpperCase()) })
     return () => { alive = false }
   }, [me?.mgrId])
-  const mine = me?.ecode ? { me: me.ecode.toUpperCase(), mgr } : null
-  const tagOf = (x: One) => {
-    if (!mine) return null
-    if (x.ecode.toUpperCase() === mine.me) return 'You'
-    if ((mine.mgr && x.manager_ecode.toUpperCase() === mine.mgr) || x.manager_ecode.toUpperCase() === mine.me) return 'Your team'
-    return null
-  }
+  // One level down (the user, 11 Nov, Mohandas's account): the teams led by the managers who report to me come next.
+  const [leads, setLeads] = useState<string[]>([])
+  useEffect(() => {
+    if (!me?.id) return
+    let alive = true
+    void supabase.from('employees').select('ecode').eq('reporting_manager_id', me.id).eq('is_active', true)
+      .then(({ data }) => { if (alive && data) setLeads(data.map(r => String(r.ecode).toUpperCase())) })
+    return () => { alive = false }
+  }, [me?.id])
   const listed = useMemo(() => {
-    const top = ones.filter(x => tagOf(x)); const rest = ones.filter(x => !tagOf(x))
-    // The team I belong to before the team I lead.
-    top.sort((a, b) => Number(a.manager_ecode.toUpperCase() === mine?.me) - Number(b.manager_ecode.toUpperCase() === mine?.me))
-    return [...top, ...rest]
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ones, mine?.me, mine?.mgr])
+    const my = me?.ecode?.toUpperCase()
+    if (!my) return ones
+    const below = new Set(leads)
+    // 0 the team I belong to (or me), 1 the team I lead, 2 the teams of my reportees who lead, 3 everybody else;
+    // each group keeps the list's manager A to Z.
+    const group = (x: One) => {
+      const m = x.manager_ecode.toUpperCase()
+      if (x.ecode.toUpperCase() === my || (mgr && m === mgr)) return 0
+      if (m === my) return 1
+      if (below.has(m)) return 2
+      return 3
+    }
+    return ones.map((x, k) => ({ x, k, g: group(x) })).sort((p, q) => p.g - q.g || p.k - q.k).map(r => r.x)
+  }, [ones, me?.ecode, mgr, leads])
   const month = label(ones[0].period_month)
   const o = ones[order[i % order.length]]
   return (
@@ -200,7 +210,7 @@ export default function Leaders({ ones, me }: { ones: One[]; me?: { ecode: strin
             <ul className="leaders-list">
               {listed.map(x => (
                 // The whole row opens the large photo, not only the round (the user, 11 Nov: easier with a thumb).
-                <li key={x.manager_ecode + x.ecode} data-mine={tagOf(x) ? 'true' : undefined} role="button" tabIndex={0}
+                <li key={x.manager_ecode + x.ecode} role="button" tabIndex={0}
                   aria-label={`${x.full_name}, ${x.manager_name}'s team`} onClick={() => setFace(x)}
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFace(x) } }}>
                   <span className="leaders-face" aria-hidden>

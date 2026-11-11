@@ -317,7 +317,7 @@ function SignIn() {
 function Portal() {
   const [modules, setModules] = useState<Module[] | null>(null)
   /** Name and photo together: the header shows both, the greeting one. */
-  const [me, setMe] = useState<{ full_name: string; avatar: string | null; ecode: string; mgrId: string | null } | null>(null)
+  const [me, setMe] = useState<{ full_name: string; avatar: string | null; id: string; ecode: string; mgrId: string | null } | null>(null)
   /** HR, SW, IT and Marketing admin logins: no Cyrix Digest on their home page (the user, 10 Oct). */
   const [adminLogin, setAdminLogin] = useState<boolean | null>(null)
   // Team rank 1 this month: gold greeting, dust and a gold Digest ring (the user, 10 Nov).
@@ -403,7 +403,7 @@ function Portal() {
       ])
       if (!alive) return
       if (me.data?.full_name) {
-        setMe({ full_name: me.data.full_name.trim(), avatar: me.data.avatar ?? null, ecode: String(me.data.ecode ?? ''), mgrId: me.data.reporting_manager_id ?? null })
+        setMe({ full_name: me.data.full_name.trim(), avatar: me.data.avatar ?? null, id: String(me.data.id), ecode: String(me.data.ecode ?? ''), mgrId: me.data.reporting_manager_id ?? null })
       }
       if (mods === null) setFailed(true)
       else setModules(mods)

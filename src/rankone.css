@@ -229,7 +229,6 @@
 .leaders-zoom-name.r1-name { animation: lz-up 0.45s 0.3s ease-out both, r1-shine 4.5s ease-in-out 1.2s infinite; }
 @media (prefers-reduced-motion: reduce) { .leaders-zoom-name.r1-name { animation: none; } }
 /* Mine on top (the user, 11 Nov): a soft gold band and a small tag. */
-.leaders-list li[data-mine] { background: color-mix(in srgb, #e6a817 9%, transparent); border-radius: 12px; padding-left: 0.6rem; padding-right: 0.6rem; border-bottom-color: transparent; margin-bottom: 0.35rem; }
 .leaders-mine { display: inline-block; margin-right: 0.45rem; padding: 0.05rem 0.5rem; border-radius: 999px; font-size: 0.68rem; letter-spacing: 0.04em;
   background: #e6a817; color: #3b2600; vertical-align: 1px; }
 /* Every row the same inside padding, so the photos make one straight line with or without the band. */
