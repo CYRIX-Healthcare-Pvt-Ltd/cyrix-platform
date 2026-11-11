@@ -317,7 +317,7 @@ function SignIn() {
 function Portal() {
   const [modules, setModules] = useState<Module[] | null>(null)
   /** Name and photo together: the header shows both, the greeting one. */
-  const [me, setMe] = useState<{ full_name: string; avatar: string | null } | null>(null)
+  const [me, setMe] = useState<{ full_name: string; avatar: string | null; ecode: string; mgrId: string | null } | null>(null)
   /** HR, SW, IT and Marketing admin logins: no Cyrix Digest on their home page (the user, 10 Oct). */
   const [adminLogin, setAdminLogin] = useState<boolean | null>(null)
   // Team rank 1 this month: gold greeting, dust and a gold Digest ring (the user, 10 Nov).
@@ -395,14 +395,14 @@ function Portal() {
               // avatar comes along for the ride. It is a data URL on the
               // row itself rather than a file to go and fetch, so the
               // photo costs this query nothing extra to carry.
-              .select('id, full_name, ecode, avatar, account_type')
+              .select('id, full_name, ecode, avatar, account_type, reporting_manager_id')
               .eq('auth_user_id', uid).maybeSingle()
           : Promise.resolve({ data: null }),
         loadModules(),
       ])
       if (!alive) return
       if (me.data?.full_name) {
-        setMe({ full_name: me.data.full_name.trim(), avatar: me.data.avatar ?? null })
+        setMe({ full_name: me.data.full_name.trim(), avatar: me.data.avatar ?? null, ecode: String(me.data.ecode ?? ''), mgrId: me.data.reporting_manager_id ?? null })
       }
       if (mods === null) setFailed(true)
       else setModules(mods)
@@ -493,7 +493,7 @@ function Portal() {
         {/* The Digest bar and the Rank 1s bar on one row, ranking first (the user, 10 Nov: "2 rows in bad, but need both", "first ranking then digest"). */}
         {me && adminLogin === false && (
           <div className="home-bars">
-            {!!rankOnes?.length && <Leaders ones={rankOnes} />}
+            {!!rankOnes?.length && <Leaders ones={rankOnes} me={me} />}
             <DigestTeaser />
           </div>
         )}

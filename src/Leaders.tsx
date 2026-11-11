@@ -106,7 +106,7 @@ export function useRankOnes(on: boolean) {
   return ones
 }
 
-export default function Leaders({ ones }: { ones: One[] }) {
+export default function Leaders({ ones, me }: { ones: One[]; me?: { ecode: string; mgrId: string | null } | null }) {
   const [i, setI] = useState(0)
   const [open, setOpen] = useState(() => takeR1('list'))
   // One Rank 1's photo, large; a press anywhere closes it (the user, 11 Nov: "just a click again will close it").
@@ -130,21 +130,18 @@ export default function Leaders({ ones }: { ones: One[] }) {
   }, [open])
   // Mine first (the user, 11 Nov): my own team's Rank 1 (or me) and, for a manager, the Rank 1 of the team I lead;
   // everybody else stays by manager, A to Z.
-  const [mine, setMine] = useState<{ me: string; mgr: string | null } | null>(null)
+  // Known before the list opens, so my row is first the moment it shows (the user, 11 Nov: "my name loading time
+  // more why?" — it used to ask the server three times after the press, then move the row up). My ecode comes from the
+  // portal's own sign-in lookup; only my manager's ecode is fetched, once, while the home page loads.
+  const [mgr, setMgr] = useState<string | null>(null)
   useEffect(() => {
-    if (!open || mine) return
+    if (!me?.mgrId) return
     let alive = true
-    ;(async () => {
-      const { data: auth } = await supabase.auth.getUser()
-      const { data: me } = await supabase.from('employees').select('ecode, reporting_manager_id').eq('auth_user_id', auth.user?.id ?? '').maybeSingle()
-      if (!alive || !me) return
-      const { data: m } = me.reporting_manager_id
-        ? await supabase.from('employees').select('ecode').eq('id', me.reporting_manager_id).maybeSingle()
-        : { data: null }
-      if (alive) setMine({ me: String(me.ecode).toUpperCase(), mgr: m?.ecode ? String(m.ecode).toUpperCase() : null })
-    })()
+    void supabase.from('employees').select('ecode').eq('id', me.mgrId).maybeSingle()
+      .then(({ data }) => { if (alive && data?.ecode) setMgr(String(data.ecode).toUpperCase()) })
     return () => { alive = false }
-  }, [open, mine])
+  }, [me?.mgrId])
+  const mine = me?.ecode ? { me: me.ecode.toUpperCase(), mgr } : null
   const tagOf = (x: One) => {
     if (!mine) return null
     if (x.ecode.toUpperCase() === mine.me) return 'You'
@@ -157,7 +154,7 @@ export default function Leaders({ ones }: { ones: One[] }) {
     top.sort((a, b) => Number(a.manager_ecode.toUpperCase() === mine?.me) - Number(b.manager_ecode.toUpperCase() === mine?.me))
     return [...top, ...rest]
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ones, mine])
+  }, [ones, mine?.me, mine?.mgr])
   const month = label(ones[0].period_month)
   const o = ones[order[i % order.length]]
   return (
