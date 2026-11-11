@@ -3,6 +3,7 @@ import { supabase } from './lib/supabase'
 import Avatar from './Avatar'
 import { Camera } from 'lucide-react'
 import { fileToAvatar } from './lib/avatar'
+import { takeR1 } from './lib/r1Link'
 
 /**
  * Who is signed in, and a card with their basic details on a press (the user,
@@ -20,7 +21,7 @@ interface Details {
 }
 
 export default function ProfileCard({ name, avatar, onAvatar }: { name: string; avatar: string | null; onAvatar?: (a: string) => void }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(() => takeR1('photo'))
   // Add or change one's own photo from here (the user, 11 Nov); it goes through set_my_avatar (KPI 0037) like KPI's.
   const pick = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)

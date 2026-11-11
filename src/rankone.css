@@ -228,3 +228,69 @@
 @media (prefers-reduced-motion: reduce) { .leaders-who b.leaders-gold, .leaders-zoom-name.r1-name { animation: none; } }
 .leaders-zoom-name.r1-name { animation: lz-up 0.45s 0.3s ease-out both, r1-shine 4.5s ease-in-out 1.2s infinite; }
 @media (prefers-reduced-motion: reduce) { .leaders-zoom-name.r1-name { animation: none; } }
+/* Mine on top (the user, 11 Nov): a soft gold band and a small tag. */
+.leaders-list li[data-mine] { background: color-mix(in srgb, #e6a817 9%, transparent); border-radius: 12px; padding-left: 0.6rem; padding-right: 0.6rem; border-bottom-color: transparent; margin-bottom: 0.35rem; }
+.leaders-mine { display: inline-block; margin-right: 0.45rem; padding: 0.05rem 0.5rem; border-radius: 999px; font-size: 0.68rem; letter-spacing: 0.04em;
+  background: #e6a817; color: #3b2600; vertical-align: 1px; }
+/* Every row the same inside padding, so the photos make one straight line with or without the band. */
+.leaders-list li { padding-left: 0.6rem; padding-right: 0.6rem; }
+/* Light mode: the list's gold names a step deeper so they read on white (the user, 11 Nov); dark keeps its light gold. */
+.leaders-list b.leaders-gold, .leaders-zoom-name.r1-name {
+  background-image: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.85) 48%, rgba(255, 255, 255, 0.85) 52%, transparent 62%),
+                    linear-gradient(180deg, #b98309 0%, #8f6205 55%, #6b4502 100%);
+}
+:root[data-theme='dark'] .leaders-list b.leaders-gold, :root[data-theme='dark'] .leaders-zoom-name.r1-name {
+  background-image: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.95) 48%, rgba(255, 255, 255, 0.95) 52%, transparent 62%),
+                    linear-gradient(180deg, #fffaf0 0%, #fff1b8 45%, #ffcf40 100%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .leaders-list b.leaders-gold, :root:not([data-theme='light']) .leaders-zoom-name.r1-name {
+    background-image: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.95) 48%, rgba(255, 255, 255, 0.95) 52%, transparent 62%),
+                      linear-gradient(180deg, #fffaf0 0%, #fff1b8 45%, #ffcf40 100%);
+  }
+}
+
+/* Royal, premium head (the user, 11 Nov). */
+.leaders-head { padding-bottom: 0.8rem; color: #3a2400;
+  background: linear-gradient(125deg, #fff4c4 0%, #f7d465 22%, #e6a817 48%, #c98e0c 70%, #f2c94c 86%, #a8740a 100%);
+}
+.leaders-head::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.55) 48%, transparent 60%) no-repeat;
+  background-size: 260% 100%; background-position: 160% 0; animation: lz-head-sheen 6s ease-in-out 0.8s infinite; }
+@keyframes lz-head-sheen { 0% { background-position: 160% 0; } 45%, 100% { background-position: -70% 0; } }
+.leaders-eyebrow { position: relative; display: inline-flex; align-items: center; gap: 0.55rem; font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.28em; text-transform: uppercase; color: #5c3b02; }
+.leaders-eyebrow i { width: 1.6rem; height: 1px; background: linear-gradient(90deg, transparent, #5c3b02); position: relative; }
+.leaders-eyebrow i:last-child { background: linear-gradient(90deg, #5c3b02, transparent); }
+.leaders-eyebrow i::after { content: ''; position: absolute; top: -2.5px; width: 6px; height: 6px; transform: rotate(45deg); background: #5c3b02; }
+.leaders-eyebrow i:first-child::after { right: -3px; } .leaders-eyebrow i:last-child::after { left: -3px; }
+.leaders-head h2 { margin-top: 0.35rem; font-family: Georgia, 'Times New Roman', serif; font-size: 2rem; font-weight: 700; letter-spacing: 0.01em;
+  color: #3a2400; text-shadow: 0 1px 0 rgb(255 244 196 / 0.75), 0 -1px 0 rgb(90 58 2 / 0.25); }
+.leaders-art { right: 3.4rem; top: auto; bottom: 0.25rem; color: #fff7d6; }
+/* The crown arrives once on opening: drops from above, settles with a small bounce, its glow fades up, then the
+   gentle rock begins (the user, 11 Nov). */
+/* Calmer (the user, 11 Nov: "reduce the motion"): a short drop and a slow, small sway. */
+.leaders-art { animation: lz-crown-drop 0.8s cubic-bezier(0.22, 1.1, 0.36, 1) both, lz-crown-calm 5s ease-in-out 0.8s infinite; }
+@keyframes lz-crown-calm { 0%, 100% { transform: rotate(-14deg) translateY(0); } 50% { transform: rotate(-11deg) translateY(-2px); } }
+@keyframes lz-crown-drop {
+  0% { opacity: 0; transform: translateY(-18px) rotate(-18deg) scale(0.92); }
+  60% { opacity: 1; transform: translateY(2px) rotate(-13deg) scale(1.01); }
+  100% { opacity: 1; transform: rotate(-14deg) translateY(0); }
+}
+.lz-crown-glow { animation: lz-glow-up 1.2s ease-out 0.35s both; }
+@keyframes lz-glow-up { from { opacity: 0; } to { opacity: 1; } }
+.lz-gem-flash > * { opacity: 0; animation: lz-gem 4.5s ease-in-out 1.4s infinite; }
+@keyframes lz-gem { 0%, 14%, 100% { opacity: 0; } 6% { opacity: 0.75; } }
+@media (prefers-reduced-motion: reduce) { .leaders-art, .lz-crown-glow, .lz-gem-flash > * { animation: none; } .lz-gem-flash { display: none; } }
+/* A small, raised s: the 1 carries the title (the user, 11 Nov: "make s very small"). */
+.leaders-head h2 small { font-size: 0.5em; font-weight: 700; margin-left: 0.04em; vertical-align: 0.15em; }
+.leaders-art svg { filter: drop-shadow(0 6px 10px rgb(110 70 4 / 0.4)); }
+/* Only a gold outline (the user, 11 Nov: "gold border enough for crown"): no fill, a soft gold line just above the background, not standing out. */
+.leaders-art svg.leaders-crown-old { fill: none; color: #b9820b; opacity: 0.7; filter: drop-shadow(0 1px 0 rgb(255 244 196 / 0.45)); }
+.leaders-glint { position: absolute; width: 12px; height: 12px; background: #fff;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  opacity: 0; animation: lz-glint 2.6s ease-in-out infinite; }
+.leaders-glint.g1 { top: 2px; left: 2px; } .leaders-glint.g2 { top: -2px; right: 26px; width: 9px; height: 9px; animation-delay: 0.9s; }
+.leaders-glint.g3 { top: 38px; left: 48px; width: 8px; height: 8px; animation-delay: 1.7s; }
+@keyframes lz-glint { 0%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); } 45% { opacity: 1; transform: scale(1) rotate(45deg); } 70% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .leaders-head::after, .leaders-glint { animation: none; } .leaders-glint { opacity: 0.8; } }
