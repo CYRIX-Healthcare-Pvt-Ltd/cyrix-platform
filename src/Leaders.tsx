@@ -190,10 +190,13 @@ export default function Leaders({ ones }: { ones: One[] }) {
             </div>
             <ul className="leaders-list">
               {listed.map(x => (
-                <li key={x.manager_ecode + x.ecode} data-mine={tagOf(x) ? 'true' : undefined}>
-                  <button type="button" className="leaders-face" onClick={() => setFace(x)} aria-label={`${x.full_name}'s photo`}>
+                // The whole row opens the large photo, not only the round (the user, 11 Nov: easier with a thumb).
+                <li key={x.manager_ecode + x.ecode} data-mine={tagOf(x) ? 'true' : undefined} role="button" tabIndex={0}
+                  aria-label={`${x.full_name}, ${x.manager_name}'s team`} onClick={() => setFace(x)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFace(x) } }}>
+                  <span className="leaders-face" aria-hidden>
                     {x.avatar ? <img src={x.avatar} alt="" loading="lazy" draggable={false} /> : <Crown size={18} />}
-                  </button>
+                  </span>
                   <span className="leaders-text">
                     <span className="leaders-mgr">{x.manager_name}&rsquo;s team{x.function_name && ` · ${x.function_name}`}</span>
                     <span className="leaders-who"><b className="r1-name leaders-gold">{x.full_name}</b> <span>{x.ecode}{x.designation ? ` · ${x.designation}` : ''}</span></span>
@@ -213,7 +216,8 @@ export default function Leaders({ ones }: { ones: One[] }) {
                   </span>
                   <b className="leaders-zoom-name r1-name" key={face.ecode}>{face.full_name}</b>
                   <span className="leaders-zoom-role">{face.ecode}{face.designation ? ` · ${face.designation}` : ''}</span>
-                  <span className="leaders-zoom-rank">{month} Rank 1 in {face.manager_name}&rsquo;s team</span>
+                  {/* When it takes two lines, the manager's name starts the second (the user, 11 Nov). */}
+                  <span className="leaders-zoom-rank"><span className="lz-rank-of">{month} Rank 1 in</span><span className="lz-rank-team">{face.manager_name}&rsquo;s team</span></span>
                   {face.function_name && <span className="leaders-zoom-fn">{face.function_name}</span>}
                 </div>
               </div>

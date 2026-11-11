@@ -294,3 +294,13 @@
 .leaders-glint.g3 { top: 38px; left: 48px; width: 8px; height: 8px; animation-delay: 1.7s; }
 @keyframes lz-glint { 0%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); } 45% { opacity: 1; transform: scale(1) rotate(45deg); } 70% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .leaders-head::after, .leaders-glint { animation: none; } .leaders-glint { opacity: 0.8; } }
+
+/* A press anywhere on a row opens the large photo (the user, 11 Nov). */
+.leaders-list li[role='button'] { cursor: pointer; border-radius: 12px; -webkit-tap-highlight-color: transparent; transition: background 0.15s ease; }
+.leaders-list li[role='button']:active { background: color-mix(in srgb, #e6a817 16%, transparent); }
+.leaders-list li[role='button']:active .leaders-face { transform: scale(0.94); }
+.leaders-list li[role='button']:focus-visible { outline: 2px solid #e6a817; outline-offset: -2px; }
+
+.leaders-zoom-rank { flex-wrap: wrap; justify-content: center; column-gap: 0.3em; row-gap: 0; text-align: center; }
+.lz-rank-of { white-space: nowrap; }
+.lz-rank-team { max-width: 100%; }
