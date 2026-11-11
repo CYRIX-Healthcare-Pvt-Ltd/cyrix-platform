@@ -221,3 +221,10 @@
   .leaders-zoom-crown { transform: translate(-50%, 0) rotate(-8deg); }
   .leaders-zoom-burst { display: none; }
 }
+/* Every Rank 1's name in gold with the shine (the user, 11 Nov); the shine runs a little apart row by row. */
+.leaders-who b.leaders-gold { font-weight: 750; animation-duration: 4.5s; }
+.leaders-list li:nth-child(3n + 2) b.leaders-gold { animation-delay: 2.1s; }
+.leaders-list li:nth-child(3n) b.leaders-gold { animation-delay: 3.2s; }
+@media (prefers-reduced-motion: reduce) { .leaders-who b.leaders-gold, .leaders-zoom-name.r1-name { animation: none; } }
+.leaders-zoom-name.r1-name { animation: lz-up 0.45s 0.3s ease-out both, r1-shine 4.5s ease-in-out 1.2s infinite; }
+@media (prefers-reduced-motion: reduce) { .leaders-zoom-name.r1-name { animation: none; } }

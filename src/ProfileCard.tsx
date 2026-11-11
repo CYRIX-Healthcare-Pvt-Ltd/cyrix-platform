@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from './lib/supabase'
 import Avatar from './Avatar'
+import { Camera } from 'lucide-react'
+import { fileToAvatar } from './lib/avatar'
 
 /**
  * Who is signed in, and a card with their basic details on a press (the user,
@@ -17,8 +19,24 @@ interface Details {
   date_of_joining: string | null; manager: string | null
 }
 
-export default function ProfileCard({ name, avatar }: { name: string; avatar: string | null }) {
+export default function ProfileCard({ name, avatar, onAvatar }: { name: string; avatar: string | null; onAvatar?: (a: string) => void }) {
   const [open, setOpen] = useState(false)
+  // Add or change one's own photo from here (the user, 11 Nov); it goes through set_my_avatar (KPI 0037) like KPI's.
+  const pick = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [top, setTop] = useState<number | null>(null)
+  const upload = async (file: File | undefined) => {
+    if (!file) return
+    setBusy(true); setErr(null)
+    try {
+      const url = await fileToAvatar(file)
+      const { error } = await supabase.rpc('set_my_avatar', { p_data: url })
+      if (error) throw new Error(error.message)
+      onAvatar?.(url)
+    } catch (e) { setErr(e instanceof Error ? e.message : 'The photo could not be saved.') }
+    finally { setBusy(false); if (pick.current) pick.current.value = '' }
+  }
   const [d, setD] = useState<Details | null>(null)
   const box = useRef<HTMLSpanElement>(null)
 
@@ -64,19 +82,25 @@ export default function ProfileCard({ name, avatar }: { name: string; avatar: st
 
   return (
     <span className="who-wrap" ref={box}>
-      <button type="button" className="who" onClick={() => setOpen(v => !v)} aria-expanded={open} aria-haspopup="dialog">
+      <button type="button" className="who" aria-expanded={open} aria-haspopup="dialog"
+        onClick={e => { setTop(e.currentTarget.getBoundingClientRect().bottom + 8); setOpen(v => !v) }}>
         <span className="who-name">{name}</span>
         <Avatar name={name} src={avatar} />
       </button>
       {open && (
-        <span className="profile-card" role="dialog" aria-label="Your profile">
+        <span className="profile-card" role="dialog" aria-label="Your profile" style={top != null ? { ['--pc-top' as string]: `${top}px` } : undefined}>
           <span className="profile-head">
-            <Avatar name={name} src={avatar} />
+            <button type="button" className="profile-photo" onClick={() => pick.current?.click()} disabled={busy} aria-label={avatar ? 'Change photo' : 'Add photo'}>
+              <Avatar name={name} src={avatar} />
+              <span className="profile-photo-cam" aria-hidden><Camera size={12} strokeWidth={2.4} /></span>
+            </button>
+            <input ref={pick} type="file" accept="image/*" hidden onChange={e => void upload(e.target.files?.[0])} />
             <span>
               <span className="profile-name">{name}</span>
               {d?.designation && <span className="profile-sub">{d.designation}</span>}
             </span>
           </span>
+          {err && <span className="profile-photo-err" role="alert">{err}</span>}
           {!d ? (
             <span className="profile-sub profile-loading">Loading…</span>
           ) : (

@@ -88,7 +88,7 @@ export default function Leaders({ ones }: { ones: One[] }) {
                   </button>
                   <span className="leaders-text">
                     <span className="leaders-mgr">{x.manager_name}&rsquo;s team{x.function_name && ` · ${x.function_name}`}</span>
-                    <span className="leaders-who"><b>{x.full_name}</b> <span>{x.ecode}{x.designation ? ` · ${x.designation}` : ''}</span></span>
+                    <span className="leaders-who"><b className="r1-name leaders-gold">{x.full_name}</b> <span>{x.ecode}{x.designation ? ` · ${x.designation}` : ''}</span></span>
                   </span>
                 </li>
               ))}
@@ -103,7 +103,7 @@ export default function Leaders({ ones }: { ones: One[] }) {
                     <span className="leaders-zoom-crown" aria-hidden><Crown size={34} strokeWidth={2.2} /></span>
                     <span className="leaders-zoom-burst" aria-hidden>{SPARKS.map(k => <i key={k} style={{ ['--a' as string]: `${k * 30}deg`, ['--d' as string]: `${(k % 3) * 40}ms` }} />)}</span>
                   </span>
-                  <b className="leaders-zoom-name" key={face.ecode}>{face.full_name}</b>
+                  <b className="leaders-zoom-name r1-name" key={face.ecode}>{face.full_name}</b>
                   <span className="leaders-zoom-role">{face.ecode}{face.designation ? ` · ${face.designation}` : ''}</span>
                   <span className="leaders-zoom-rank">{month} Rank 1 in {face.manager_name}&rsquo;s team</span>
                   {face.function_name && <span className="leaders-zoom-fn">{face.function_name}</span>}

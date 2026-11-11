@@ -459,7 +459,7 @@ function Portal() {
         {/* Who is signed in, shown the same way every module shows it; a press
             opens their basic details (ProfileCard). The name is hidden on a
             phone where the mark and the controls already fill the bar. */}
-        {me && <ProfileCard name={me.full_name} avatar={me.avatar} />}
+        {me && <ProfileCard name={me.full_name} avatar={me.avatar} onAvatar={avatar => setMe(m => (m ? { ...m, avatar } : m))} />}
         <ThemeToggle />
         <InstallButton />
         <button
