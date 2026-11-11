@@ -18,6 +18,11 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const label = (iso: string) => `${MONTHS[Number(iso.slice(5, 7)) - 1]}-${iso.slice(2, 4)}`
 const first = (name: string) => name.split(/\s+/)[0]
 
+const DUST = Array.from({ length: 22 }, (_, i) => {
+  const r = (n: number) => { const x = Math.sin(i * 7919 + n * 104729) * 233280; return x - Math.floor(x) }
+  return { left: 3 + r(1) * 94, dx: r(2) * 24 - 12, dur: 10 + r(3) * 8, delay: -r(4) * 18, size: 2 + r(5) * 2 }
+})
+
 export function useRankOnes(on: boolean) {
   const [ones, setOnes] = useState<One[] | null>(null)
   useEffect(() => {
@@ -59,6 +64,12 @@ export default function Leaders({ ones }: { ones: One[] }) {
       {open && createPortal(
         <div className="leaders-shade" onClick={e => { if (e.target === e.currentTarget) setOpen(false) }}>
           <div className="leaders-panel" role="dialog" aria-modal="true" aria-label={`${month} Rank 1s`}>
+            {/* Gold dust rising through the list, for everybody who opens it (the user, 11 Nov: "it is rank list so"). */}
+            <div className="leaders-sky" aria-hidden>
+              {DUST.map((d, k) => (
+                <span key={k} style={{ left: `${d.left}%`, width: d.size, height: d.size, animationDuration: `${d.dur}s`, animationDelay: `${d.delay}s`, ['--dx' as string]: `${d.dx}px` }} />
+              ))}
+            </div>
             <div className="leaders-head">
               <span className="leaders-art" aria-hidden><Crown size={88} /></span>
               <span className="leaders-count"><Crown size={14} /> {ones.length} teams</span>
