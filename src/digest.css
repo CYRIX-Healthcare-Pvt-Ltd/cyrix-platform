@@ -464,3 +464,23 @@ a.digest-sheet-btn { text-decoration: none; }
 .digest-quiz-timed { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; }
 .digest-quiz-timed > span { display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 700; color: var(--hue); font-variant-numeric: tabular-nums; }
 .digest-quiz-start-note { font-size: 0.85rem; opacity: 0.8; }
+
+/* Start asks first on a timed quiz (the user, 12 Nov). */
+.digest-quiz-ask-shade { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 1rem; background: rgb(0 0 0 / 0.5);
+  animation: dqa-fade 0.18s ease-out; }
+.digest-quiz-ask { width: min(100%, 360px); display: grid; justify-items: center; gap: 0.25rem; padding: 1.4rem 1.2rem 1.1rem; border-radius: 18px;
+  background: var(--white); color: var(--ink-900); text-align: center; box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.5); animation: dqa-up 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+.digest-quiz-ask-icon { display: grid; place-items: center; width: 52px; height: 52px; margin-bottom: 0.4rem; border-radius: 50%; background: #fdf0d5; color: #b45309; }
+.digest-quiz-ask strong { font-size: 1.15rem; }
+.digest-quiz-ask-sub { color: var(--ink-500); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.digest-quiz-ask ul { list-style: none; margin: 0.9rem 0 1rem; padding: 0.8rem 0.9rem; width: 100%; display: grid; gap: 0.65rem; border-radius: 12px;
+  background: var(--soft, rgb(127 127 127 / 0.08)); text-align: left; font-size: 0.9rem; line-height: 1.4; }
+.digest-quiz-ask li { display: grid; grid-template-columns: auto 1fr; gap: 0.6rem; align-items: start; }
+.digest-quiz-ask li svg { margin-top: 1px; color: var(--ink-500); }
+.digest-quiz-ask li svg.t-warn { color: #d97706; } .digest-quiz-ask li svg.t-bad { color: #dc2626; }
+.digest-quiz-ask-go { width: 100%; display: grid; grid-template-columns: 1fr 1.4fr; gap: 0.6rem; }
+.digest-quiz-ask-go > button { min-height: 44px; justify-content: center; }
+.digest-quiz-ask-no { border-radius: 10px; border: 1px solid var(--ink-200); background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+@keyframes dqa-fade { from { opacity: 0; } }
+@keyframes dqa-up { from { opacity: 0; transform: translateY(14px) scale(0.97); } }
+@media (prefers-reduced-motion: reduce) { .digest-quiz-ask-shade, .digest-quiz-ask { animation: none; } }

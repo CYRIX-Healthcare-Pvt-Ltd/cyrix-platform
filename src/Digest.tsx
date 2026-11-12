@@ -5,7 +5,9 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from 're
 import {
   Heart, MessageCircle, Megaphone, Newspaper, Send, Trash2, Video, X, MapPin, Clock, ChevronRight, BarChart3, Check,
   TriangleAlert, Pin, Briefcase, CalendarClock, ClipboardList, Pencil, PlayCircle, Play, FileText, Trophy, EyeOff, Timer,
+  AlarmClock, LogOut, RotateCcw,
 } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { supabase } from './lib/supabase'
 import './digest.css'
 
@@ -801,6 +803,8 @@ function QuizBody({ p }: { p: Post }) {
   const order = useOrder(p.id, !!settings?.shuffle)
   const answers = useRef(a); answers.current = a
   const sentAuto = useRef(false)
+  // Start asks first: the clock does not stop, and leaving ends the quiz (the user, 12 Nov).
+  const [asking, setAsking] = useState(false)
 
   // A start already running (the page was closed and opened again) carries on where the server's clock is.
   useEffect(() => {
@@ -821,6 +825,39 @@ function QuizBody({ p }: { p: Post }) {
     setRetake(false); setDeadline(null); sentAuto.current = false
     window.dispatchEvent(new CustomEvent(QUIZ_SENT, { detail: p.id }))
   }, [p.id, load])
+  /*
+    Leaving a timed quiz ends it (the user, 12 Nov: "ones started on exit quiz will be considered as closed and till
+    that answer will be considered"): closing the quiz, going back, switching apps or closing the tab sends what is
+    answered so far, and the rest counts as not answered. keepalive lets the send finish while the page goes away;
+    the token is kept ready because there is no time to ask for it then.
+  */
+  const token = useRef<string | null>(null)
+  const running = useRef(false); running.current = deadline != null
+  useEffect(() => {
+    if (deadline == null || p.id === PREVIEW_ID) return
+    void supabase.auth.getSession().then(({ data }) => { token.current = data.session?.access_token ?? null })
+    const leave = () => {
+      if (sentAuto.current || !running.current) return
+      sentAuto.current = true
+      const key = import.meta.env.VITE_SUPABASE_ANON_KEY
+      void fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rpc/digest_quiz_submit`, {
+        method: 'POST', keepalive: true,
+        headers: { apikey: key, Authorization: `Bearer ${token.current ?? key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_id: p.id, p_answers: answers.current }),
+      }).finally(() => { setDeadline(null); sentAuto.current = false; window.dispatchEvent(new CustomEvent(QUIZ_SENT, { detail: p.id })) })
+    }
+    const hide = () => { if (document.visibilityState === 'hidden') leave() }
+    document.addEventListener('visibilitychange', hide)
+    window.addEventListener('pagehide', leave)
+    return () => { document.removeEventListener('visibilitychange', hide); window.removeEventListener('pagehide', leave) }
+  }, [deadline, p.id])
+  // Closing the quiz or going back unmounts it mid-quiz: the same send.
+  useEffect(() => () => {
+    if (!running.current || sentAuto.current || p.id === PREVIEW_ID) return
+    sentAuto.current = true
+    void supabase.rpc('digest_quiz_submit', { p_id: p.id, p_answers: answers.current })
+      .then(() => window.dispatchEvent(new CustomEvent(QUIZ_SENT, { detail: p.id })))
+  }, [p.id])
   // Time up: what is answered goes, the rest counts as wrong.
   const left = deadline == null ? null : Math.max(0, Math.ceil((deadline - now) / 1000))
   useEffect(() => {
@@ -865,12 +902,13 @@ function QuizBody({ p }: { p: Post }) {
   if (settings.seconds && deadline == null) {
     const total = qs.reduce((t, q) => t + q.points, 0)
     const start = async () => {
-      if (p.id === PREVIEW_ID) { setDeadline(Date.now() + settings.seconds! * 1000); return }
+      if (p.id === PREVIEW_ID) { setDeadline(Date.now() + settings.seconds! * 1000); return true }
       setBusy(true); setErr(null)
       const { data, error } = await supabase.rpc('digest_quiz_start', { p_id: p.id })
       setBusy(false)
-      if (error) { setErr(error.message); return }
+      if (error) { setErr(error.message); return false }
       setA({}); setDeadline(Date.now() + Number(data ?? 0) * 1000)
+      return true
     }
     return (
       <div className="digest-form">
@@ -879,8 +917,28 @@ function QuizBody({ p }: { p: Post }) {
           <p className="digest-poll-meta">{qs.length} {qs.length === 1 ? 'question' : 'questions'} · {total} marks</p>
           <p className="digest-quiz-start-note">The timer starts when you press Start quiz.</p>
           {err && <p className="digest-poll-err">{err}</p>}
-          <button type="button" className="digest-vote" disabled={busy} onClick={start}><Play size={15} /> Start quiz</button>
+          <button type="button" className="digest-vote" disabled={busy} onClick={() => setAsking(true)}><Play size={15} /> Start quiz</button>
         </div>
+        {asking && createPortal(
+          <div className="digest-quiz-ask-shade" onClick={e => { if (e.target === e.currentTarget) setAsking(false) }}>
+            <div className="digest-quiz-ask" role="alertdialog" aria-modal="true" aria-label="Start the quiz?">
+              <span className="digest-quiz-ask-icon" aria-hidden><AlarmClock size={26} /></span>
+              <strong>Start the quiz?</strong>
+              <span className="digest-quiz-ask-sub">{qs.length} {qs.length === 1 ? 'question' : 'questions'} · {clock(settings.seconds)}</span>
+              <ul>
+                <li><Timer size={18} className="t-warn" /> The clock doesn&rsquo;t stop once you start</li>
+                <li><LogOut size={18} className="t-bad" /> Leaving the quiz or switching apps ends it. Only what you&rsquo;ve answered till then is counted</li>
+                {!again && <li><RotateCcw size={18} /> One try only</li>}
+              </ul>
+              {err && <p className="digest-poll-err">{err}</p>}
+              <div className="digest-quiz-ask-go">
+                <button type="button" className="digest-quiz-ask-no" onClick={() => setAsking(false)}>Not now</button>
+                <button type="button" className="digest-vote" disabled={busy} onClick={() => { void start().then(ok => { if (ok) setAsking(false) }) }}><Play size={15} /> Start quiz</button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
       </div>
     )
   }
