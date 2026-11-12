@@ -811,6 +811,13 @@ function QuizBody({ p }: { p: Post }) {
   const order = useOrder(p.id, !!settings?.shuffle)
   const answers = useRef(a); answers.current = a
   const sentAuto = useRef(false)
+  // After sending, the score comes into view at the top (the user, 12 Nov).
+  const justSent = useRef(false)
+  const toScore = (el: HTMLDivElement | null) => {
+    if (!el || !justSent.current) return
+    justSent.current = false
+    window.requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
   // Start asks first: the clock runs while open, leaving pauses it (the user, 12 Nov).
   const [asking, setAsking] = useState(false)
 
@@ -834,7 +841,7 @@ function QuizBody({ p }: { p: Post }) {
     const { error } = await supabase.rpc('digest_quiz_submit', { p_id: p.id, p_answers: answers.current })
     setBusy(false)
     if (error) { if (!auto) setErr(error.message); return }
-    setRetake(false); setDeadline(null); sentAuto.current = false
+    setRetake(false); setDeadline(null); sentAuto.current = false; justSent.current = true
     window.dispatchEvent(new CustomEvent(QUIZ_SENT, { detail: p.id }))
   }, [p.id, load])
   /*
@@ -893,7 +900,7 @@ function QuizBody({ p }: { p: Post }) {
     const got = qs[0].score ?? 0, of = qs[0].max_score ?? 0
     return (
       <div className="digest-form">
-        <div className="digest-quiz-score">
+        <div className="digest-quiz-score" ref={toScore}>
           <Trophy size={22} />
           <div><strong>{got} of {of}</strong><span>{of ? Math.round((got / of) * 100) : 0}% · {qs.filter(q => isRight(q, qs[0].mine?.[q.id])).length} of {qs.length} correct</span></div>
         </div>
