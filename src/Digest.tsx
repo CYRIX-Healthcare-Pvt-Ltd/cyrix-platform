@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from 're
 import {
   Heart, MessageCircle, Megaphone, Newspaper, Send, Trash2, Video, X, MapPin, Clock, ChevronRight, BarChart3, Check,
   TriangleAlert, Pin, Briefcase, CalendarClock, ClipboardList, Pencil, PlayCircle, Play, FileText, Trophy, EyeOff, Timer,
-  AlarmClock, LogOut, RotateCcw,
+  AlarmClock, Pause, RotateCcw,
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { supabase } from './lib/supabase'
@@ -44,7 +44,7 @@ const KIND_WORD: Record<Kind, string> = {
 }
 /** One of the named colours, or any colour as #rrggbb (0168). */
 type Hue = string
-interface Comment { id: string; author: string; ecode: string; body: string; created_at: string; mine: boolean; reply?: string | null; reply_desk?: string | null; reply_at?: string | null }
+interface Comment { id: string; author: string; ecode: string; body: string; created_at: string; mine: boolean; reply?: string | null; reply_desk?: string | null; reply_at?: string | null; parent_id?: string | null }
 interface Option { id: string; label: string; votes: number; mine: boolean; closes_at: string | null; multi: boolean; voters: number }
 
 export const HUES: Record<string, { from: string; to: string; ink: string; soft: string }> = {
@@ -695,8 +695,10 @@ interface QuizQ {
   closes_at: string | null; mine: Record<string, string | string[]> | null; sent_at: string | null
   score: number | null; max_score: number | null
 }
-interface QuizSettings { shuffle: boolean; seconds: number | null; left: number | null }
+interface QuizSettings { shuffle: boolean; seconds: number | null; left: number | null; paused?: boolean; draft?: Record<string, string | string[]> | null }
 const QUIZ_SENT = 'digest-quiz-sent'
+/** "Shivam Kumar" → "Shivam". */
+const first = (name: string) => name.trim().split(/\s+/)[0]
 function useQuiz(id: string) {
   const [qs, setQs] = useState<QuizQ[] | null>(null)
   const [again, setAgain] = useState(false)
@@ -803,12 +805,16 @@ function QuizBody({ p }: { p: Post }) {
   const order = useOrder(p.id, !!settings?.shuffle)
   const answers = useRef(a); answers.current = a
   const sentAuto = useRef(false)
-  // Start asks first: the clock does not stop, and leaving ends the quiz (the user, 12 Nov).
+  // Start asks first: the clock runs while open, leaving pauses it (the user, 12 Nov).
   const [asking, setAsking] = useState(false)
 
-  // A start already running (the page was closed and opened again) carries on where the server's clock is.
+  // A start still running (the page was closed and opened again) carries on where the server's clock is, with the
+  // answers kept; a paused one waits for Continue.
   useEffect(() => {
-    if (settings?.left != null && deadline == null) setDeadline(Date.now() + settings.left * 1000)
+    if (settings?.left != null && !settings.paused && deadline == null) {
+      if (settings.draft) setA(settings.draft)
+      setDeadline(Date.now() + settings.left * 1000)
+    }
   }, [settings, deadline])
   useEffect(() => {
     if (deadline == null) return
@@ -826,38 +832,44 @@ function QuizBody({ p }: { p: Post }) {
     window.dispatchEvent(new CustomEvent(QUIZ_SENT, { detail: p.id }))
   }, [p.id, load])
   /*
-    Leaving a timed quiz ends it (the user, 12 Nov: "ones started on exit quiz will be considered as closed and till
-    that answer will be considered"): closing the quiz, going back, switching apps or closing the tab sends what is
-    answered so far, and the rest counts as not answered. keepalive lets the send finish while the page goes away;
-    the token is kept ready because there is no time to ask for it then.
+    Leaving a timed quiz pauses it (the user, 12 Nov: "can we make it as draft? ie time freeze", after a call ended
+    Shivam's quiz): closing it, going back, switching apps or closing the tab stops the clock and keeps the answers so
+    far; Continue carries on with the time left. keepalive lets the pause reach the server while the page goes away;
+    the token is kept ready because there is no time to ask for it then. Answers are also kept as they are chosen.
   */
   const token = useRef<string | null>(null)
   const running = useRef(false); running.current = deadline != null
+  const pausing = useRef(false)
   useEffect(() => {
     if (deadline == null || p.id === PREVIEW_ID) return
     void supabase.auth.getSession().then(({ data }) => { token.current = data.session?.access_token ?? null })
     const leave = () => {
-      if (sentAuto.current || !running.current) return
-      sentAuto.current = true
+      if (pausing.current || sentAuto.current || !running.current) return
+      pausing.current = true
       const key = import.meta.env.VITE_SUPABASE_ANON_KEY
-      void fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rpc/digest_quiz_submit`, {
+      void fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rpc/digest_quiz_keep`, {
         method: 'POST', keepalive: true,
         headers: { apikey: key, Authorization: `Bearer ${token.current ?? key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ p_id: p.id, p_answers: answers.current }),
-      }).finally(() => { setDeadline(null); sentAuto.current = false; window.dispatchEvent(new CustomEvent(QUIZ_SENT, { detail: p.id })) })
+        body: JSON.stringify({ p_id: p.id, p_answers: answers.current, p_pause: true }),
+      }).finally(() => { pausing.current = false; setDeadline(null); void load() })
     }
     const hide = () => { if (document.visibilityState === 'hidden') leave() }
     document.addEventListener('visibilitychange', hide)
     window.addEventListener('pagehide', leave)
     return () => { document.removeEventListener('visibilitychange', hide); window.removeEventListener('pagehide', leave) }
-  }, [deadline, p.id])
-  // Closing the quiz or going back unmounts it mid-quiz: the same send.
+  }, [deadline, p.id, load])
+  // Closing the quiz or going back unmounts it mid-quiz: the same pause.
   useEffect(() => () => {
-    if (!running.current || sentAuto.current || p.id === PREVIEW_ID) return
-    sentAuto.current = true
-    void supabase.rpc('digest_quiz_submit', { p_id: p.id, p_answers: answers.current })
+    if (!running.current || sentAuto.current || pausing.current || p.id === PREVIEW_ID) return
+    void supabase.rpc('digest_quiz_keep', { p_id: p.id, p_answers: answers.current, p_pause: true })
       .then(() => window.dispatchEvent(new CustomEvent(QUIZ_SENT, { detail: p.id })))
   }, [p.id])
+  // Each answer is kept a moment after it is chosen, so a phone that dies keeps them too.
+  useEffect(() => {
+    if (deadline == null || p.id === PREVIEW_ID) return
+    const t = window.setTimeout(() => { void supabase.rpc('digest_quiz_keep', { p_id: p.id, p_answers: a, p_pause: false }) }, 800)
+    return () => window.clearTimeout(t)
+  }, [a, deadline, p.id])
   // Time up: what is answered goes, the rest counts as wrong.
   const left = deadline == null ? null : Math.max(0, Math.ceil((deadline - now) / 1000))
   useEffect(() => {
@@ -907,17 +919,30 @@ function QuizBody({ p }: { p: Post }) {
       const { data, error } = await supabase.rpc('digest_quiz_start', { p_id: p.id })
       setBusy(false)
       if (error) { setErr(error.message); return false }
-      setA({}); setDeadline(Date.now() + Number(data ?? 0) * 1000)
+      setA(settings.paused && settings.draft ? settings.draft : {}); setDeadline(Date.now() + Number(data ?? 0) * 1000)
       return true
     }
     return (
       <div className="digest-form">
         <div className="digest-quiz-start">
-          <p><Timer size={18} /> <strong>{clock(settings.seconds)}</strong></p>
-          <p className="digest-poll-meta">{qs.length} {qs.length === 1 ? 'question' : 'questions'} · {total} marks</p>
-          <p className="digest-quiz-start-note">The timer starts when you press Start quiz.</p>
-          {err && <p className="digest-poll-err">{err}</p>}
-          <button type="button" className="digest-vote" disabled={busy} onClick={() => setAsking(true)}><Play size={15} /> Start quiz</button>
+          {settings.paused ? (
+            <>
+              {/* Paused by leaving: the time left and the answers kept wait for Continue (the user, 12 Nov). */}
+              <p className="digest-quiz-paused"><Pause size={15} /> Paused</p>
+              <p><Timer size={18} /> <strong>{clock(settings.left ?? 0)}</strong></p>
+              <p className="digest-poll-meta">{Object.values(settings.draft ?? {}).filter(v => (Array.isArray(v) ? v.length : String(v).trim())).length} of {qs.length} answered · {total} marks</p>
+              {err && <p className="digest-poll-err">{err}</p>}
+              <button type="button" className="digest-vote" disabled={busy} onClick={() => { void start() }}><Play size={15} /> Continue</button>
+            </>
+          ) : (
+            <>
+              <p><Timer size={18} /> <strong>{clock(settings.seconds)}</strong></p>
+              <p className="digest-poll-meta">{qs.length} {qs.length === 1 ? 'question' : 'questions'} · {total} marks</p>
+              <p className="digest-quiz-start-note">The timer starts when you press Start quiz.</p>
+              {err && <p className="digest-poll-err">{err}</p>}
+              <button type="button" className="digest-vote" disabled={busy} onClick={() => setAsking(true)}><Play size={15} /> Start quiz</button>
+            </>
+          )}
         </div>
         {asking && createPortal(
           <div className="digest-quiz-ask-shade" style={tint(p.color)} onClick={e => { if (e.target === e.currentTarget) setAsking(false) }}>
@@ -926,8 +951,8 @@ function QuizBody({ p }: { p: Post }) {
               <strong>Start the quiz?</strong>
               <span className="digest-quiz-ask-sub">{qs.length} {qs.length === 1 ? 'question' : 'questions'} · {clock(settings.seconds)}</span>
               <ul>
-                <li><Timer size={18} className="t-warn" /> The clock doesn&rsquo;t stop once you start</li>
-                <li><LogOut size={18} className="t-bad" /> Leaving the quiz or switching apps ends it. Only what you&rsquo;ve answered till then is counted</li>
+                <li><Timer size={18} className="t-warn" /> The clock runs while the quiz is open</li>
+                <li><Pause size={18} className="t-bad" /> Leaving the quiz or switching apps pauses it. Your answers are kept, and Continue carries on</li>
                 {!again && <li><RotateCcw size={18} /> One try only</li>}
               </ul>
               {err && <p className="digest-poll-err">{err}</p>}
@@ -1115,6 +1140,9 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
   const [comments, setComments] = useState<Comment[] | null>(null)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  // Anyone replies to any comment (the user, 12 Nov); a reply to a reply joins the same thread (KPI 0284).
+  const [replyTo, setReplyTo] = useState<Comment | null>(null)
+  const [replyText, setReplyText] = useState('')
   useEffect(() => {
     if (p.id === PREVIEW_ID) return
     void supabase.rpc('digest_opened', { p_id: p.id }).then(() => {}, () => {})
@@ -1134,6 +1162,13 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
     const { error } = await supabase.rpc('digest_add_comment', { p_id: p.id, p_body: text.trim() })
     setBusy(false)
     if (!error) { setText(''); void load() }
+  }
+  const sendReply = async () => {
+    if (!replyTo || !replyText.trim() || p.id === PREVIEW_ID) return
+    setBusy(true)
+    const { error } = await supabase.rpc('digest_add_comment', { p_id: p.id, p_body: replyText.trim(), p_parent: replyTo.id })
+    setBusy(false)
+    if (!error) { setReplyText(''); setReplyTo(null); void load() }
   }
   const remove = async (id: string) => { await supabase.rpc('digest_delete_comment', { p_id: id }); void load() }
   const kind = KIND_WORD[p.kind]
@@ -1172,23 +1207,40 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
 
         <div className="digest-comments">
           <p className="digest-comments-h"><MessageCircle size={16} /> Comments{comments?.length ? ` · ${comments.length}` : ''}</p>
-          {comments?.map(c => (
-            <div key={c.id} className="digest-comment">
-              <span className="digest-avatar" style={{ background: grad(p.color) }}>{c.author.split(/\s+/).map(w => w[0]).slice(0, 2).join('')}</span>
-              <div>
-                <p><strong>{c.author}</strong> <span>{ago(c.created_at)}</span></p>
-                <p>{c.body}</p>
-                {/* The posting desk's reply (KPI 0202). */}
-                {c.reply && (
-                  <div className="digest-reply">
-                    <p><strong>{DESK_WORD[c.reply_desk ?? ''] ?? 'Reply'}</strong>{c.reply_at && <span> {ago(c.reply_at)}</span>}</p>
-                    <p>{c.reply}</p>
+          {(() => {
+            const one = (c: Comment, top: Comment) => (
+              <div key={c.id} className={c.parent_id ? 'digest-comment is-reply' : 'digest-comment'}>
+                <span className="digest-avatar" style={{ background: grad(p.color) }}>{c.author.split(/\s+/).map(w => w[0]).slice(0, 2).join('')}</span>
+                <div>
+                  <p><strong>{c.author}</strong> <span>{ago(c.created_at)}</span></p>
+                  <p>{c.body}</p>
+                  {/* The posting desk's reply (KPI 0202). */}
+                  {c.reply && (
+                    <div className="digest-reply">
+                      <p><strong>{DESK_WORD[c.reply_desk ?? ''] ?? 'Reply'}</strong>{c.reply_at && <span> {ago(c.reply_at)}</span>}</p>
+                      <p>{c.reply}</p>
+                    </div>
+                  )}
+                  <button type="button" className="digest-reply-btn" onClick={() => { setReplyTo(top); setReplyText(c.parent_id ? `@${first(c.author)} ` : '') }}>Reply</button>
+                </div>
+                {c.mine && <button type="button" className="icon-btn" onClick={() => remove(c.id)} title="Delete"><Trash2 size={14} /><span className="sr">Delete</span></button>}
+              </div>
+            )
+            const tops = (comments ?? []).filter(c => !c.parent_id)
+            return tops.map(t => (
+              <div key={t.id} className="digest-thread">
+                {one(t, t)}
+                {(comments ?? []).filter(c => c.parent_id === t.id).map(c => one(c, t))}
+                {replyTo?.id === t.id && (
+                  <div className="digest-write is-reply">
+                    <input autoFocus value={replyText} maxLength={500} placeholder={`Reply to ${first(t.author)}`} onChange={e => setReplyText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') void sendReply(); if (e.key === 'Escape') setReplyTo(null) }} />
+                    <button type="button" className="digest-send" onClick={sendReply} disabled={busy || !replyText.trim()} title="Send"><Send size={16} /><span className="sr">Send</span></button>
                   </div>
                 )}
               </div>
-              {c.mine && <button type="button" className="icon-btn" onClick={() => remove(c.id)} title="Delete"><Trash2 size={14} /><span className="sr">Delete</span></button>}
-            </div>
-          ))}
+            ))
+          })()}
           <div className="digest-write">
             <input value={text} maxLength={500} placeholder="Write a comment" onChange={e => setText(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') void add() }} />

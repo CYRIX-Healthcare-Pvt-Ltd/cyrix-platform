@@ -484,3 +484,10 @@ a.digest-sheet-btn { text-decoration: none; }
 @keyframes dqa-fade { from { opacity: 0; } }
 @keyframes dqa-up { from { opacity: 0; transform: translateY(14px) scale(0.97); } }
 @media (prefers-reduced-motion: reduce) { .digest-quiz-ask-shade, .digest-quiz-ask { animation: none; } }
+.digest-quiz-paused { padding: 0.2rem 0.65rem; border-radius: 999px; background: #fdf0d5; color: #92400e; font-size: 0.78rem; font-weight: 700; }
+/* Anyone replies to a comment (the user, 12 Nov): replies sit under it, indented. */
+.digest-thread { display: grid; }
+.digest-comment.is-reply { margin-left: 2.4rem; }
+.digest-comment.is-reply .digest-avatar { width: 26px; height: 26px; font-size: 0.65rem; }
+.digest-reply-btn { margin-top: 0.15rem; padding: 0.15rem 0; border: 0; background: none; color: var(--hue, var(--ink-500)); font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
+.digest-write.is-reply { margin: 0.2rem 0 0.6rem 2.4rem; }
