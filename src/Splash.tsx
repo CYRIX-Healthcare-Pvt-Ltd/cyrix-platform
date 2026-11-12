@@ -44,7 +44,7 @@ export default function Splash() {
       document.removeEventListener('focusin', hold, true)
       setShow(false)
       if (wanted && document.contains(wanted)) window.setTimeout(() => wanted?.focus(), 50)
-    }, 3000)
+    }, 1500)
     return () => { window.clearTimeout(t); document.removeEventListener('focusin', hold, true) }
   }, [show])
   if (!show) return null

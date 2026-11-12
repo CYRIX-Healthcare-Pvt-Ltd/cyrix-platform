@@ -925,30 +925,30 @@ body {
 /* Opening splash (16 Oct): the X meets, zooms onto the logo's own X, the wordmark opens out
    leftwards, a band of light sweeps the letters (no stars, the user said). Splash.tsx. */
 .splash { overflow: hidden; position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; background: #ffffff;
-  animation: splash-out 3s ease forwards; pointer-events: none; }
+  animation: splash-out 1.5s ease forwards; pointer-events: none; }
 :root[data-theme="dark"] .splash, :root.dark .splash { background: #111318; }
 .splash-mark { position: relative; width: min(72vw, 420px); aspect-ratio: 300 / 115; }
 .splash-logo { position: absolute; inset: 0; width: 100%; height: 100%;
-  animation: splash-open 3s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
+  animation: splash-open 1.5s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
 .splash-logo.on-dark { display: none; }
 :root[data-theme="dark"] .splash-logo.on-dark, :root.dark .splash-logo.on-dark { display: block; }
 :root[data-theme="dark"] .splash-logo.on-light, :root.dark .splash-logo.on-light { display: none; }
 /* Drawn over the whole logo in its own coordinates, so it ends exactly on the logo's X
    (rows 14-66 of 115, centred 84.9% across, 34.8% down). */
 .splash-x { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible;
-  transform-origin: 84.9% 34.8%; animation: splash-land 3s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
+  transform-origin: 84.9% 34.8%; animation: splash-land 1.5s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
 .splash-x-left, .splash-x-right { transform-box: fill-box; }
 /* The drawn X stays as the wordmark's X; this patch hides the logo's own X beneath it once landed. */
-.splash-x-cover { fill: #ffffff; opacity: 0; animation: splash-cover 3s linear forwards; }
+.splash-x-cover { fill: #ffffff; opacity: 0; animation: splash-cover 1.5s linear forwards; }
 :root[data-theme="dark"] .splash-x-cover, :root.dark .splash-x-cover { fill: #111318; }
 @keyframes splash-cover { 0%, 52% { opacity: 0; } 53%, 100% { opacity: 1; } }
-.splash-x-left { fill: #000000; animation: splash-left 3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-.splash-x-right { fill: #ED1C24; animation: splash-right 3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.splash-x-left { fill: #000000; animation: splash-left 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.splash-x-right { fill: #ED1C24; animation: splash-right 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 :root[data-theme="dark"] .splash-x-left, :root.dark .splash-x-left { fill: #ffffff; }
 .splash-shine { position: absolute; inset: 0; opacity: 0;
   background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 0.95) 50%, transparent 62%) no-repeat;
   background-size: 260% 100%; -webkit-mask: var(--logo) center / 100% 100% no-repeat; mask: var(--logo) center / 100% 100% no-repeat;
-  mix-blend-mode: screen; animation: splash-shine 3s ease-in-out forwards; }
+  mix-blend-mode: screen; animation: splash-shine 1.5s ease-in-out forwards; }
 /* From either side of the screen, meeting in the middle (the user, 16 Oct: "come from both sides and join, then go"). */
 @keyframes splash-left  { 0% { transform: translateX(-280%); opacity: 0; } 8% { opacity: 1; } 24%, 100% { transform: none; opacity: 1; } }
 @keyframes splash-right { 0% { transform: translateX(280%); opacity: 0; } 8% { opacity: 1; } 24%, 100% { transform: none; opacity: 1; } }
@@ -959,7 +959,7 @@ body {
 @keyframes splash-open { 0%, 53% { clip-path: inset(0 0 0 100%); opacity: 0; } 55% { opacity: 1; } 70%, 100% { clip-path: inset(0 0 0 0); opacity: 1; } }
 @keyframes splash-shine { 0%, 72% { opacity: 0; background-position: 130% 0; } 75% { opacity: 1; } 88% { opacity: 1; background-position: -30% 0; } 90%, 100% { opacity: 0; background-position: -30% 0; } }
 /* The wave carries on across the drawn X, reaching it as the letters' wave does (the user, 16 Oct). */
-.splash-x-shine { mix-blend-mode: screen; animation: splash-x-shine 3s ease-in-out forwards; }
+.splash-x-shine { mix-blend-mode: screen; animation: splash-x-shine 1.5s ease-in-out forwards; }
 @keyframes splash-x-shine { 0%, 79% { transform: translateX(0); } 87%, 100% { transform: translateX(120px); } }
 @keyframes splash-out { 0%, 90% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 
