@@ -44,7 +44,7 @@ const KIND_WORD: Record<Kind, string> = {
 }
 /** One of the named colours, or any colour as #rrggbb (0168). */
 type Hue = string
-interface Comment { id: string; author: string; ecode: string; body: string; created_at: string; mine: boolean; reply?: string | null; reply_desk?: string | null; reply_at?: string | null; parent_id?: string | null }
+interface Comment { id: string; author: string; ecode: string; body: string; created_at: string; mine: boolean; reply?: string | null; reply_desk?: string | null; reply_at?: string | null; parent_id?: string | null; avatar?: string | null }
 interface Option { id: string; label: string; votes: number; mine: boolean; closes_at: string | null; multi: boolean; voters: number }
 
 export const HUES: Record<string, { from: string; to: string; ink: string; soft: string }> = {
@@ -1216,7 +1216,10 @@ function PostSheet({ p, onClose, onLike, onJoin }: { p: Post; onClose: () => voi
           {(() => {
             const one = (c: Comment, top: Comment) => (
               <div key={c.id} className={c.parent_id ? 'digest-comment is-reply' : 'digest-comment'}>
-                <span className="digest-avatar" style={{ background: grad(p.color) }}>{c.author.split(/\s+/).map(w => w[0]).slice(0, 2).join('')}</span>
+                {/* The writer's profile photo, initials without one (the user, 12 Nov; KPI 0285). */}
+                {c.avatar
+                  ? <img className="digest-avatar digest-avatar-img" src={c.avatar} alt="" loading="lazy" draggable={false} />
+                  : <span className="digest-avatar" style={{ background: grad(p.color) }}>{c.author.split(/\s+/).map(w => w[0]).slice(0, 2).join('')}</span>}
                 <div>
                   <p><strong>{c.author}</strong> <span>{ago(c.created_at)}</span></p>
                   <p>{c.body}</p>

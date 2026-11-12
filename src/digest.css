@@ -491,3 +491,4 @@ a.digest-sheet-btn { text-decoration: none; }
 .digest-comment.is-reply .digest-avatar { width: 26px; height: 26px; font-size: 0.65rem; }
 .digest-reply-btn { margin-top: 0.15rem; padding: 0.15rem 0; border: 0; background: none; color: var(--hue, var(--ink-500)); font: inherit; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
 .digest-write.is-reply { margin: 0.2rem 0 0.6rem 2.4rem; }
+.digest-avatar-img { object-fit: cover; padding: 0; }
