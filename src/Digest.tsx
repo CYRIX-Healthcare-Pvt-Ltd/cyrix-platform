@@ -692,6 +692,8 @@ interface QuizQ {
   id: string; label: string; qtype: 'one' | 'many' | 'short'; options: string[]; points: number
   /** Only once this person has sent theirs. */
   correct: string[] | null
+  /** Other spellings also given the marks (KPI 0287): counted, never shown as the answer. */
+  also?: string[] | null
   closes_at: string | null; mine: Record<string, string | string[]> | null; sent_at: string | null
   score: number | null; max_score: number | null
 }
@@ -752,7 +754,7 @@ const norm = (t: string) => t.replace(/\s+/g, '').toLowerCase()
 const isRight = (q: QuizQ, v: string | string[] | undefined) => {
   const c = q.correct ?? []
   if (q.qtype === 'many') { const a = Array.isArray(v) ? v : []; return a.length === c.length && a.every(x => c.includes(x)) }
-  if (q.qtype === 'short') return typeof v === 'string' && c.some(x => norm(x) === norm(v))
+  if (q.qtype === 'short') return typeof v === 'string' && [...c, ...(q.also ?? [])].some(x => norm(x) === norm(v))
   return typeof v === 'string' && c.includes(v)
 }
 
