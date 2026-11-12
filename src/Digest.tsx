@@ -597,7 +597,38 @@ function FormBody({ p }: { p: Post }) {
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  useEffect(() => { if (qs?.[0]?.mine) setA(qs[0].mine) }, [qs])
+  /*
+    Answers not yet sent are kept on this phone until Submit (the user, 12 Nov: Mohandas was filling in a form, a call
+    came and the answers were gone — the phone reloaded the page). Kept per person and form; Submit clears them.
+  */
+  const draftKey = `digest-form-draft:${p.id}`
+  const uid = useRef<string | null>(null)
+  const [restored, setRestored] = useState(false)
+  useEffect(() => {
+    let alive = true
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!alive) return
+      uid.current = data.session?.user.id ?? null
+      try {
+        const kept = JSON.parse(local.getItem(draftKey) ?? 'null') as { uid: string; a: Record<string, string | string[]> } | null
+        if (kept && kept.uid === uid.current && Object.keys(kept.a ?? {}).length) { setA(kept.a); if (qs?.[0]?.sent_at) setEditing(true) }
+      } catch { /* nothing kept */ }
+      setRestored(true)
+    })
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey])
+  useEffect(() => {
+    if (!restored || !uid.current || p.id === PREVIEW_ID) return
+    try { if (Object.keys(a).length) local.setItem(draftKey, JSON.stringify({ uid: uid.current, a })) } catch { /* private window */ }
+  }, [a, restored, draftKey, p.id])
+  // The answers already sent fill the form, unless answers not yet sent were kept.
+  useEffect(() => {
+    if (!qs?.[0]?.mine) return
+    let kept = false
+    try { kept = !!local.getItem(draftKey) } catch { /* none */ }
+    if (!kept) setA(qs[0].mine)
+  }, [qs, draftKey])
   if (!qs) return <div className="digest-poll-skel" />
   const closes = qs[0]?.closes_at ?? null
   const closed = !!closes && new Date(closes).getTime() < Date.now()
@@ -632,6 +663,7 @@ function FormBody({ p }: { p: Post }) {
     const { error } = await supabase.rpc('digest_form_submit', { p_id: p.id, p_answers: a })
     setBusy(false)
     if (error) { setErr(error.message); return }
+    try { local.removeItem(draftKey) } catch { /* none */ }
     setEditing(false); void load()
   }
   return (
