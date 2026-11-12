@@ -920,7 +920,7 @@ function QuizBody({ p }: { p: Post }) {
           <button type="button" className="digest-vote" disabled={busy} onClick={() => setAsking(true)}><Play size={15} /> Start quiz</button>
         </div>
         {asking && createPortal(
-          <div className="digest-quiz-ask-shade" onClick={e => { if (e.target === e.currentTarget) setAsking(false) }}>
+          <div className="digest-quiz-ask-shade" style={tint(p.color)} onClick={e => { if (e.target === e.currentTarget) setAsking(false) }}>
             <div className="digest-quiz-ask" role="alertdialog" aria-modal="true" aria-label="Start the quiz?">
               <span className="digest-quiz-ask-icon" aria-hidden><AlarmClock size={26} /></span>
               <strong>Start the quiz?</strong>
