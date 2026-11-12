@@ -781,7 +781,8 @@ function useOrder(postId: string, on: boolean) {
     return [...items].sort((x, y) => key(x) - key(y))
   }
 }
-const norm = (t: string) => t.replace(/\s+/g, '').toLowerCase()
+// Letters and digits only, as digest_quiz_same (KPI 0292): a full stop or a stray mark never costs a mark.
+const norm = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
 /** Whether one answer earned its marks, the way the server counted it. */
 const isRight = (q: QuizQ, v: string | string[] | undefined) => {
   const c = q.correct ?? []
