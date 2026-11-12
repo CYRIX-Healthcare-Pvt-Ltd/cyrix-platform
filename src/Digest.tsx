@@ -777,6 +777,12 @@ function QuizCard({ p, onOpen }: { p: Post; onOpen: (p: Post) => void }) {
         {sent
           ? <button type="button" className="digest-quiz-mini" onClick={() => onOpen(p)}><Trophy size={15} /> You scored {qs![0].score} of {qs![0].max_score}</button>
           : closed ? <p className="digest-poll-meta">This quiz has closed.</p>
+          : settings?.seconds && settings.left != null
+            // Started and left: the card says so and offers Continue, not a fresh Start (the user, 12 Nov).
+            ? <div className="digest-quiz-timed">
+                <span><Pause size={15} /> {clock(settings.left)} left</span>
+                <button type="button" className="digest-vote digest-form-go" onClick={() => onOpen(p)}><Play size={15} /> Continue</button>
+              </div>
           : settings?.seconds
             ? <div className="digest-quiz-timed">
                 <span><Timer size={15} /> {timerWords(settings.seconds)}</span>
@@ -851,7 +857,7 @@ function QuizBody({ p }: { p: Post }) {
         method: 'POST', keepalive: true,
         headers: { apikey: key, Authorization: `Bearer ${token.current ?? key}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ p_id: p.id, p_answers: answers.current, p_pause: true }),
-      }).finally(() => { pausing.current = false; setDeadline(null); void load() })
+      }).finally(() => { pausing.current = false; setDeadline(null); void load(); window.dispatchEvent(new CustomEvent(QUIZ_SENT, { detail: p.id })) })
     }
     const hide = () => { if (document.visibilityState === 'hidden') leave() }
     document.addEventListener('visibilitychange', hide)
