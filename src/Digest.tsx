@@ -184,7 +184,7 @@ export function DigestTeaser({ gold = false }: { gold?: boolean }) {
   return (
     <button type="button" className={gold ? 'digest-teaser r1-ring' : 'digest-teaser'} onClick={go}>
       <span className="digest-teaser-tag"><Newspaper size={15} /> Cyrix Digest</span>
-      {fresh > 0 && <span className="digest-teaser-new">{fresh} new</span>}
+      {fresh > 0 && <span className="digest-teaser-new" data-n={fresh}>{fresh} new</span>}
       <span key={p.id} className="digest-teaser-line"><KindIcon p={p} size={14} /> {line}</span>
       <ChevronRight size={16} className="digest-teaser-go" />
     </button>

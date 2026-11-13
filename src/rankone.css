@@ -303,3 +303,12 @@
 .leaders-zoom-rank { flex-wrap: wrap; justify-content: center; column-gap: 0.3em; row-gap: 0; text-align: center; }
 .lz-rank-of { white-space: nowrap; }
 .lz-rank-team { max-width: 100%; }
+/* Phone: the Digest bar is half the row, so "1 new" becomes a count on its corner instead of a pill that runs out of the bar (the user, 13 Nov). */
+@media (max-width: 767px) {
+  .home-bars > .digest-teaser { padding: 0.3rem; }
+  .home-bars > .digest-teaser .digest-teaser-line, .home-bars > .digest-teaser .digest-teaser-go { display: none; }
+  .home-bars > .digest-teaser .digest-teaser-tag { white-space: nowrap; min-width: 0; flex: 1; justify-content: center; }
+  .home-bars > .digest-teaser .digest-teaser-new { position: absolute; top: -0.55rem; right: -0.35rem; min-width: 1.35rem; padding: 0.1rem 0.4rem;
+    font-size: 0; text-align: center; box-shadow: 0 0 0 2px var(--white); }
+  .home-bars > .digest-teaser .digest-teaser-new::before { content: attr(data-n); font-size: 0.72rem; }
+}
