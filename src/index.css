@@ -433,6 +433,9 @@ body {
 /* CYRA (12 Oct) takes red, its own mark's colour, between the pink and the amber. */
 .tile[data-module='cyra'] .tile-icon { background: #dc2626; --glow: rgba(220, 38, 38, 0.7); }  /* red */
 .tile[data-module='digest'] .tile-icon { background: #7c3aed; --glow: rgba(124, 58, 237, 0.7); }  /* violet */
+/* Workplace and Ops were the black default, and hovered violet (the user, 13 Nov: chose C, brown and slate). */
+.tile[data-module='workplace'] .tile-icon { background: #a16207; --glow: rgba(161, 98, 7, 0.7); }  /* brown */
+.tile[data-module='ops'] .tile-icon { background: #475569; --glow: rgba(71, 85, 105, 0.7); }  /* slate */
 
 /*
  * Roughly a third of the wheel apart, deliberately.
@@ -964,7 +967,8 @@ body {
 @keyframes splash-out { 0%, 90% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 
 /* Hover in each tile's own icon colour, like a Digest card (the user, 16 Oct). */
-.tile { --tint: 124 58 237; transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1), border-color 180ms ease, box-shadow 220ms ease; }
+/* A tile with no colour of its own (Workplace, Ops: black icons) hovers in a neutral grey, not violet (the user, 13 Nov). */
+.tile { --tint: 113 113 122; transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1), border-color 180ms ease, box-shadow 220ms ease; }
 .tile[data-module='kpi'] { --tint: 217 119 6; }
 .tile[data-module='spare'] { --tint: 147 51 234; }
 .tile[data-module='bemmp'] { --tint: 13 148 136; }
@@ -972,6 +976,9 @@ body {
 .tile[data-module='travel'] { --tint: 219 39 119; }
 .tile[data-module='tasks'] { --tint: 101 163 13; }
 .tile[data-module='cyra'] { --tint: 220 38 38; }
+.tile[data-module='digest'] { --tint: 124 58 237; }
+.tile[data-module='workplace'] { --tint: 161 98 7; }
+.tile[data-module='ops'] { --tint: 71 85 105; }
 .tile:hover { border-color: rgb(var(--tint)); box-shadow: 0 0 0 1px rgb(var(--tint) / 0.35), 0 18px 40px -16px rgb(var(--tint) / 0.6); }
 .tile:hover .tile-go { color: rgb(var(--tint)); }
 
