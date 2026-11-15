@@ -92,6 +92,14 @@
       "destination": "https://cyrix-workplace.vercel.app/workplace/:path*"
     },
     {
+      "source": "/projects/",
+      "destination": "https://cyrix-projects.vercel.app/projects/"
+    },
+    {
+      "source": "/projects/:path*",
+      "destination": "https://cyrix-projects.vercel.app/projects/:path*"
+    },
+    {
       "source": "/cyra/",
       "destination": "https://cyrix-cyra.vercel.app/cyra/"
     },
