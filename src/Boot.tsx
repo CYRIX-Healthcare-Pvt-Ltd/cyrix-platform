@@ -14,7 +14,7 @@ export class Boot extends Component<{ children: ReactNode }, { error: Error | nu
 
   static getDerivedStateFromError(error: Error) { return { error } }
 
-  componentDidCatch(error: Error) { console.error('portal failed to start', error); reportError(error, 'Crash') }
+  componentDidCatch(error: Error) { window.cyraSplash?.done(); console.error('portal failed to start', error); reportError(error, 'Crash') }
 
   render() {
     if (!this.state.error) return this.props.children
