@@ -24,7 +24,7 @@ import './digest.css'
 export interface Post {
   id: string; kind: Kind; title: string; body: string; image_url: string | null; color: Hue
   meet_at: string | null; meet_minutes: number | null; meet_link: string | null; meet_place: string | null
-  posted_as: 'hr' | 'it' | 'mkt' | 'mgmt'; author: string | null; created_at: string
+  posted_as: 'hr' | 'it' | 'mkt' | 'mgmt' | 'sw'; author: string | null; created_at: string
   likes: number; liked: boolean; comments: number
   /** A vacancy (0170): where, apply by, and how to apply. */
   vac_location: string | null; apply_by: string | null; apply_link: string | null
@@ -121,7 +121,7 @@ const when = (p: Post) => {
   const t = (d: Date) => d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase()
   return `${s.toLocaleDateString('en-GB', { weekday: 'short' })} · ${t(s)} – ${t(e)}`
 }
-const DESK_WORD: Record<string, string> = { hr: 'HR', it: 'IT', mkt: 'Marketing', mgmt: 'Management' }
+const DESK_WORD: Record<string, string> = { hr: 'HR', it: 'IT', mkt: 'Marketing', mgmt: 'Management', sw: 'Software admin' }
 const desk = (p: Post) => DESK_WORD[p.posted_as] ?? 'HR'
 /** Where the meeting is: what was typed, else read off the link (the user: "what if it is Google Meet"). */
 const where = (p: Post) => {
