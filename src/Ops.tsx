@@ -63,7 +63,9 @@ type HealthData = { at: string; checks: Check[] }
 type DeploysData = { deploys: Deploy[] }
 type ChangesData = { repos: { repo: string; commits: number; failed: string | number | null }[]; commits: Commit[] }
 type ErrorsData = { total: number; truncated: boolean; by_day: { day: string; errors: number }[]; groups: ErrGroup[] }
-type AiData = { cost: number; calls: number; unmetered: string[]; by_day: Spend[]; by_model: Spend[]; by_route: Spend[] }
+type SarvamUse = { calls: number; chars: number; inr: number }
+type AiData = { cost: number; calls: number; unmetered: string[]; by_day: Spend[]; by_model: Spend[]; by_route: Spend[]
+                sarvam?: { tts: SarvamUse; stt: SarvamUse } }
 
 /** Pulse's own view of itself (Pulse 1.12.0, GET /pulse/api/ops/summary): what only cyrix-svc01 can see. */
 interface PulseData {
@@ -97,7 +99,7 @@ type Part<T> = { state: 'loading' } | { state: 'off' } | { state: 'failed'; erro
 
 const MODULE_NAMES: Record<string, string> = {
   portal: 'Portal', cyra: 'Cyra Assist', pulse: 'Pulse', kpi: 'KPI', spare: 'Spare Mapping', bemmp: 'BEMMP', revive: 'Revive Lab', travel: 'Travel Expense', tasks: 'My Task',
-  workplace: 'Workplace',
+  workplace: 'Workplace', projects: 'Projects',
 }
 
 /** Where things run and what the database says about itself (/api/ops?part=infra, KPI 0241 ops_db). */
@@ -128,6 +130,7 @@ const APPS: { key: string; name: string; ids: string[]; project?: string; repo?:
   { key: 'travel', name: 'Travel Expense', ids: ['travel'], project: 'cyrix-travel', repo: 'cyrix-travel' },
   { key: 'tasks', name: 'My Task', ids: ['tasks'], project: 'cyrix-task', repo: 'cyrix-task' },
   { key: 'workplace', name: 'Workplace', ids: ['workplace', 'inventory'], project: 'cyrix-workplace' },
+  { key: 'projects', name: 'Projects', ids: ['projects'], project: 'cyrix-projects' },
   { key: 'cyra', name: 'Cyra Assist', ids: ['cyra', 'cyra-engine', 'db-cyra'], project: 'cyrix-cyra', repo: 'Cyrix-Cyra' },
   { key: 'pulse', name: 'Pulse', ids: ['pulse'], repo: 'Cyrix-Pulse' },
 ]
@@ -1010,7 +1013,7 @@ function AiPanel({ ai, aiApps, days }: { ai: Part<AiData>; aiApps: Part<AiApps>;
   ].sort((x, y) => y.cost - x.cost)
 
   return (
-    <Panel id="ai" title="AI cost" note="Estimated from each app's own meter and the price tables. Speech is not metered.">
+    <Panel id="ai" title="AI cost" note="Estimated from each app's own meter and the price tables. Sarvam speech is priced from sarvam.ai's list.">
       {problems.map(p => <p key={p} className="ops-off">{p}</p>)}
       {(cyra || apps) && (
         <>
@@ -1019,6 +1022,22 @@ function AiPanel({ ai, aiApps, days }: { ai: Part<AiData>; aiApps: Part<AiApps>;
                          { label: 'Per day, average', value: fmtUsd(cost / days) }]} />
           {apps && apps.unpriced.length > 0 && (
             <p className="ops-note">No price set for {apps.unpriced.join(', ')}: counted, not costed. Add a row to ops_ai_price.</p>
+          )}
+          {cyra?.sarvam && (cyra.sarvam.tts.calls > 0 || cyra.sarvam.stt.calls > 0) && (
+            <div className="ops-table-wrap">
+              <table className="ops-table">
+                <caption>Sarvam AI (Cyra voice)</caption>
+                <thead><tr><th>Use</th><th>Calls</th><th>Characters</th><th>Cost</th></tr></thead>
+                <tbody>
+                  <tr><td>Text to speech (bulbul)</td><td>{fmtInt(cyra.sarvam.tts.calls)}</td><td>{fmtInt(cyra.sarvam.tts.chars)}</td>
+                      <td>₹{fmtInt(Math.round(cyra.sarvam.tts.inr))}</td></tr>
+                  <tr><td>Speech to text (saaras)</td><td>{fmtInt(cyra.sarvam.stt.calls)}</td><td>{fmtInt(cyra.sarvam.stt.chars)}</td>
+                      <td>≈ ₹{fmtInt(Math.round(cyra.sarvam.stt.inr))}</td></tr>
+                </tbody>
+              </table>
+              <p className="ops-note">Text to speech at ₹3 per 1,000 characters. Speech to text at ₹0.49 a minute, with minutes
+                estimated from the transcript length (the engine does not record the audio length). GST extra.</p>
+            </div>
           )}
           <Bars label={`Cost per day (USD, ₹${usdInr} per $)`} data={fillDays(days, perDay)} fmt={fmtUsd} />
           <SpendTable caption="By app" rows={byApp} />

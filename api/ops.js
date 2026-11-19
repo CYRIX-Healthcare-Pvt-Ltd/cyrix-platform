@@ -36,7 +36,7 @@ const SUPABASE_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || ''
 const SHARED_REF = (SHARED_URL.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/) ?? [])[1] ?? ''
 // Vercel project per app, for Web Analytics. Workplace was cyrix-inventory until it was renamed.
 const VERCEL_PROJECTS = { portal: 'cyrix-platform', kpi: 'cyrix-kpi', spare: 'cyrix-spare-mapping', bemmp: 'cyrix-bemmp-dashboard',
-  revive: 'cyrix-revive-lab', travel: 'cyrix-travel', tasks: 'cyrix-task', workplace: 'cyrix-workplace', cyra: 'cyrix-cyra' }
+  revive: 'cyrix-revive-lab', travel: 'cyrix-travel', tasks: 'cyrix-task', workplace: 'cyrix-workplace', projects: 'cyrix-projects', cyra: 'cyrix-cyra' }
 const ORG = 'CYRIX-Healthcare-Pvt-Ltd'
 const REPOS = (process.env.OPS_REPOS ||
   'cyrix-platform,Cyrix-KPI,Cyrix-Spare-Mapping,Cyrix-Bemmp-Dashboard,Cyrix-Revive-Lab,cyrix-travel,cyrix-task,Cyrix-Cyra,Cyrix-Pulse')
@@ -56,6 +56,7 @@ const TARGETS = [
   { id: 'travel', name: 'Travel Expense', group: 'Vercel', url: 'https://cyrix-travel.vercel.app/travel/' },
   { id: 'tasks', name: 'My Task', group: 'Vercel', url: 'https://cyrix-task.vercel.app/tasks/' },
   { id: 'workplace', name: 'Workplace', group: 'Vercel', url: 'https://cyrix-workplace.vercel.app/workplace/' },
+  { id: 'projects', name: 'Projects', group: 'Vercel', url: 'https://cyrix-projects.vercel.app/projects/' },
   { id: 'cyra', name: 'Cyra Assist', group: 'Vercel', url: 'https://cyrix-cyra.vercel.app/cyra/' },
   { id: 'cyra-engine', name: 'Cyra engine', group: 'Render', url: 'https://cyra-diagnostic-chat-1.onrender.com/api/health', timeout: 25_000 },
   { id: 'pulse', name: 'Pulse API', group: 'cyrix-svc01', url: 'https://pulse.cyrix.in/pulse/api/health' },
@@ -213,6 +214,22 @@ async function errors(days) {
   }
 }
 
+/**
+ * Sarvam AI (Cyra's voice: bulbul TTS, saaras/saarika STT) is metered in cyra_v2.llm_usage by characters, and
+ * CYRA's price table prices tokens only, so those rows arrive with est_cost null. They are priced here instead,
+ * from sarvam.ai's pay-as-you-go list (docs.sarvam.ai/api/getting-started/pricing, read 19 Nov 2026, GST extra):
+ *   text to speech  ₹3.00 per 1,000 characters (exact: the engine counts the characters it sends)
+ *   speech to text  ₹0.49 per minute of audio. The engine does not know the clip's length, only the transcript's
+ *                   characters, so minutes are estimated at ~840 transcript characters per minute of speech.
+ *                   That is an estimate, and the page says so.
+ */
+const USD_INR = Number(process.env.OPS_USD_INR) || 94.5
+const SARVAM = [
+  { re: /^bulbul/i, kind: 'tts', inrPerChar: 3.0 / 1000 },
+  { re: /^(saaras|saarika)/i, kind: 'stt', inrPerChar: 0.49 / 840 },
+]
+const sarvamOf = model => SARVAM.find(p => p.re.test(model ?? ''))
+
 async function ai(days) {
   if (!CYRA_URL || !CYRA_KEY) return { configured: false }
   const since = sinceDays(days).toISOString().slice(0, 10)
@@ -224,6 +241,16 @@ async function ai(days) {
     a.cost += Number(r.est_cost ?? 0)
     a.tokens += Number(r.prompt_tokens ?? 0) + Number(r.completion_tokens ?? 0)
     map.set(key, a)
+  }
+  const sarvam = { tts: { calls: 0, chars: 0, inr: 0 }, stt: { calls: 0, chars: 0, inr: 0 } }
+  for (const r of rows) {
+    const p = r.est_cost == null && r.unit_kind === 'chars' ? sarvamOf(r.model) : null
+    if (!p) continue
+    const inr = Number(r.units ?? 0) * p.inrPerChar
+    sarvam[p.kind].calls += r.calls ?? 0
+    sarvam[p.kind].chars += Number(r.units ?? 0)
+    sarvam[p.kind].inr += inr
+    r.est_cost = inr / USD_INR
   }
   const byDay = new Map(), byModel = new Map(), byRoute = new Map()
   for (const r of rows) {
@@ -242,6 +269,7 @@ async function ai(days) {
     by_day: [...byDay.values()].sort((a, b) => a.key.localeCompare(b.key)),
     by_model: sorted(byModel),
     by_route: sorted(byRoute).slice(0, 15),
+    sarvam,
   }
 }
 
