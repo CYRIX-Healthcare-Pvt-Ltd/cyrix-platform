@@ -54,6 +54,19 @@ interface Overview {
   top_actions: { module: string; action: string; events: number }[]
 }
 interface Check { id: string; name: string; group: string; ok: boolean; status: number | null; ms: number; problem?: string }
+/** One row of ops_latest() (KPI 0300): the newest stored check for each target. */
+interface LatestRow { id: string; name: string; group: string; ok: boolean | null; status: number | null; ms: number | null; problem: string | null; at: string | null }
+/** pg_cron jobs in the shared database and how they ran (ops_cron(), KPI 0300). */
+interface CronJob { name: string; schedule: string; active: boolean; last_at: string | null; last_status: string | null
+                    runs_24h: number; failed_24h: number; avg_s: number | null; last_error: string | null; last_error_at: string | null }
+function toHealth(rows: LatestRow[]): HealthData {
+  const at = rows.reduce((m, r) => (r.at && r.at > m ? r.at : m), '')
+  return {
+    at: at || new Date().toISOString(),
+    checks: rows.map(r => ({ id: r.id, name: r.name, group: r.group, ok: r.ok === true, status: r.status, ms: r.ms ?? 0,
+                             problem: r.at ? (r.problem ?? undefined) : 'Not checked yet' })),
+  }
+}
 interface Deploy { project: string; state: string; at: string; message: string; sha: string; author: string | null }
 interface Commit { repo: string; sha: string; at: string; message: string; author: string | null; url: string }
 interface ErrGroup { source: string; kind: string; message: string; routes: string[]; count: number; last: string; statuses: number[] }
@@ -138,6 +151,7 @@ const appOf = (key: string) => APPS.find(a => a.key === key)
 const mapOk = <T,>(p: Part<T>, f: (d: T) => T): Part<T> => p.state === 'ok' ? { state: 'ok', data: f(p.data) } : p
 const NO_ERRORS: ErrorsData = { total: 0, truncated: false, by_day: [], groups: [] }
 const NO_AI: AiData = { cost: 0, calls: 0, unmetered: [], by_day: [], by_model: [], by_route: [] }
+const NO_CRON: Part<CronJob[]> = { state: 'ok', data: [] }
 
 async function api<T>(part: string, days: number): Promise<Part<T>> {
   try {
@@ -182,8 +196,11 @@ const REGIONS: Record<string, string> = {
 }
 const regionName = (code: string | null | undefined) => code ? (REGIONS[code] ?? code) : '—'
 
-const QUICK_MS = 60_000
-const SLOW_MS = 5 * 60_000
+// What the page costs to keep open (the user, 19 Nov: Vercel and Supabase both have monthly limits). The quick tier is
+// Supabase RPCs only and never calls a Vercel function; the uptime round itself only runs every 5 minutes, so asking
+// more often than every 2 minutes shows nothing new. The slow tier (deploys, commits, Cyra, Pulse, infra) is every 10.
+const QUICK_MS = 2 * 60_000
+const SLOW_MS = 10 * 60_000
 
 /** Same origin: app.cyrix.in/pulse/ is a rewrite to cyrix-svc01, so the portal's own session goes straight through. */
 async function pulseSummary(): Promise<Part<PulseData>> {
@@ -219,7 +236,7 @@ const ago = (iso: string) => {
   return `${Math.round(s / 86400)} d ago`
 }
 const clock = (ms: number) => new Date(ms).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
-const SECTIONS = [['status', 'Status'], ['uptime', 'Uptime'], ['errors', 'Errors'], ['usage', 'Usage'], ['ai', 'AI cost'], ['pulse', 'Pulse'], ['security', 'Security'], ['infra', 'Infrastructure'], ['changes', 'Changes']] as const
+const SECTIONS = [['status', 'Status'], ['uptime', 'Uptime'], ['errors', 'Errors'], ['usage', 'Usage'], ['ai', 'AI cost'], ['pulse', 'Pulse'], ['security', 'Security'], ['cron', 'Scheduled jobs'], ['infra', 'Infrastructure'], ['changes', 'Changes']] as const
 const shortDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 
 /**
@@ -256,6 +273,7 @@ export default function Ops() {
   const [security, setSecurity] = useState<Part<SecurityData>>({ state: 'loading' })
   const [infra, setInfra] = useState<Part<InfraData>>({ state: 'loading' })
   const [db, setDb] = useState<Part<DbData>>({ state: 'loading' })
+  const [cron, setCron] = useState<Part<CronJob[]>>({ state: 'loading' })
   const [browserMs, setBrowserMs] = useState<number | null>(null)
   const [app, setApp] = useState('all')
   const [exporting, setExporting] = useState(false)
@@ -286,17 +304,22 @@ export default function Ops() {
         () => keep(fn)({ state: 'failed', error: 'Could not reach the database' }))
 
     if (reset) {
-      for (const fn of [setOverview, setUptime, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi, setPulse, setAiApps, setSecurity, setInfra, setDb] as
+      for (const fn of [setOverview, setUptime, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi, setPulse, setAiApps, setSecurity, setInfra, setDb, setCron] as
                        React.Dispatch<React.SetStateAction<Part<unknown>>>[]) fn({ state: 'loading' })
     }
     const jobs: PromiseLike<unknown>[] = [
       rpc(setAppErrors, 'ops_errors', { p_days: Math.min(d, 90) }),
       rpc(setUptime, 'ops_uptime', { p_days: Math.min(d, 90) }),
-      api<HealthData>('health', 1).then(keep(setHealth)),
-      api<ErrorsData>('errors', d).then(keep(setErrors)),
+      // The 5-minute round's own results, not a live ping of every app from a Vercel function (KPI 0300).
+      supabase.rpc('ops_latest').then(
+        r => keep(setHealth)(r.error ? { state: r.error.code === 'PGRST202' ? 'off' : 'failed', error: r.error.message } as Part<HealthData>
+                                     : { state: 'ok', data: toHealth((r.data ?? []) as LatestRow[]) }),
+        () => keep(setHealth)({ state: 'failed', error: 'Could not reach the database' })),
     ]
     if (slow) {
       jobs.push(
+        api<ErrorsData>('errors', d).then(keep(setErrors)),
+        rpc(setCron, 'ops_cron', {}),
         rpc(setOverview, 'ops_overview', { p_days: d }, false),
         api<DeploysData>('deploys', d).then(keep(setDeploys)),
         api<ChangesData>('changes', d).then(keep(setChanges)),
@@ -423,7 +446,7 @@ export default function Ops() {
             </div>
             <p className="ops-live" aria-live="polite">
               <span className="ops-live-dot" aria-hidden="true" />
-              {updated ? `Updated ${clock(updated)}` : 'Loading'} · refreshes every minute while open
+              {updated ? `Updated ${clock(updated)}` : 'Loading'} · refreshes every 2 minutes while open
             </p>
 
             <nav className="ops-jump" aria-label="Sections">
@@ -433,12 +456,12 @@ export default function Ops() {
             {scoped && (
               <p className="ops-note">Showing {appOf(app)?.name} only. Charts that the sources cannot split by app are hidden; Security and Infrastructure stay company-wide.</p>
             )}
-            <Attention health={sc.health} uptime={sc.uptime} errors={sc.errors} appErrors={sc.appErrors} deploys={sc.deploys} ai={sc.ai} pulse={sc.pulse} security={sc.security} />
+            <Attention health={sc.health} uptime={sc.uptime} errors={sc.errors} appErrors={sc.appErrors} deploys={sc.deploys} ai={sc.ai} pulse={sc.pulse} security={sc.security} cron={scoped ? NO_CRON : cron} />
             <StatusPanel health={sc.health} deploys={sc.deploys} />
             {/* Side by side on a wide screen, one column below that. */}
             <div className="ops-pair">
               <UptimePanel uptime={sc.uptime} days={days} />
-              <ErrorsPanel errors={sc.errors} appErrors={sc.appErrors} days={days} scoped={scoped} />
+              <ErrorsPanel errors={sc.errors} appErrors={sc.appErrors} deploys={sc.deploys} days={days} scoped={scoped} />
             </div>
             <div className="ops-pair">
               <UsagePanel overview={sc.overview} days={days} scoped={scoped} />
@@ -450,6 +473,7 @@ export default function Ops() {
                 <SecurityPanel security={sc.security} />
               </div>
             ) : <SecurityPanel security={sc.security} />}
+            <CronPanel cron={cron} />
             <InfraPanel infra={infra} db={db} browserMs={browserMs} />
             <ChangesPanel changes={sc.changes} deploys={sc.deploys} />
           </>
@@ -484,12 +508,13 @@ function Waiting<T>({ part, off, children }: { part: Part<T>; off: string; child
  */
 interface Flag { level: 'bad' | 'warn'; text: string; detail?: string; href: string }
 
-function Attention({ health, uptime, errors, appErrors, deploys, ai, pulse, security }: {
+function Attention({ health, uptime, errors, appErrors, deploys, ai, pulse, security, cron }: {
+  cron: Part<CronJob[]>
   health: Part<HealthData>; uptime: Part<Uptime>; errors: Part<ErrorsData>; appErrors: Part<AppErrors>
   deploys: Part<DeploysData>; ai: Part<AiData>; pulse: Part<PulseData>; security: Part<SecurityData>
 }) {
-  const flags = useMemo(() => attentionFlags(health, uptime, errors, appErrors, deploys, ai, pulse, security),
-                        [health, uptime, errors, appErrors, deploys, ai, pulse, security])
+  const flags = useMemo(() => attentionFlags(health, uptime, errors, appErrors, deploys, ai, pulse, security, cron),
+                        [health, uptime, errors, appErrors, deploys, ai, pulse, security, cron])
   const settled = [health, uptime, errors, appErrors].every(p => p.state !== 'loading')
   if (!settled && flags.length === 0) return <div className="ops-attn"><div className="ops-skeleton ops-skeleton-thin" /></div>
   if (flags.length === 0) {
@@ -517,8 +542,15 @@ const HOUR = 3_600_000
 
 function attentionFlags(health: Part<HealthData>, uptime: Part<Uptime>, errors: Part<ErrorsData>, appErrors: Part<AppErrors>,
                                deploys: Part<DeploysData>, ai: Part<AiData>, pulse: Part<PulseData>, security: Part<SecurityData>,
-                               now = Date.now()): Flag[] {
+                               cron: Part<CronJob[]> = { state: 'loading' }, now = Date.now()): Flag[] {
   const out: Flag[] = []
+  // A scheduled job that keeps failing (KPI 0300). Three in a day, or its latest run failed.
+  if (cron.state === 'ok') {
+    for (const j of cron.data.filter(j => j.active && (j.failed_24h >= 3 || j.last_status === 'failed'))) {
+      out.push({ level: 'warn', text: `Scheduled job ${j.name} is failing`,
+                 detail: `${j.failed_24h} of ${j.runs_24h} runs failed in 24 h${j.last_error ? ` · ${j.last_error}` : ''}`, href: '#cron' })
+    }
+  }
   const fmtWhen = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
 
   // Down now: the live check first, the 5-minute history if the live one is not in yet.
@@ -631,6 +663,7 @@ function StatusPanel({ health, deploys }: { health: Part<HealthData>; deploys: P
   const project: Record<string, string> = {
     portal: 'cyrix-platform', kpi: 'cyrix-kpi', spare: 'cyrix-spare-mapping', bemmp: 'cyrix-bemmp-dashboard',
     revive: 'cyrix-revive-lab', travel: 'cyrix-travel', tasks: 'cyrix-task', cyra: 'cyrix-cyra',
+    inventory: 'cyrix-workplace', workplace: 'cyrix-workplace', projects: 'cyrix-projects',
   }
   return (
     <Panel id="status" title="Status" note={health.state === 'ok' ? `Checked ${ago(health.data.at)}` : undefined}>
@@ -654,7 +687,7 @@ function StatusPanel({ health, deploys }: { health: Part<HealthData>; deploys: P
                     <span className="ops-check-body">
                       <span className="ops-check-name">{c.name}</span>
                       <span className="ops-check-meta">
-                        {c.ok ? `${c.status} · ${fmtInt(c.ms)} ms` : (c.problem ?? `Answered ${c.status}`)} · {c.group}
+                        {c.ok ? `Answered ${c.status}` : (c.problem ?? `Answered ${c.status}`)} · {c.group}
                       </span>
                       {d && <span className="ops-check-meta">Deployed {ago(d.at)}</span>}
                     </span>
@@ -726,7 +759,15 @@ function UptimePanel({ uptime, days }: { uptime: Part<Uptime>; days: number }) {
  * Two sources, one panel: every app's browser errors from the shared database (KPI 0230), and Cyra Assist's own
  * app_error, which lives in Cyra's database and comes through /api/ops. Either can be missing without hiding the other.
  */
-function ErrorsPanel({ errors, appErrors, days, scoped = false }: { errors: Part<ErrorsData>; appErrors: Part<AppErrors>; days: number; scoped?: boolean }) {
+function ErrorsPanel({ errors, appErrors, deploys, days, scoped = false }: { errors: Part<ErrorsData>; appErrors: Part<AppErrors>; deploys: Part<DeploysData>; days: number; scoped?: boolean }) {
+  // Days with a production deploy, marked on the chart so a spike that starts right after one is plain to see.
+  const deployDays = useMemo(() => {
+    const m = new Map<string, number>()
+    if (deploys.state === 'ok') for (const d of deploys.data.deploys) if (d.state === 'READY') {
+      const k = istDay(Date.parse(d.at)); m.set(k, (m.get(k) ?? 0) + 1)
+    }
+    return m
+  }, [deploys])
   if (errors.state === 'loading' || appErrors.state === 'loading') {
     return <Panel id="errors" title="Errors"><div className="ops-skeleton" /></Panel>
   }
@@ -765,7 +806,7 @@ function ErrorsPanel({ errors, appErrors, days, scoped = false }: { errors: Part
           <Stats items={[{ label: `Errors, last ${days} days`, value: fmtInt(total) + (cyra?.truncated ? '+' : '') },
                          { label: 'Distinct messages', value: fmtInt(groups.length) },
                          { label: 'Apps with errors', value: fmtInt(byApp.length) }]} />
-          {showDays && <Bars label="Errors per day" data={fillDays(days, byDay)} fmt={fmtInt} />}
+          {showDays && <Bars label="Errors per day" data={fillDays(days, byDay)} fmt={fmtInt} marks={deployDays} markLabel="deploy" />}
           {byApp.length > 0 && (
             <div className="ops-table-wrap">
               <table className="ops-table">
@@ -916,6 +957,45 @@ function PulsePanel({ pulse }: { pulse: Part<PulseData> }) {
                   </table>
                   <p className="ops-note">Backups sit on the same server as the database, so a lost disk loses both.</p>
                 </div>
+              </div>
+            </>
+          )
+        }}
+      </Waiting>
+    </Panel>
+  )
+}
+
+/** Every pg_cron job in the shared database: mail, bells, KPI settling, housekeeping (ops_cron(), KPI 0300). */
+function CronPanel({ cron }: { cron: Part<CronJob[]> }) {
+  return (
+    <Panel id="cron" title="Scheduled jobs" note="Jobs the shared database runs by itself, last 24 hours.">
+      <Waiting part={cron} off="Not set up yet: KPI migration 0300 has not been applied.">
+        {jobs => {
+          const failing = jobs.filter(j => j.failed_24h > 0)
+          return (
+            <>
+              <Stats items={[{ label: 'Jobs', value: fmtInt(jobs.length) },
+                             { label: 'Runs, 24 h', value: fmtInt(jobs.reduce((n, j) => n + j.runs_24h, 0)) },
+                             { label: 'Failed runs, 24 h', value: fmtInt(failing.reduce((n, j) => n + j.failed_24h, 0)) }]} />
+              <div className="ops-table-wrap">
+                <table className="ops-table">
+                  <caption>By job, failing first</caption>
+                  <thead><tr><th>Job</th><th>Schedule</th><th>Last run</th><th className="num">Runs</th><th className="num">Failed</th><th className="num">Avg s</th><th>Last failure</th></tr></thead>
+                  <tbody>
+                    {jobs.map(j => (
+                      <tr key={j.name}>
+                        <td className="ops-mono">{j.name}{!j.active && ' (paused)'}</td>
+                        <td className="ops-mono">{j.schedule}</td>
+                        <td className={j.last_status === 'failed' ? 'down' : undefined}>{j.last_at ? ago(j.last_at) : '—'}</td>
+                        <td className="num">{fmtInt(j.runs_24h)}</td>
+                        <td className={j.failed_24h > 0 ? 'num down' : 'num'}>{fmtInt(j.failed_24h)}</td>
+                        <td className="num">{j.avg_s ?? '—'}</td>
+                        <td>{j.last_error ? `${ago(j.last_error_at!)}: ${j.last_error}` : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </>
           )
@@ -1259,7 +1339,8 @@ function Stats({ items }: { items: { label: string; value: string }[] }) {
  * One measure over days: thin bars from a zero baseline, one hue, no legend (the label names it). Hovering a
  * day — or focusing it from the keyboard — shows its value above the plot; the hit area is the full column.
  */
-function Bars({ label, data, fmt }: { label: string; data: { day: string; value: number }[]; fmt: (n: number) => string }) {
+function Bars({ label, data, fmt, marks, markLabel = 'mark' }: { label: string; data: { day: string; value: number }[]; fmt: (n: number) => string
+                                                         marks?: Map<string, number>; markLabel?: string }) {
   const [hover, setHover] = useState<number | null>(null)
   const max = Math.max(1, ...data.map(d => d.value))
   const W = 100 / data.length
@@ -1268,7 +1349,8 @@ function Bars({ label, data, fmt }: { label: string; data: { day: string; value:
     <figure className="ops-bars">
       <figcaption>
         <span>{label}</span>
-        <span className="ops-bars-read">{shortDay(data[shown].day)}: <strong>{fmt(data[shown].value)}</strong></span>
+        <span className="ops-bars-read">{shortDay(data[shown].day)}: <strong>{fmt(data[shown].value)}</strong>
+          {marks?.get(data[shown].day) ? ` · ${marks.get(data[shown].day)} ${markLabel}${marks.get(data[shown].day) === 1 ? '' : 's'}` : ''}</span>
       </figcaption>
       <svg viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label={`${label}, peak ${fmt(max)}`}
            onMouseLeave={() => setHover(null)}>
@@ -1280,11 +1362,14 @@ function Bars({ label, data, fmt }: { label: string; data: { day: string; value:
               <rect x={i * W} y="0" width={W} height="40" fill="transparent" />
               <rect x={i * W + W * 0.18} y={40 - h} width={W * 0.64} height={h}
                     className={hover === i ? 'ops-bar is-hover' : 'ops-bar'} rx="0.6" />
+              {marks?.get(d.day) ? <rect x={i * W + W * 0.3} y="0" width={W * 0.4} height="2" className="ops-bar-mark" /> : null}
             </g>
           )
         })}
       </svg>
-      <div className="ops-bars-x"><span>{shortDay(data[0].day)}</span><span>{shortDay(data[data.length - 1].day)}</span></div>
+      <div className="ops-bars-x"><span>{shortDay(data[0].day)}</span>
+        {marks && marks.size > 0 && <span className="ops-bars-key"><i className="ops-bar-mark-key" /> day with a {markLabel}</span>}
+        <span>{shortDay(data[data.length - 1].day)}</span></div>
     </figure>
   )
 }

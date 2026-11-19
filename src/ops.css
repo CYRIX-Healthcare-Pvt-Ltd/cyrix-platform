@@ -80,6 +80,9 @@
 .ops-bar.is-hover { fill: var(--ink-950); }
 .ops-axis { stroke: var(--ink-300); stroke-width: 0.3; vector-effect: non-scaling-stroke; }
 .ops-bars-x { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--ink-500); margin-top: 0.25rem; }
+.ops-bar-mark { fill: var(--ops-warn); }
+.ops-bars-key { display: inline-flex; align-items: center; gap: 0.3rem; }
+.ops-bar-mark-key { display: inline-block; width: 0.6rem; height: 0.2rem; background: var(--ops-warn); border-radius: 1px; }
 
 .ops-two { display: grid; gap: 1rem; grid-template-columns: 1fr; margin-bottom: 0.5rem; }
 @media (min-width: 820px) { .ops-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
