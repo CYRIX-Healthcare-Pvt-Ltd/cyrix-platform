@@ -12,6 +12,10 @@
   :root:not([data-theme='light']) .ops { --ops-series: #3987e5; --ops-good: #4ade80; --ops-bad: #ff6b6b; --ops-warn: #fbbf24; }
 }
 
+.ops { --ops-bar-h: 3.8rem; }
+/* The bar with the way back stays on screen while the page scrolls (the user, 19 Nov: "top bar to go back is not
+   available once we scroll down"). The section links stick just under it. */
+.ops > .bar { position: sticky; top: 0; z-index: 20; height: var(--ops-bar-h); box-sizing: border-box; }
 .ops-back { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--ink-700); text-decoration: none; }
 .ops-main { max-width: 104rem; margin: 0 auto; padding: 2rem 1rem 5rem; }
 @media (min-width: 640px) { .ops-main { padding: 2rem 2rem 6rem; } }
@@ -103,12 +107,12 @@
 .ops-live-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--ops-good); animation: ops-pulse 2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .ops-live-dot { animation: none; } }
 .ops-jump {
-  position: sticky; top: 0; z-index: 5; display: flex; gap: 0.25rem; overflow-x: auto; margin: 0 -1rem 1rem; padding: 0.5rem 1rem;
+  position: sticky; top: var(--ops-bar-h); z-index: 5; display: flex; gap: 0.25rem; overflow-x: auto; margin: 0 -1rem 1rem; padding: 0.5rem 1rem;
   background: var(--page, var(--white)); scrollbar-width: none;
 }
 .ops-jump a { flex: none; padding: 0.3rem 0.75rem; border-radius: 999px; background: var(--ink-100); color: var(--ink-700); font-size: 0.8125rem; text-decoration: none; }
 .ops-jump a:hover { color: var(--ink-950); }
-.ops-panel { scroll-margin-top: 3.5rem; }
+.ops-panel { scroll-margin-top: calc(var(--ops-bar-h) + 3.5rem); }
 .ops-attn { margin: 0 0 1.25rem; padding: 0.9rem 1rem; border: 1px solid var(--ops-bad); border-radius: 14px; }
 .ops-attn.is-clear { display: flex; align-items: center; gap: 0.5rem; border-color: var(--ink-200); font-weight: 600; }
 .ops-attn h2 { display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.5rem; font-size: 1rem; font-weight: 700; }
