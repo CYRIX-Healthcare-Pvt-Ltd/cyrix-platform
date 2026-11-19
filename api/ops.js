@@ -39,7 +39,7 @@ const VERCEL_PROJECTS = { portal: 'cyrix-platform', kpi: 'cyrix-kpi', spare: 'cy
   revive: 'cyrix-revive-lab', travel: 'cyrix-travel', tasks: 'cyrix-task', workplace: 'cyrix-workplace', projects: 'cyrix-projects', cyra: 'cyrix-cyra' }
 const ORG = 'CYRIX-Healthcare-Pvt-Ltd'
 const REPOS = (process.env.OPS_REPOS ||
-  'cyrix-platform,Cyrix-KPI,Cyrix-Spare-Mapping,Cyrix-Bemmp-Dashboard,Cyrix-Revive-Lab,cyrix-travel,cyrix-task,Cyrix-Cyra,Cyrix-Pulse')
+  'cyrix-platform,Cyrix-KPI,Cyrix-Spare-Mapping,Cyrix-Bemmp-Dashboard,Cyrix-Revive-Lab,cyrix-travel,cyrix-task,Cyrix-Workplace,Cyrix-Projects,Cyrix-Cyra,Cyrix-Pulse')
   .split(',').map(s => s.trim()).filter(Boolean)
 
 /**
