@@ -129,8 +129,8 @@ const APPS: { key: string; name: string; ids: string[]; project?: string; repo?:
   { key: 'revive', name: 'Revive Lab', ids: ['revive'], project: 'cyrix-revive-lab', repo: 'Cyrix-Revive-Lab' },
   { key: 'travel', name: 'Travel Expense', ids: ['travel'], project: 'cyrix-travel', repo: 'cyrix-travel' },
   { key: 'tasks', name: 'My Task', ids: ['tasks'], project: 'cyrix-task', repo: 'cyrix-task' },
-  { key: 'workplace', name: 'Workplace', ids: ['workplace', 'inventory'], project: 'cyrix-workplace' },
-  { key: 'projects', name: 'Projects', ids: ['projects'], project: 'cyrix-projects' },
+  { key: 'workplace', name: 'Workplace', ids: ['workplace', 'inventory'], project: 'cyrix-workplace', repo: 'Cyrix-Workplace' },
+  { key: 'projects', name: 'Projects', ids: ['projects'], project: 'cyrix-projects', repo: 'Cyrix-Projects' },
   { key: 'cyra', name: 'Cyra Assist', ids: ['cyra', 'cyra-engine', 'db-cyra'], project: 'cyrix-cyra', repo: 'Cyrix-Cyra' },
   { key: 'pulse', name: 'Pulse', ids: ['pulse'], repo: 'Cyrix-Pulse' },
 ]
