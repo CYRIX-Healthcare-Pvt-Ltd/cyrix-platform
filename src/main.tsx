@@ -12,7 +12,6 @@ import { Boot } from './Boot'
 import App from './App'
 import { DigestPreview } from './Digest'
 import './index.css'
-import Splash from './Splash'
 
 /*
   A number box changes only by typing: the mouse wheel over a focused one changed its value (Travel, 22 Oct;
@@ -45,7 +44,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Boot>
       {/* KPI's Digest page frames this to show a draft as people will see it. */}
-      {digestPreview ? <DigestPreview /> : <><Splash /><App /></>}
+      {digestPreview ? <DigestPreview /> : <App />}
     </Boot>
   </React.StrictMode>,
 )

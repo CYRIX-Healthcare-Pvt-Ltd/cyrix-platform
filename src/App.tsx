@@ -130,6 +130,11 @@ export default function App() {
     if (toCyra && session && device?.state === 'ok') void openCyra()
   }, [toCyra, session, device])
 
+  // The opening splash in index.html stays up until the first real screen can draw: the
+  // sign-in page, the device code, or the portal itself (never the spinner below).
+  const booting = !ready || (!!session && !device) || (toCyra && device?.state === 'ok')
+  useEffect(() => { if (!booting) window.cyraSplash?.done() }, [booting])
+
   if (!ready) return <Splash />
   if (!session) return <SignIn />
   if (!device) return <Splash />
