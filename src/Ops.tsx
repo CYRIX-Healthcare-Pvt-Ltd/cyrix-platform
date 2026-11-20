@@ -801,7 +801,7 @@ function expectedRounds(day: string, first: boolean, rounds: number, now = Date.
 }
 
 /**
- * Uptime over time: a row per app, a cell per day, coloured by that day's uptime. Rounds the monitor could not run
+ * Uptime over time, status-page style: a slim bar per day for each app, coloured by that day's uptime. Rounds the monitor could not run
  * count as down: it runs inside the shared database, so when it cannot run, nothing that uses that database can
  * either. Below it, availability per calendar month, the figure a contract or an SLA is written against.
  */
@@ -823,15 +823,20 @@ function UptimeTimeline({ daily, days }: { daily: UptimeDaily; days: number }) {
     const exp = expectedRounds(day, day === firstDay, d.rounds)
     const missed = Math.max(0, exp - d.rounds)
     const ids = id ? [id] : daily.targets.map(t => t.id)
-    let n = 0, up = 0
-    for (const t of ids) { const v = d.apps[t]; if (v) { n += v[0]; up += v[1] } }
+    let n = 0, up = 0, per = 0
+    for (const t of ids) {
+      const v = d.apps[t]
+      if (!v) continue
+      n += v[0]; up += v[1]
+      // A target added part way through the day was not missed before it existed.
+      if (v[0] >= d.rounds - 1) per += 1
+    }
     if (n === 0) return null
-    const per = n / Math.max(1, d.rounds)            // checks per round, to price the missed rounds
     const pct = (100 * up) / (n + missed * per)
-    return { pct, down: Math.round(((n + missed * per - up) / per) * 5), missed, blind: d.blind }
+    const apps = Math.max(1, ids.filter(t => d.apps[t]).length)
+    return { pct, down: Math.round(((n + missed * per - up) / apps) * 5), missed: per > 0 ? missed : 0, blind: d.blind }
   }
-  const tone = (pct: number | undefined) => pct === undefined ? 'is-none' : pct >= 99.9 ? 'is-good' : pct >= 99 ? 'is-warn' : 'is-bad'
-  const rows = [{ id: null as string | null, name: 'All apps', group: '' }, ...daily.targets]
+  const tone = (pct: number | undefined) => pct === undefined ? 'is-none' : pct >= 99.9 ? 'is-good' : pct >= 98 ? 'is-warn' : 'is-bad'
 
   const months = useMemo(() => {
     const keys = [...new Set(daily.days.map(d => d.day.slice(0, 7)))]
@@ -843,7 +848,7 @@ function UptimeTimeline({ daily, days }: { daily: UptimeDaily; days: number }) {
         for (const t of daily.targets) {
           const v = d.apps[t.id]; if (!v) continue
           const cur = per.get(t.id) ?? [0, 0]
-          per.set(t.id, [cur[0] + v[0] + missed, cur[1] + v[1]])
+          per.set(t.id, [cur[0] + v[0] + (v[0] >= d.rounds - 1 ? missed : 0), cur[1] + v[1]])
         }
       }
       return { month: m, per }
@@ -852,47 +857,81 @@ function UptimeTimeline({ daily, days }: { daily: UptimeDaily; days: number }) {
   const monthName = (m: string) => new Date(`${m}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
   const fmtPct = (n: number) => n >= 99.995 ? '100%' : `${n.toFixed(2)}%`
 
-  const shown = hover ? { ...hover, c: cell(rows.find(r => (r.id ?? 'all') === hover.app)?.id ?? null, hover.day) } : null
+  // Each row's figure for the whole period: the same rule as a cell, summed over the days.
+  const total = (id: string | null) => {
+    let n = 0, up = 0
+    for (const d of daily.days) {
+      const exp = expectedRounds(d.day, d.day === firstDay, d.rounds)
+      const missed = Math.max(0, exp - d.rounds)
+      const ids = id ? [id] : daily.targets.map(t => t.id)
+      for (const t of ids) {
+        const v = d.apps[t]
+        if (!v) continue
+        n += v[0] + (v[0] >= d.rounds - 1 ? missed : 0); up += v[1]
+      }
+    }
+    return n > 0 ? (100 * up) / n : null
+  }
+  const overall = total(null)
+  const label = (r: { id: string | null; name: string }, day: string) => {
+    const c = cell(r.id, day)
+    if (!c) return `${shortDay(day)} · no checks`
+    return `${shortDay(day)} · ${fmtPct(c.pct)}${c.down > 0 ? ` · ~${c.down} min down` : ''}${c.missed > 0 ? ` · monitor missed ${c.missed} round${c.missed > 1 ? 's' : ''}` : ''}`
+  }
+
+  const strip = (r: { id: string | null; name: string }, big = false) => (
+    <div className={big ? 'ops-tl-strip is-big' : 'ops-tl-strip'} style={{ gridTemplateColumns: `repeat(${cols.length}, minmax(0, 1fr))` }}
+         onMouseLeave={() => setHover(null)}>
+      {cols.map(day => {
+        const c = cell(r.id, day)
+        const on = hover?.app === (r.id ?? 'all') && hover.day === day
+        return (
+          <span key={day} className={`ops-tl-bar ${tone(c?.pct)}${on ? ' is-on' : ''}`} aria-label={label(r, day)}
+                onMouseEnter={() => setHover({ app: r.id ?? 'all', day })}>
+            {on && <span className="ops-tl-tip" role="tooltip">{label(r, day)}</span>}
+          </span>
+        )
+      })}
+    </div>
+  )
+  const axis = (
+    <div className="ops-tl-axis" aria-hidden="true">
+      <span>{days} days ago</span><span className="ops-tl-axis-line" /><span>Today</span>
+    </div>
+  )
+
   return (
     <>
-      <div className="ops-tl-read" aria-live="polite">
-        {shown
-          ? <>{rows.find(r => (r.id ?? 'all') === shown.app)?.name} · {shortDay(shown.day)}: {shown.c
-              ? <><strong>{fmtPct(shown.c.pct)}</strong>{shown.c.down > 0 ? ` · about ${shown.c.down} min down` : ''}
-                  {shown.c.missed > 0 ? ` · monitor missed ${shown.c.missed} round${shown.c.missed > 1 ? 's' : ''}` : ''}
-                  {shown.c.blind > 0 ? ` · ${shown.c.blind} round${shown.c.blind > 1 ? 's' : ''} where everything failed at once` : ''}</>
-              : 'no checks'}</>
-          : 'Point at a day for its figures.'}
+      <div className="ops-tl-hero">
+        <div>
+          <span className={overall !== null && overall < 99 ? 'ops-tl-big down' : 'ops-tl-big'}>{overall === null ? '—' : fmtPct(overall)}</span>
+          <span className="ops-tl-sub">all apps, last {days} days</span>
+        </div>
+        <span className="ops-tl-key" aria-hidden="true">
+          <i className="ops-tl-dot is-good" />Up <i className="ops-tl-dot is-warn" />Partial <i className="ops-tl-dot is-bad" />Outage <i className="ops-tl-dot is-none" />No data
+        </span>
       </div>
-      <div className="ops-tl" role="table" aria-label={`Uptime per day, last ${days} days`} onMouseLeave={() => setHover(null)}>
-        {rows.map(r => {
-          const key = r.id ?? 'all'
+      {strip({ id: null, name: 'All apps' }, true)}
+      {axis}
+      <ul className="ops-tl-list">
+        {daily.targets.map(t => {
+          const pct = total(t.id)
           return (
-            <div key={key} className={r.id ? 'ops-tl-row' : 'ops-tl-row is-all'} role="row">
-              <span className="ops-tl-name" role="rowheader">{r.name}</span>
-              <span className="ops-tl-cells" style={{ gridTemplateColumns: `repeat(${cols.length}, minmax(0, 1fr))` }}>
-                {cols.map(day => {
-                  const c = cell(r.id, day)
-                  return <span key={day} role="cell" className={`ops-tl-cell ${tone(c?.pct)}${hover?.day === day ? ' is-col' : ''}`}
-                               title={`${r.name} · ${shortDay(day)}: ${c ? fmtPct(c.pct) : 'no checks'}`}
-                               onMouseEnter={() => setHover({ app: key, day })} />
-                })}
-              </span>
-            </div>
+            <li key={t.id}>
+              <div className="ops-tl-head">
+                <span className="ops-tl-name">{t.name}<span className="ops-tag">{t.group}</span></span>
+                <span className={pct !== null && pct < 99 ? 'ops-tl-pct down' : 'ops-tl-pct'}>{pct === null ? '—' : fmtPct(pct)}</span>
+              </div>
+              {strip(t)}
+            </li>
           )
         })}
-        <div className="ops-tl-row ops-tl-axis" aria-hidden="true">
-          <span />
-          <span className="ops-bars-x"><span>{shortDay(cols[0])}</span><span>{shortDay(cols[cols.length - 1])}</span></span>
-        </div>
-      </div>
-      <p className="ops-tl-key">
-        <i className="ops-tl-cell is-good" /> 99.9% or better <i className="ops-tl-cell is-warn" /> 99 to 99.9%
-        <i className="ops-tl-cell is-bad" /> below 99% <i className="ops-tl-cell is-none" /> not checked yet
-      </p>
+      </ul>
+      <details className="ops-tl-months">
+        <summary>Availability per month</summary>
       <div className="ops-table-wrap">
         <table className="ops-table">
-          <caption>Availability per month (rounds the monitor missed count as down)</caption>
+          <caption>Rounds the monitor missed count as down</caption>
           <thead><tr><th>App</th>{months.map(m => <th key={m.month} className="num">{monthName(m.month)}</th>)}</tr></thead>
           <tbody>
             {daily.targets.map(t => (
@@ -908,6 +947,7 @@ function UptimeTimeline({ daily, days }: { daily: UptimeDaily; days: number }) {
           </tbody>
         </table>
       </div>
+      </details>
     </>
   )
 }
