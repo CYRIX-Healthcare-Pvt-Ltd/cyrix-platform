@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Loader2, RefreshCw, GitCommitHorizontal, Rocket, BellRing, Download,
+  ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Loader2, RefreshCw, GitCommitHorizontal, Rocket, BellRing, Download, Wrench,
 } from 'lucide-react'
 import Logo from './Logo'
 import ThemeToggle from './ThemeToggle'
@@ -44,6 +44,15 @@ interface UptimeDaily {
 }
 
 /** People with an app open (KPI 0303): live counts, the last 24 h of 5-minute samples, and the typical day by IST hour. */
+/** The maintenance switch (KPI 0303-0305): set here or in SW Admin → Platform; every app reads it. */
+interface Maint { on?: boolean; from?: string | null; to?: string | null; apps?: string[]; notice_min?: number; by?: string; at?: string; now?: string }
+const MAINT_APPS: [string, string][] = [
+  ['portal', 'Portal'], ['kpi', 'KPI'], ['travel', 'Travel'], ['bemmp', 'BEMMP'], ['revive', 'Revive Lab'], ['tasks', 'My Task'],
+  ['cyra', 'Cyra'], ['workplace', 'Workplace'], ['projects', 'Projects'], ['pulse', 'Pulse'],
+]
+const maintApps = (list?: string[]) => !list?.length ? 'every app' : MAINT_APPS.filter(([c]) => list.includes(c)).map(([, n]) => n).join(', ')
+const maintWhen = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+
 interface ActiveNow {
   at: string; users_60: number; users_15: number; first_sample: string | null
   last_24h: [string, number][]
@@ -287,6 +296,7 @@ export default function Ops() {
   const [uptime, setUptime] = useState<Part<Uptime>>({ state: 'loading' })
   const [daily, setDaily] = useState<Part<UptimeDaily>>({ state: 'loading' })
   const [online, setOnline] = useState<Part<ActiveNow>>({ state: 'loading' })
+  const [maint, setMaint] = useState<Part<Maint>>({ state: 'loading' })
   const [upstream, setUpstream] = useState<Part<Upstream>>({ state: 'loading' })
   const [health, setHealth] = useState<Part<HealthData>>({ state: 'loading' })
   const [deploys, setDeploys] = useState<Part<DeploysData>>({ state: 'loading' })
@@ -330,7 +340,7 @@ export default function Ops() {
         () => keep(fn)({ state: 'failed', error: 'Could not reach the database' }))
 
     if (reset) {
-      for (const fn of [setOverview, setUptime, setDaily, setOnline, setUpstream, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi, setPulse, setAiApps, setSecurity, setInfra, setDb, setCron] as
+      for (const fn of [setOverview, setUptime, setDaily, setOnline, setMaint, setUpstream, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi, setPulse, setAiApps, setSecurity, setInfra, setDb, setCron] as
                        React.Dispatch<React.SetStateAction<Part<unknown>>>[]) fn({ state: 'loading' })
     }
     const jobs: PromiseLike<unknown>[] = [
@@ -338,6 +348,8 @@ export default function Ops() {
       rpc(setUptime, 'ops_uptime', { p_days: Math.min(d, 90) }),
       // Who has an app open now: one count over recent sessions, cheap enough for the 2-minute tier (KPI 0303).
       rpc(setOnline, 'ops_active_now', {}),
+      // The maintenance switch, so the page says when it is on (KPI 0303). One settings row.
+      rpc(setMaint, 'platform_maintenance', {}),
       // The 5-minute round's own results, not a live ping of every app from a Vercel function (KPI 0300).
       supabase.rpc('ops_latest').then(
         r => keep(setHealth)(r.error ? { state: r.error.code === 'PGRST202' ? 'off' : 'failed', error: r.error.message } as Part<HealthData>
@@ -489,9 +501,9 @@ export default function Ops() {
               <p className="ops-note">Showing {appOf(app)?.name} only. Charts that the sources cannot split by app are hidden; Security and Infrastructure stay company-wide.</p>
             )}
             <Attention health={sc.health} uptime={sc.uptime} errors={sc.errors} appErrors={sc.appErrors} deploys={sc.deploys} ai={sc.ai} pulse={sc.pulse} security={sc.security} cron={scoped ? NO_CRON : cron}
-                       upstream={upstream} db={db} />
+                       upstream={upstream} db={db} maint={maint} />
             <StatusPanel health={sc.health} deploys={sc.deploys} />
-            {!scoped && <OnlinePanel online={online} />}
+            {!scoped && <OnlinePanel online={online} maint={maint} onMaintChanged={() => { void supabase.rpc('platform_maintenance').then(r => { if (!r.error) setMaint({ state: 'ok', data: r.data as Maint }) }) }} />}
             {/* The timeline needs the width: a column per day. */}
             <UptimePanel uptime={sc.uptime} daily={sc.daily} upstream={upstream} days={days} />
             <ErrorsPanel errors={sc.errors} appErrors={sc.appErrors} deploys={sc.deploys} days={days} scoped={scoped} />
@@ -540,14 +552,14 @@ function Waiting<T>({ part, off, children }: { part: Part<T>; off: string; child
  */
 interface Flag { level: 'bad' | 'warn'; text: string; detail?: string; href: string }
 
-function Attention({ health, uptime, errors, appErrors, deploys, ai, pulse, security, cron, upstream, db }: {
-  cron: Part<CronJob[]>; upstream: Part<Upstream>; db: Part<DbData>
+function Attention({ health, uptime, errors, appErrors, deploys, ai, pulse, security, cron, upstream, db, maint }: {
+  cron: Part<CronJob[]>; upstream: Part<Upstream>; db: Part<DbData>; maint: Part<Maint>
   health: Part<HealthData>; uptime: Part<Uptime>; errors: Part<ErrorsData>; appErrors: Part<AppErrors>
   deploys: Part<DeploysData>; ai: Part<AiData>; pulse: Part<PulseData>; security: Part<SecurityData>
 }) {
-  const flags = useMemo(() => [...upstreamFlags(upstream, db), ...attentionFlags(health, uptime, errors, appErrors, deploys, ai, pulse, security, cron)]
+  const flags = useMemo(() => [...maintFlags(maint), ...upstreamFlags(upstream, db), ...attentionFlags(health, uptime, errors, appErrors, deploys, ai, pulse, security, cron)]
                           .sort((a, b) => (a.level === b.level ? 0 : a.level === 'bad' ? -1 : 1)),
-                        [health, uptime, errors, appErrors, deploys, ai, pulse, security, cron, upstream, db])
+                        [health, uptime, errors, appErrors, deploys, ai, pulse, security, cron, upstream, db, maint])
   const settled = [health, uptime, errors, appErrors].every(p => p.state !== 'loading')
   if (!settled && flags.length === 0) return <div className="ops-attn"><div className="ops-skeleton ops-skeleton-thin" /></div>
   if (flags.length === 0) {
@@ -572,6 +584,18 @@ function Attention({ health, uptime, errors, appErrors, deploys, ai, pulse, secu
 }
 
 const HOUR = 3_600_000
+
+/** Maintenance on, or planned: said at the top so nobody reads a quiet page as a healthy one. */
+function maintFlags(maint: Part<Maint>): Flag[] {
+  if (maint.state !== 'ok' || !maint.data.on) return []
+  const m = maint.data
+  const now = m.now ? Date.parse(m.now) : Date.now()
+  const back = m.to ? ` · back by ${maintWhen(m.to)}` : ''
+  if (m.from && Date.parse(m.from) > now) {
+    return [{ level: 'warn', text: `Maintenance planned from ${maintWhen(m.from)} for ${maintApps(m.apps)}`, detail: `Set by ${m.by ?? '—'}${back}`, href: '#online' }]
+  }
+  return [{ level: 'bad', text: `Maintenance is on for ${maintApps(m.apps)}`, detail: `People see the maintenance screen; admins get through. Set by ${m.by ?? '—'}${back}`, href: '#online' }]
+}
 
 /**
  * The database under everything, and Supabase above it. 20 Nov 2026: all 60 connection slots filled at 09:40 IST,
@@ -720,9 +744,10 @@ function attentionFlags(health: Part<HealthData>, uptime: Part<Uptime>, errors: 
  * (Adrian, 20 Nov 2026: backend work must not land on people mid-task). "Online" = a signed-in session that refreshed
  * in the last hour, which an open tab of any Cyrix app does about hourly. People, not tabs; no names.
  */
-function OnlinePanel({ online }: { online: Part<ActiveNow> }) {
+function OnlinePanel({ online, maint, onMaintChanged }: { online: Part<ActiveNow>; maint: Part<Maint>; onMaintChanged: () => void }) {
   return (
     <Panel id="online" title="People online" note="Signed in with a Cyrix app open (session refreshed in the last hour). Counted every 5 minutes.">
+      {maint.state === 'ok' && <MaintenanceBox m={maint.data} onlineNow={online.state === 'ok' ? online.data.users_15 : null} onChanged={onMaintChanged} />}
       <Waiting part={online} off="Needs KPI migration 0303 (ops/apply-0303.sql).">
         {o => {
           const weekday = o.by_hour.filter(h => !h.weekend)
@@ -796,6 +821,92 @@ function OnlineLine({ points }: { points: [string, number][] }) {
 }
 
 /** A typical day: average people online per IST hour, weekdays and weekends side by side. The low bars are the window. */
+/**
+ * The maintenance switch, beside the numbers it should be set from (KPI 0303-0305). The same switch as SW Admin →
+ * Platform; the Ops admins may set it too (0305). Asks before changing, and says how many people will be cut off
+ * when it is turned on with no From (no notice bar for them).
+ */
+function MaintenanceBox({ m, onlineNow, onChanged }: { m: Maint; onlineNow: number | null; onChanged: () => void }) {
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [notice, setNotice] = useState(60)
+  const [apps, setApps] = useState<string[]>([])
+  const [asking, setAsking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const now = m.now ? Date.parse(m.now) : Date.now()
+  const planned = !!m.on && !!m.from && Date.parse(m.from) > now
+
+  const save = async (next: boolean) => {
+    setBusy(true); setError(null)
+    if (next && from && to && new Date(to) <= new Date(from)) { setError('To must be after From.'); setBusy(false); return }
+    const { error: e } = await supabase.rpc('platform_set_maintenance', {
+      p_on: next,
+      p_from: next && from ? new Date(from).toISOString() : null,
+      p_to: next && to ? new Date(to).toISOString() : null,
+      p_apps: next ? apps : [],
+      p_notice_min: next ? notice : 15,
+    })
+    setBusy(false)
+    if (e) { setError(e.message); return }
+    setAsking(false)
+    if (!next) { setFrom(''); setTo(''); setApps([]) }
+    onChanged()
+  }
+
+  const confirm = (
+    <div className="ops-maint-ask">
+      <p>{m.on ? `Turn maintenance off for ${maintApps(m.apps)}?`
+               : `Turn maintenance on for ${maintApps(apps)}${from ? ` from ${maintWhen(new Date(from).toISOString())}` : ' now'}?`}</p>
+      {!m.on && !from && (onlineNow ?? 0) > 0 && (
+        <p className="ops-check-meta">{onlineNow} people were active in the last 15 minutes and will see the screen straight away, with no notice bar. A From gives them warning.</p>
+      )}
+      <div className="ops-maint-row">
+        <button className="ops-maint-go" disabled={busy} onClick={() => { void save(!m.on) }}>{busy ? 'Saving…' : m.on ? 'Yes, turn off' : 'Yes, turn on'}</button>
+        <button className="ops-maint-cancel" disabled={busy} onClick={() => { setAsking(false); setError(null) }}>Cancel</button>
+      </div>
+    </div>
+  )
+
+  if (m.on) {
+    return (
+      <div className={planned ? 'ops-maint is-planned' : 'ops-maint is-on'}>
+        <div className="ops-maint-row">
+          <Wrench size={15} />
+          <strong>{planned ? `Maintenance planned from ${maintWhen(m.from!)}` : 'Maintenance is on'}</strong>
+          <span className="ops-check-meta">{maintApps(m.apps)}{m.to ? ` · back by ${maintWhen(m.to)}` : ''}{m.by ? ` · set by ${m.by}` : ''}</span>
+          {!asking && <button className="ops-maint-go" onClick={() => setAsking(true)}>Turn off</button>}
+        </div>
+        {asking && confirm}
+        {error && <p className="ops-maint-err">{error}</p>}
+      </div>
+    )
+  }
+  return (
+    <details className="ops-maint">
+      <summary><Wrench size={15} /> Maintenance mode <span className="ops-check-meta">off · plan a window from the quiet hours below</span></summary>
+      <div className="ops-maint-form">
+        <label>From<input type="datetime-local" className="ops-select" value={from} onChange={e => setFrom(e.target.value)} /></label>
+        <label>To<input type="datetime-local" className="ops-select" value={to} min={from || undefined} onChange={e => setTo(e.target.value)} /></label>
+        <label>Notice bar before
+          <select className="ops-select" value={notice} onChange={e => setNotice(Number(e.target.value))}>
+            {[[15, '15 minutes'], [30, '30 minutes'], [60, '1 hour'], [120, '2 hours'], [180, '3 hours'], [1440, '1 day']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="ops-chips" role="group" aria-label="Apps">
+        <button aria-pressed={!apps.length} onClick={() => setApps([])}>All</button>
+        {MAINT_APPS.map(([c, n]) => (
+          <button key={c} aria-pressed={apps.includes(c)} onClick={() => setApps(a => a.includes(c) ? a.filter(x => x !== c) : [...a, c])}>{n}</button>
+        ))}
+      </div>
+      {asking ? confirm : <button className="ops-maint-go" onClick={() => { setAsking(true); setError(null) }}>{from ? 'Plan it' : 'Turn on now'}</button>}
+      {error && <p className="ops-maint-err">{error}</p>}
+      <p className="ops-note">Leave From empty to start now. It stays on until turned off here or in SW Admin → Platform. SW Admin, Adrian and Kevin still get in, with a red bar.</p>
+    </details>
+  )
+}
+
 function HourBars({ weekday, weekend }: { weekday: ActiveNow['by_hour']; weekend: ActiveNow['by_hour'] }) {
   const [hover, setHover] = useState<number | null>(null)
   const wd = new Map(weekday.map(r => [r.hour, r])), we = new Map(weekend.map(r => [r.hour, r]))
