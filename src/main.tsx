@@ -4,6 +4,7 @@ import React from 'react'
 import { startTheme } from './lib/theme'
 import { watchInstallability } from './lib/pwa'
 import { startIdleSignOut } from './lib/idleSignOut'
+import { startMaintenance } from './lib/maintenance'
 import { supabase } from './lib/supabase'
 import { startErrorReporting } from './lib/reportErrors'
 import ReactDOM from 'react-dom/client'
@@ -39,6 +40,7 @@ const digestPreview = new URLSearchParams(location.search).has('digest-preview')
 // Signed out after 3 hours with nothing done, across every Cyrix app — not the preview,
 // which has nobody signed in and would be reloaded away from itself.
 if (!digestPreview) startIdleSignOut(supabase)
+if (!digestPreview) startMaintenance(supabase, 'portal')
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
