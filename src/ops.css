@@ -189,3 +189,22 @@
 .ops-bar-alt { fill: var(--ops-series); opacity: 0.4; }
 .ops-key-a, .ops-key-b { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 2px; background: var(--ops-series); margin-left: 0.4rem; }
 .ops-key-b { opacity: 0.4; }
+
+/* Maintenance switch, in the People online panel (KPI 0303-0305). */
+.ops-maint { margin: 0 0 1rem; padding: 0.7rem 0.85rem; border: 1px solid var(--ink-200); border-radius: 0.75rem; }
+.ops-maint.is-on { border-color: rgb(206 36 52 / 0.45); background: rgb(206 36 52 / 0.06); }
+.ops-maint.is-planned { border-color: rgb(217 119 6 / 0.45); background: rgb(217 119 6 / 0.06); }
+.ops-maint summary { cursor: pointer; display: flex; align-items: center; gap: 0.45rem; font-weight: 600; flex-wrap: wrap; }
+.ops-maint[open] summary { margin-bottom: 0.7rem; }
+.ops-maint-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.ops-maint-row .ops-maint-go { margin-left: auto; }
+.ops-maint-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.6rem; margin-bottom: 0.6rem; }
+.ops-maint-form label { display: grid; gap: 0.25rem; font-size: 0.8rem; color: var(--ink-600); min-width: 0; }
+.ops-maint-form .ops-select { width: 100%; min-width: 0; box-sizing: border-box; }
+.ops-maint-go, .ops-maint-cancel { padding: 0.4rem 0.9rem; border-radius: 999px; border: 0; font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.ops-maint-go { background: #ce2434; color: #fff; }
+.ops-maint-cancel { background: var(--ink-100); color: var(--ink-800); }
+.ops-maint-go:disabled, .ops-maint-cancel:disabled { opacity: 0.6; cursor: default; }
+.ops-maint-ask { margin-top: 0.6rem; padding: 0.6rem 0.75rem; border-radius: 0.6rem; background: rgb(217 119 6 / 0.08); display: grid; gap: 0.4rem; }
+.ops-maint-ask p { margin: 0; }
+.ops-maint-err { margin: 0.4rem 0 0; color: #ce2434; font-size: 0.85rem; }
