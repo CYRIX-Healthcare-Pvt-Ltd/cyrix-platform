@@ -35,6 +35,22 @@ interface Uptime {
   incidents: { target: string; started_at: string; ended_at: string | null; problem: string | null; minutes: number }[]
 }
 
+/** Uptime per IST day (KPI 0302): each app's [checks, up], plus how many rounds ran and how many saw everything fail. */
+interface UptimeDaily {
+  since: string
+  db_started: string | null
+  targets: { id: string; name: string; group: string }[]
+  days: { day: string; rounds: number; blind: number; apps: Record<string, [number, number]> }[]
+}
+
+/** Supabase's own status feed (/api/ops?part=upstream), last 14 days. `ours` = touches ap-northeast-1 or all regions. */
+interface Upstream {
+  checked: string
+  region: string
+  incidents: { title: string; status: string; updated: string; ours: boolean; open: boolean; scheduled: boolean
+               components: string[]; detail: string; url: string }[]
+}
+
 /** Every app's browser errors (KPI 0230), grouped by message in the database as they arrive. */
 interface AppErrors {
   total: number
@@ -262,6 +278,8 @@ export default function Ops() {
 
   const [overview, setOverview] = useState<Part<Overview>>({ state: 'loading' })
   const [uptime, setUptime] = useState<Part<Uptime>>({ state: 'loading' })
+  const [daily, setDaily] = useState<Part<UptimeDaily>>({ state: 'loading' })
+  const [upstream, setUpstream] = useState<Part<Upstream>>({ state: 'loading' })
   const [health, setHealth] = useState<Part<HealthData>>({ state: 'loading' })
   const [deploys, setDeploys] = useState<Part<DeploysData>>({ state: 'loading' })
   const [changes, setChanges] = useState<Part<ChangesData>>({ state: 'loading' })
@@ -304,7 +322,7 @@ export default function Ops() {
         () => keep(fn)({ state: 'failed', error: 'Could not reach the database' }))
 
     if (reset) {
-      for (const fn of [setOverview, setUptime, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi, setPulse, setAiApps, setSecurity, setInfra, setDb, setCron] as
+      for (const fn of [setOverview, setUptime, setDaily, setUpstream, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi, setPulse, setAiApps, setSecurity, setInfra, setDb, setCron] as
                        React.Dispatch<React.SetStateAction<Part<unknown>>>[]) fn({ state: 'loading' })
     }
     const jobs: PromiseLike<unknown>[] = [
@@ -320,6 +338,9 @@ export default function Ops() {
       jobs.push(
         api<ErrorsData>('errors', d).then(keep(setErrors)),
         rpc(setCron, 'ops_cron', {}),
+        // Up to 90 days of checks per day: the slow tier, not every 2 minutes (KPI 0302).
+        rpc(setDaily, 'ops_uptime_daily', { p_days: Math.min(d, 90) }),
+        api<Upstream>('upstream', d).then(keep(setUpstream)),
         rpc(setOverview, 'ops_overview', { p_days: d }, false),
         api<DeploysData>('deploys', d).then(keep(setDeploys)),
         api<ChangesData>('changes', d).then(keep(setChanges)),
@@ -368,7 +389,7 @@ export default function Ops() {
   // Everything below reads the scoped copies, so the filter applies to every panel and to the Needs attention box.
   const sc = useMemo(() => {
     const a = appOf(app)
-    if (!a) return { health, uptime, appErrors, errors, overview, ai, aiApps, deploys, changes, pulse, security }
+    if (!a) return { health, uptime, daily, appErrors, errors, overview, ai, aiApps, deploys, changes, pulse, security }
     const k = a.key
     return {
       health: mapOk(health, h => ({ ...h, checks: h.checks.filter(c => a.ids.includes(c.id)) })),
@@ -377,6 +398,7 @@ export default function Ops() {
         const names = new Set(targets.map(t => t.name))
         return { ...u, targets, incidents: u.incidents.filter(i => names.has(i.target)) }
       }),
+      daily: mapOk(daily, u => ({ ...u, targets: u.targets.filter(t => a.ids.includes(t.id)) })),
       appErrors: mapOk(appErrors, e => {
         const by_app = e.by_app.filter(x => x.app === k)
         return { ...e, by_app, groups: e.groups.filter(g => g.app === k), by_day: [], total: by_app.reduce((n, x) => n + x.errors, 0) }
@@ -397,7 +419,7 @@ export default function Ops() {
       pulse: k === 'pulse' ? pulse : { state: 'off' } as Part<PulseData>,
       security,
     }
-  }, [app, health, uptime, appErrors, errors, overview, ai, aiApps, deploys, changes, pulse, security])
+  }, [app, health, uptime, daily, appErrors, errors, overview, ai, aiApps, deploys, changes, pulse, security])
   const scoped = app !== 'all'
 
   const exportReport = () => {
@@ -456,13 +478,12 @@ export default function Ops() {
             {scoped && (
               <p className="ops-note">Showing {appOf(app)?.name} only. Charts that the sources cannot split by app are hidden; Security and Infrastructure stay company-wide.</p>
             )}
-            <Attention health={sc.health} uptime={sc.uptime} errors={sc.errors} appErrors={sc.appErrors} deploys={sc.deploys} ai={sc.ai} pulse={sc.pulse} security={sc.security} cron={scoped ? NO_CRON : cron} />
+            <Attention health={sc.health} uptime={sc.uptime} errors={sc.errors} appErrors={sc.appErrors} deploys={sc.deploys} ai={sc.ai} pulse={sc.pulse} security={sc.security} cron={scoped ? NO_CRON : cron}
+                       upstream={upstream} db={db} />
             <StatusPanel health={sc.health} deploys={sc.deploys} />
-            {/* Side by side on a wide screen, one column below that. */}
-            <div className="ops-pair">
-              <UptimePanel uptime={sc.uptime} days={days} />
-              <ErrorsPanel errors={sc.errors} appErrors={sc.appErrors} deploys={sc.deploys} days={days} scoped={scoped} />
-            </div>
+            {/* The timeline needs the width: a column per day. */}
+            <UptimePanel uptime={sc.uptime} daily={sc.daily} upstream={upstream} days={days} />
+            <ErrorsPanel errors={sc.errors} appErrors={sc.appErrors} deploys={sc.deploys} days={days} scoped={scoped} />
             <div className="ops-pair">
               <UsagePanel overview={sc.overview} days={days} scoped={scoped} />
               <AiPanel ai={sc.ai} aiApps={sc.aiApps} days={days} />
@@ -508,13 +529,14 @@ function Waiting<T>({ part, off, children }: { part: Part<T>; off: string; child
  */
 interface Flag { level: 'bad' | 'warn'; text: string; detail?: string; href: string }
 
-function Attention({ health, uptime, errors, appErrors, deploys, ai, pulse, security, cron }: {
-  cron: Part<CronJob[]>
+function Attention({ health, uptime, errors, appErrors, deploys, ai, pulse, security, cron, upstream, db }: {
+  cron: Part<CronJob[]>; upstream: Part<Upstream>; db: Part<DbData>
   health: Part<HealthData>; uptime: Part<Uptime>; errors: Part<ErrorsData>; appErrors: Part<AppErrors>
   deploys: Part<DeploysData>; ai: Part<AiData>; pulse: Part<PulseData>; security: Part<SecurityData>
 }) {
-  const flags = useMemo(() => attentionFlags(health, uptime, errors, appErrors, deploys, ai, pulse, security, cron),
-                        [health, uptime, errors, appErrors, deploys, ai, pulse, security, cron])
+  const flags = useMemo(() => [...upstreamFlags(upstream, db), ...attentionFlags(health, uptime, errors, appErrors, deploys, ai, pulse, security, cron)]
+                          .sort((a, b) => (a.level === b.level ? 0 : a.level === 'bad' ? -1 : 1)),
+                        [health, uptime, errors, appErrors, deploys, ai, pulse, security, cron, upstream, db])
   const settled = [health, uptime, errors, appErrors].every(p => p.state !== 'loading')
   if (!settled && flags.length === 0) return <div className="ops-attn"><div className="ops-skeleton ops-skeleton-thin" /></div>
   if (flags.length === 0) {
@@ -539,6 +561,34 @@ function Attention({ health, uptime, errors, appErrors, deploys, ai, pulse, secu
 }
 
 const HOUR = 3_600_000
+
+/**
+ * The database under everything, and Supabase above it. 20 Nov 2026: all 60 connection slots filled at 09:40 IST,
+ * Postgres stopped answering at 09:52 and crash-restarted at 10:06. None of that was on the page except as thirteen
+ * apps failing at once, and Supabase's own feed was quiet, so the cause was ours. These say so directly.
+ */
+function upstreamFlags(upstream: Part<Upstream>, db: Part<DbData>, now = Date.now()): Flag[] {
+  const out: Flag[] = []
+  if (upstream.state === 'ok') {
+    for (const i of upstream.data.incidents.filter(i => i.open)) {
+      out.push({ level: i.ours ? 'bad' : 'warn', text: `Supabase: ${i.title}`,
+                 detail: `${i.status}${i.ours ? ` · affects ${upstream.data.region}, our region` : ' · not our region'} · ${ago(i.updated)}`, href: '#uptime' })
+    }
+  }
+  if (db.state === 'ok') {
+    const d = db.data
+    const used = Object.values(d.connections).reduce((n, x) => n + x, 0)
+    if (d.max_connections > 0 && used / d.max_connections >= 0.8) {
+      out.push({ level: used / d.max_connections >= 0.9 ? 'bad' : 'warn', text: `Database connections ${used} of ${d.max_connections}`,
+                 detail: 'When they run out every app fails at once (20 Nov). Larger compute raises the limit.', href: '#infra' })
+    }
+    if (d.started && now - Date.parse(d.started) < 24 * HOUR) {
+      out.push({ level: 'warn', text: `Database restarted ${ago(d.started)}`,
+                 detail: 'If nobody restarted it, it fell over. Check Infrastructure and the Supabase logs.', href: '#infra' })
+    }
+  }
+  return out
+}
 
 function attentionFlags(health: Part<HealthData>, uptime: Part<Uptime>, errors: Part<ErrorsData>, appErrors: Part<AppErrors>,
                                deploys: Part<DeploysData>, ai: Part<AiData>, pulse: Part<PulseData>, security: Part<SecurityData>,
@@ -706,34 +756,20 @@ function StatusPanel({ health, deploys }: { health: Part<HealthData>; deploys: P
  * What happened between visits (KPI 0229): every app is checked every 5 minutes from the database, an outage opens
  * after two failed checks in a row, and the Ops admins get a push when one opens and when it closes.
  */
-function UptimePanel({ uptime, days }: { uptime: Part<Uptime>; days: number }) {
+function UptimePanel({ uptime, daily, upstream, days }: { uptime: Part<Uptime>; daily: Part<UptimeDaily>; upstream: Part<Upstream>; days: number }) {
   const fmtWhen = (iso: string) => new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
   return (
     <Panel id="uptime" title="Uptime" note="Checked every 5 minutes. An outage is two failed checks in a row, and the Ops admins get a push.">
+      <UpstreamBox upstream={upstream} />
+      {daily.state === 'ok' && daily.data.days.length > 0 && <UptimeTimeline daily={daily.data} days={Math.min(days, 90)} />}
+      {daily.state === 'failed' && <p className="ops-off">Timeline: {daily.error}</p>}
+      {daily.state === 'off' && <p className="ops-off">The timeline needs KPI migration 0302.</p>}
       <Waiting part={uptime} off="Not set up yet: KPI migration 0229 has not been applied.">
         {u => (
           <>
             {u.first_check && new Date(u.first_check) > new Date(u.since) && (
               <p className="ops-note">Checking since {fmtWhen(u.first_check)} IST, so this covers less than {days} days.</p>
             )}
-            <div className="ops-table-wrap">
-              <table className="ops-table">
-                <thead><tr><th>App</th><th className="num">Uptime</th><th className="num">Outages</th><th className="num">Checks</th></tr></thead>
-                <tbody>
-                  {u.targets.map(t => (
-                    <tr key={t.id}>
-                      <td>
-                        {t.down_now ? <XCircle size={13} className="down" /> : <CheckCircle2 size={13} className="ok" />}{' '}
-                        {t.name}<span className="ops-tag">{t.group}</span>
-                      </td>
-                      <td className="num">{t.uptime === null ? '—' : `${t.uptime}%`}</td>
-                      <td className="num">{fmtInt(u.incidents.filter(i => i.target === t.name).length)}</td>
-                      <td className="num">{fmtInt(t.checks)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
             <h3>Outages, last {Math.min(days, 90)} days</h3>
             {u.incidents.length === 0 ? <p className="ops-note">None.</p> : (
               <ul className="ops-feed">
@@ -752,6 +788,151 @@ function UptimePanel({ uptime, days }: { uptime: Part<Uptime>; days: number }) {
         )}
       </Waiting>
     </Panel>
+  )
+}
+
+/** Rounds a full day should hold: one every 5 minutes. Today, only the part that has happened. */
+const ROUNDS_PER_DAY = 288
+function expectedRounds(day: string, first: boolean, rounds: number, now = Date.now()): number {
+  if (first) return rounds                         // monitoring started part way through that day
+  if (day !== istDay(now)) return ROUNDS_PER_DAY
+  const mid = Date.parse(`${day}T00:00:00+05:30`)
+  return Math.max(rounds, Math.floor((now - mid) / 300_000))
+}
+
+/**
+ * Uptime over time: a row per app, a cell per day, coloured by that day's uptime. Rounds the monitor could not run
+ * count as down: it runs inside the shared database, so when it cannot run, nothing that uses that database can
+ * either. Below it, availability per calendar month, the figure a contract or an SLA is written against.
+ */
+function UptimeTimeline({ daily, days }: { daily: UptimeDaily; days: number }) {
+  const [hover, setHover] = useState<{ app: string; day: string } | null>(null)
+  const cols = useMemo(() => {
+    const out: string[] = []
+    const end = Date.now()
+    for (let i = days - 1; i >= 0; i--) out.push(istDay(end - i * 86_400_000))
+    return out
+  }, [days])
+  const byDay = useMemo(() => new Map(daily.days.map(d => [d.day, d])), [daily])
+  const firstDay = daily.days[0]?.day
+
+  // One cell's figures: up / (checks + rounds missed). null = no data that day.
+  const cell = (id: string | null, day: string) => {
+    const d = byDay.get(day)
+    if (!d) return null
+    const exp = expectedRounds(day, day === firstDay, d.rounds)
+    const missed = Math.max(0, exp - d.rounds)
+    const ids = id ? [id] : daily.targets.map(t => t.id)
+    let n = 0, up = 0
+    for (const t of ids) { const v = d.apps[t]; if (v) { n += v[0]; up += v[1] } }
+    if (n === 0) return null
+    const per = n / Math.max(1, d.rounds)            // checks per round, to price the missed rounds
+    const pct = (100 * up) / (n + missed * per)
+    return { pct, down: Math.round(((n + missed * per - up) / per) * 5), missed, blind: d.blind }
+  }
+  const tone = (pct: number | undefined) => pct === undefined ? 'is-none' : pct >= 99.9 ? 'is-good' : pct >= 99 ? 'is-warn' : 'is-bad'
+  const rows = [{ id: null as string | null, name: 'All apps', group: '' }, ...daily.targets]
+
+  const months = useMemo(() => {
+    const keys = [...new Set(daily.days.map(d => d.day.slice(0, 7)))]
+    return keys.map(m => {
+      const per = new Map<string, [number, number]>()
+      for (const d of daily.days.filter(x => x.day.startsWith(m))) {
+        const exp = expectedRounds(d.day, d.day === firstDay, d.rounds)
+        const missed = Math.max(0, exp - d.rounds)
+        for (const t of daily.targets) {
+          const v = d.apps[t.id]; if (!v) continue
+          const cur = per.get(t.id) ?? [0, 0]
+          per.set(t.id, [cur[0] + v[0] + missed, cur[1] + v[1]])
+        }
+      }
+      return { month: m, per }
+    })
+  }, [daily, firstDay])
+  const monthName = (m: string) => new Date(`${m}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+  const fmtPct = (n: number) => n >= 99.995 ? '100%' : `${n.toFixed(2)}%`
+
+  const shown = hover ? { ...hover, c: cell(rows.find(r => (r.id ?? 'all') === hover.app)?.id ?? null, hover.day) } : null
+  return (
+    <>
+      <div className="ops-tl-read" aria-live="polite">
+        {shown
+          ? <>{rows.find(r => (r.id ?? 'all') === shown.app)?.name} · {shortDay(shown.day)}: {shown.c
+              ? <><strong>{fmtPct(shown.c.pct)}</strong>{shown.c.down > 0 ? ` · about ${shown.c.down} min down` : ''}
+                  {shown.c.missed > 0 ? ` · monitor missed ${shown.c.missed} round${shown.c.missed > 1 ? 's' : ''}` : ''}
+                  {shown.c.blind > 0 ? ` · ${shown.c.blind} round${shown.c.blind > 1 ? 's' : ''} where everything failed at once` : ''}</>
+              : 'no checks'}</>
+          : 'Point at a day for its figures.'}
+      </div>
+      <div className="ops-tl" role="table" aria-label={`Uptime per day, last ${days} days`} onMouseLeave={() => setHover(null)}>
+        {rows.map(r => {
+          const key = r.id ?? 'all'
+          return (
+            <div key={key} className={r.id ? 'ops-tl-row' : 'ops-tl-row is-all'} role="row">
+              <span className="ops-tl-name" role="rowheader">{r.name}</span>
+              <span className="ops-tl-cells" style={{ gridTemplateColumns: `repeat(${cols.length}, minmax(0, 1fr))` }}>
+                {cols.map(day => {
+                  const c = cell(r.id, day)
+                  return <span key={day} role="cell" className={`ops-tl-cell ${tone(c?.pct)}${hover?.day === day ? ' is-col' : ''}`}
+                               title={`${r.name} · ${shortDay(day)}: ${c ? fmtPct(c.pct) : 'no checks'}`}
+                               onMouseEnter={() => setHover({ app: key, day })} />
+                })}
+              </span>
+            </div>
+          )
+        })}
+        <div className="ops-tl-row ops-tl-axis" aria-hidden="true">
+          <span />
+          <span className="ops-bars-x"><span>{shortDay(cols[0])}</span><span>{shortDay(cols[cols.length - 1])}</span></span>
+        </div>
+      </div>
+      <p className="ops-tl-key">
+        <i className="ops-tl-cell is-good" /> 99.9% or better <i className="ops-tl-cell is-warn" /> 99 to 99.9%
+        <i className="ops-tl-cell is-bad" /> below 99% <i className="ops-tl-cell is-none" /> not checked yet
+      </p>
+      <div className="ops-table-wrap">
+        <table className="ops-table">
+          <caption>Availability per month (rounds the monitor missed count as down)</caption>
+          <thead><tr><th>App</th>{months.map(m => <th key={m.month} className="num">{monthName(m.month)}</th>)}</tr></thead>
+          <tbody>
+            {daily.targets.map(t => (
+              <tr key={t.id}>
+                <td>{t.name}<span className="ops-tag">{t.group}</span></td>
+                {months.map(m => {
+                  const v = m.per.get(t.id)
+                  const pct = v && v[0] > 0 ? (100 * v[1]) / v[0] : null
+                  return <td key={m.month} className={pct !== null && pct < 99 ? 'num down' : 'num'}>{pct === null ? '—' : fmtPct(pct)}</td>
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+/** Supabase's own status, so "is it them or us" has an answer on the page. */
+function UpstreamBox({ upstream }: { upstream: Part<Upstream> }) {
+  if (upstream.state === 'loading') return null
+  if (upstream.state !== 'ok') return <p className="ops-off">Supabase status: {upstream.state === 'failed' ? upstream.error : 'not available'}</p>
+  const u = upstream.data
+  const open = u.incidents.filter(i => i.open)
+  const ours = u.incidents.filter(i => i.ours && !i.scheduled)
+  return (
+    <div className={open.some(i => i.ours) ? 'ops-upstream is-bad' : open.length ? 'ops-upstream is-warn' : 'ops-upstream'}>
+      <p className="ops-summary">
+        {open.length === 0
+          ? <><CheckCircle2 size={15} className="ok" /> Supabase reports no open incident</>
+          : <><AlertTriangle size={15} className={open.some(i => i.ours) ? 'down' : undefined} /> Supabase: {open.length} open incident{open.length > 1 ? 's' : ''}{open.some(i => i.ours) ? `, ${u.region} affected` : ', not our region'}</>}
+        <span className="ops-check-meta"> · {ours.length === 0 ? `nothing in ${u.region} in 14 days` : `${ours.length} in ${u.region} in 14 days`} · <a href="https://status.supabase.com/" target="_blank" rel="noreferrer">status.supabase.com</a></span>
+      </p>
+      {[...open, ...ours.filter(i => !i.open)].slice(0, 4).map((i, k) => (
+        <p key={k} className="ops-check-meta">
+          <a href={i.url} target="_blank" rel="noreferrer">{i.title}</a> · {i.status} · {ago(i.updated)}
+        </p>
+      ))}
+    </div>
   )
 }
 

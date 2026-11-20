@@ -135,3 +135,28 @@
 @media (min-width: 1280px) { .ops-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .ops-pair .ops-two { grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 1700px) { .ops-pair .ops-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Uptime timeline (KPI 0302): a row per app, a cell per day. */
+.ops-tl { display: grid; gap: 3px; margin: 0.25rem 0 0.5rem; }
+.ops-tl-row { display: grid; grid-template-columns: minmax(6.5rem, 9rem) minmax(0, 1fr); align-items: center; gap: 0.6rem; }
+.ops-tl-row.is-all { margin-bottom: 4px; font-weight: 600; }
+.ops-tl-name { font-size: 0.8rem; color: var(--ink-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ops-tl-cells { display: grid; gap: 2px; }
+.ops-tl-cell { display: block; height: 1.1rem; border-radius: 2px; background: var(--ops-good); opacity: 0.85; }
+.ops-tl-row.is-all .ops-tl-cell { height: 1.5rem; }
+.ops-tl-cell.is-warn { background: var(--ops-warn); }
+.ops-tl-cell.is-bad { background: var(--ops-bad); }
+.ops-tl-cell.is-none { background: var(--ink-200); opacity: 1; }
+.ops-tl-cell.is-col { opacity: 1; outline: 1.5px solid var(--ink-950); outline-offset: 0; }
+.ops-tl-axis .ops-bars-x { margin: 0; }
+.ops-tl-read { font-size: 0.8125rem; color: var(--ink-500); min-height: 1.25rem; font-variant-numeric: tabular-nums; }
+.ops-tl-read strong { color: var(--ink-950); }
+.ops-tl-key { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem; font-size: 0.72rem; color: var(--ink-500); margin: 0 0 1rem; }
+.ops-tl-key .ops-tl-cell { display: inline-block; width: 0.7rem; height: 0.7rem; margin-left: 0.4rem; }
+.ops-tl-key .ops-tl-cell:first-child { margin-left: 0; }
+.ops-upstream { margin: 0 0 1rem; padding: 0.6rem 0.8rem; border: 1px solid var(--ink-200); border-radius: 12px; }
+.ops-upstream.is-bad { border-color: var(--ops-bad); }
+.ops-upstream.is-warn { border-color: var(--ops-warn); }
+.ops-upstream .ops-summary { margin: 0; flex-wrap: wrap; }
+.ops-upstream > .ops-check-meta { margin: 0.3rem 0 0; }
+@media (max-width: 640px) { .ops-tl-row { grid-template-columns: 5.5rem minmax(0, 1fr); gap: 0.4rem; } .ops-tl-cells { gap: 1px; } }

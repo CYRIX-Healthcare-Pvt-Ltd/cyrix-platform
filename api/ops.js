@@ -6,6 +6,8 @@
  *   GET /api/ops?part=changes&days=N  commits across the repos, newest first
  *   GET /api/ops?part=errors&days=N   CYRA's app_error, grouped by message
  *   GET /api/ops?part=ai&days=N       CYRA's metered AI usage and cost
+ *   GET /api/ops?part=upstream        Supabase's own status feed (status.supabase.com/feed.atom): incidents of the
+ *                                     last 14 days, with the ones that touch our region (ap-northeast-1) marked
  *   GET /api/ops?part=infra&days=N    where things run, this function's round trip to the database, and, when
  *                                     their keys are set, Supabase's request counts and Vercel Web Analytics
  *
@@ -277,6 +279,53 @@ async function ai(days) {
  * Where everything runs and how far apart it is. The database round trip is measured from this function, which runs
  * in Vercel's region and not in India, so the page measures its own from the viewer's browser as well.
  */
+/**
+ * Supabase's public status feed, so an outage on their side shows up next to ours and the two can be told apart
+ * (20 Nov 2026: every app went down for 26 minutes and the feed was quiet, which is how we knew it was our own
+ * database). Atom from incident.io; each entry's summary starts "<b>Status: Resolved</b>" and lists the affected
+ * components as <li>region (state)</li>. Kept for 10 minutes per warm function, so however many tabs are open the
+ * feed is fetched a handful of times an hour.
+ */
+const UPSTREAM_TTL = 10 * 60_000
+const OUR_REGION = 'ap-northeast-1'
+let upstreamCache = null
+
+const unhtml = s => String(s ?? '').replace(/<!\[CDATA\[|\]\]>/g, '').replace(/<[^>]+>/g, ' ')
+  .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+  .replace(/\s+/g, ' ').trim()
+const tag = (xml, name) => (xml.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`)) ?? [])[1] ?? ''
+
+async function upstream() {
+  if (upstreamCache && Date.now() - upstreamCache.at < UPSTREAM_TTL) return upstreamCache.body
+  const r = await timed('https://status.supabase.com/feed.atom', { headers: { Accept: 'application/atom+xml' } }, 8_000)
+  if (!r.ok) return { failed: `status.supabase.com answered ${r.status}` }
+  const xml = await r.text()
+  const cutoff = Date.now() - 14 * 86_400_000
+  const incidents = []
+  for (const m of xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
+    const e = m[1]
+    const updated = tag(e, 'updated').trim()
+    if (!updated || Date.parse(updated) < cutoff) continue
+    const raw = tag(e, 'summary').replace(/<!\[CDATA\[|\]\]>/g, '')
+    const status = (raw.match(/<b>\s*Status:\s*([^<(]+)/i) ?? [])[1]?.trim() ?? 'Unknown'
+    const components = [...raw.matchAll(/<li>([\s\S]*?)<\/li>/g)].map(x => unhtml(x[1]))
+    const title = unhtml(tag(e, 'title'))
+    const body = unhtml(raw.replace(/<b>\s*Status:[\s\S]*?<\/b>/i, '').split(/<b>\s*Affected components/i)[0])
+    const ours = components.some(c => c.startsWith(OUR_REGION)) || title.includes(OUR_REGION) || /all (supabase )?(projects|regions)/i.test(title)
+    incidents.push({
+      title, status, updated, ours, components,
+      open: !/^(resolved|complete|completed|postmortem)$/i.test(status) && !/^scheduled/i.test(status),
+      scheduled: /^scheduled/i.test(status),
+      detail: body.length > 220 ? body.slice(0, 220) + '…' : body,
+      url: (e.match(/<link[^>]*href="([^"]+)"/) ?? [])[1]?.replace(/([^:])\/\//, '$1/') ?? 'https://status.supabase.com/',
+    })
+  }
+  incidents.sort((a, b) => Date.parse(b.updated) - Date.parse(a.updated))
+  const body = { checked: new Date().toISOString(), region: OUR_REGION, incidents }
+  upstreamCache = { at: Date.now(), body }
+  return body
+}
+
 async function infra(days) {
   const pings = []
   for (let i = 0; i < 3; i++) {
@@ -338,7 +387,7 @@ async function infra(days) {
 
 /* ---- handler ------------------------------------------------------------------------------------------- */
 
-const PARTS = { health, deploys, changes, errors, ai, infra }
+const PARTS = { health, deploys, changes, errors, ai, infra, upstream }
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return send(res, 405, { error: 'GET only' })
