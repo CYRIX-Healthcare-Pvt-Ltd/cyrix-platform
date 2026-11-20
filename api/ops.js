@@ -185,10 +185,31 @@ async function cyra(table, query) {
   return r.json()
 }
 
+/**
+ * Every row, not just the first page. PostgREST hands back at most 1,000 rows a request whatever `limit` says, so a
+ * 30-day llm_usage read (1,696 rows on 20 Nov 2026) silently lost its newest days and the AI cost chart went blank
+ * where the 7-day view showed spend. Pages with Range until a short page comes back. `order` must be unique.
+ */
+async function cyraAll(table, query, max = 20_000) {
+  const PAGE = 1000
+  const out = []
+  for (let from = 0; from < max; from += PAGE) {
+    const r = await timed(`${CYRA_URL}/rest/v1/${table}?${query}`, {
+      headers: { apikey: CYRA_KEY, Authorization: `Bearer ${CYRA_KEY}`, 'Accept-Profile': 'cyra_v2',
+                 'Range-Unit': 'items', Range: `${from}-${from + PAGE - 1}` },
+    })
+    if (!r.ok && r.status !== 206) throw new Error(`Cyra database answered ${r.status}`)
+    const rows = await r.json()
+    out.push(...rows)
+    if (rows.length < PAGE) break
+  }
+  return out
+}
+
 async function errors(days) {
   if (!CYRA_URL || !CYRA_KEY) return { configured: false }
-  const rows = await cyra('app_error',
-    `select=source,route,status,kind,message,created_at&created_at=gte.${sinceDays(days).toISOString()}&order=created_at.desc&limit=5000`)
+  const rows = await cyraAll('app_error',
+    `select=source,route,status,kind,message,created_at&created_at=gte.${sinceDays(days).toISOString()}&order=created_at.desc,id.desc`, 5000)
   const groups = new Map()
   const byDay = new Map()
   for (const e of rows) {
@@ -235,8 +256,8 @@ const sarvamOf = model => SARVAM.find(p => p.re.test(model ?? ''))
 async function ai(days) {
   if (!CYRA_URL || !CYRA_KEY) return { configured: false }
   const since = sinceDays(days).toISOString().slice(0, 10)
-  const rows = await cyra('llm_usage',
-    `select=day,route,model,unit_kind,prompt_tokens,completion_tokens,cached_tokens,units,calls,est_cost&day=gte.${since}&limit=10000`)
+  const rows = await cyraAll('llm_usage',
+    `select=day,route,model,unit_kind,prompt_tokens,completion_tokens,cached_tokens,units,calls,est_cost&day=gte.${since}&order=day.desc,user_key,route,model`)
   const add = (map, key, r) => {
     const a = map.get(key) ?? { key, calls: 0, cost: 0, tokens: 0 }
     a.calls += r.calls ?? 0
