@@ -43,6 +43,13 @@ interface UptimeDaily {
   days: { day: string; rounds: number; blind: number; apps: Record<string, [number, number]> }[]
 }
 
+/** People with an app open (KPI 0303): live counts, the last 24 h of 5-minute samples, and the typical day by IST hour. */
+interface ActiveNow {
+  at: string; users_60: number; users_15: number; first_sample: string | null
+  last_24h: [string, number][]
+  by_hour: { hour: number; weekend: boolean; avg: number; peak: number }[]
+}
+
 /** Supabase's own status feed (/api/ops?part=upstream), last 14 days. `ours` = touches ap-northeast-1 or all regions. */
 interface Upstream {
   checked: string
@@ -252,7 +259,7 @@ const ago = (iso: string) => {
   return `${Math.round(s / 86400)} d ago`
 }
 const clock = (ms: number) => new Date(ms).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
-const SECTIONS = [['status', 'Status'], ['uptime', 'Uptime'], ['errors', 'Errors'], ['usage', 'Usage'], ['ai', 'AI cost'], ['pulse', 'Pulse'], ['security', 'Security'], ['cron', 'Scheduled jobs'], ['infra', 'Infrastructure'], ['changes', 'Changes']] as const
+const SECTIONS = [['status', 'Status'], ['online', 'Online'], ['uptime', 'Uptime'], ['errors', 'Errors'], ['usage', 'Usage'], ['ai', 'AI cost'], ['pulse', 'Pulse'], ['security', 'Security'], ['cron', 'Scheduled jobs'], ['infra', 'Infrastructure'], ['changes', 'Changes']] as const
 const shortDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 
 /**
@@ -279,6 +286,7 @@ export default function Ops() {
   const [overview, setOverview] = useState<Part<Overview>>({ state: 'loading' })
   const [uptime, setUptime] = useState<Part<Uptime>>({ state: 'loading' })
   const [daily, setDaily] = useState<Part<UptimeDaily>>({ state: 'loading' })
+  const [online, setOnline] = useState<Part<ActiveNow>>({ state: 'loading' })
   const [upstream, setUpstream] = useState<Part<Upstream>>({ state: 'loading' })
   const [health, setHealth] = useState<Part<HealthData>>({ state: 'loading' })
   const [deploys, setDeploys] = useState<Part<DeploysData>>({ state: 'loading' })
@@ -322,12 +330,14 @@ export default function Ops() {
         () => keep(fn)({ state: 'failed', error: 'Could not reach the database' }))
 
     if (reset) {
-      for (const fn of [setOverview, setUptime, setDaily, setUpstream, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi, setPulse, setAiApps, setSecurity, setInfra, setDb, setCron] as
+      for (const fn of [setOverview, setUptime, setDaily, setOnline, setUpstream, setHealth, setDeploys, setChanges, setErrors, setAppErrors, setAi, setPulse, setAiApps, setSecurity, setInfra, setDb, setCron] as
                        React.Dispatch<React.SetStateAction<Part<unknown>>>[]) fn({ state: 'loading' })
     }
     const jobs: PromiseLike<unknown>[] = [
       rpc(setAppErrors, 'ops_errors', { p_days: Math.min(d, 90) }),
       rpc(setUptime, 'ops_uptime', { p_days: Math.min(d, 90) }),
+      // Who has an app open now: one count over recent sessions, cheap enough for the 2-minute tier (KPI 0303).
+      rpc(setOnline, 'ops_active_now', {}),
       // The 5-minute round's own results, not a live ping of every app from a Vercel function (KPI 0300).
       supabase.rpc('ops_latest').then(
         r => keep(setHealth)(r.error ? { state: r.error.code === 'PGRST202' ? 'off' : 'failed', error: r.error.message } as Part<HealthData>
@@ -481,6 +491,7 @@ export default function Ops() {
             <Attention health={sc.health} uptime={sc.uptime} errors={sc.errors} appErrors={sc.appErrors} deploys={sc.deploys} ai={sc.ai} pulse={sc.pulse} security={sc.security} cron={scoped ? NO_CRON : cron}
                        upstream={upstream} db={db} />
             <StatusPanel health={sc.health} deploys={sc.deploys} />
+            {!scoped && <OnlinePanel online={online} />}
             {/* The timeline needs the width: a column per day. */}
             <UptimePanel uptime={sc.uptime} daily={sc.daily} upstream={upstream} days={days} />
             <ErrorsPanel errors={sc.errors} appErrors={sc.appErrors} deploys={sc.deploys} days={days} scoped={scoped} />
@@ -702,6 +713,117 @@ function attentionFlags(health: Part<HealthData>, uptime: Part<Uptime>, errors: 
     }
   }
   return out.sort((a, b) => (a.level === b.level ? 0 : a.level === 'bad' ? -1 : 1))
+}
+
+/**
+ * Who is on the platform. Two uses: knowing how many people an outage is hitting, and picking a maintenance window
+ * (Adrian, 20 Nov 2026: backend work must not land on people mid-task). "Online" = a signed-in session that refreshed
+ * in the last hour, which an open tab of any Cyrix app does about hourly. People, not tabs; no names.
+ */
+function OnlinePanel({ online }: { online: Part<ActiveNow> }) {
+  return (
+    <Panel id="online" title="People online" note="Signed in with a Cyrix app open (session refreshed in the last hour). Counted every 5 minutes.">
+      <Waiting part={online} off="Needs KPI migration 0303 (ops/apply-0303.sql).">
+        {o => {
+          const weekday = o.by_hour.filter(h => !h.weekend)
+          const weekend = o.by_hour.filter(h => h.weekend)
+          const quiet = (rows: typeof weekday) => {
+            // The three-hour block with the lowest average, among hours with samples.
+            const by = new Map(rows.map(r => [r.hour, r.avg]))
+            if (by.size < 12) return null
+            let best: { start: number; avg: number } | null = null
+            for (let h = 0; h < 24; h++) {
+              const v = [0, 1, 2].map(k => by.get((h + k) % 24))
+              if (v.some(x => x === undefined)) continue
+              const a = (v as number[]).reduce((n, x) => n + x, 0) / 3
+              if (!best || a < best.avg) best = { start: h, avg: a }
+            }
+            return best
+          }
+          const fmtH = (h: number) => String(h % 24).padStart(2, '0')
+          const qd = quiet(weekday), qe = quiet(weekend)
+          return (
+            <>
+              <Stats items={[
+                { label: 'Online now', value: fmtInt(o.users_60) },
+                { label: 'Active in last 15 min', value: fmtInt(o.users_15) },
+                { label: 'Quietest weekday (IST)', value: qd ? `${fmtH(qd.start)}:00–${fmtH(qd.start + 3)}:00` : '—' },
+                { label: 'Quietest weekend (IST)', value: qe ? `${fmtH(qe.start)}:00–${fmtH(qe.start + 3)}:00` : '—' },
+              ]} />
+              {o.last_24h.length > 1 && <OnlineLine points={o.last_24h} />}
+              {weekday.length > 0 && <HourBars weekday={weekday} weekend={weekend} />}
+              {(!qd || !qe) && (
+                <p className="ops-note">Counting since {o.first_sample ? new Date(o.first_sample).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) + ' IST' : 'now'}. The quiet hours show once a full weekday and weekend have been counted.</p>
+              )}
+            </>
+          )
+        }}
+      </Waiting>
+    </Panel>
+  )
+}
+
+/** The last 24 hours as a thin line, with the figure at the point under the pointer. */
+function OnlineLine({ points }: { points: [string, number][] }) {
+  const [hover, setHover] = useState<number | null>(null)
+  const max = Math.max(1, ...points.map(p => p[1]))
+  const t0 = Date.parse(points[0][0]), t1 = Date.parse(points[points.length - 1][0])
+  const x = (t: string) => ((Date.parse(t) - t0) / Math.max(1, t1 - t0)) * 100
+  const y = (v: number) => 38 - (v / max) * 34
+  const d = points.map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(2)},${y(p[1]).toFixed(2)}`).join(' ')
+  const shown = points[hover ?? points.length - 1]
+  const time = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
+  return (
+    <figure className="ops-bars">
+      <figcaption><span>Last 24 hours</span><span className="ops-bars-read">{time(shown[0])}: <strong>{fmtInt(shown[1])} online</strong></span></figcaption>
+      <svg viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label={`People online over the last 24 hours, peak ${max}`}
+           onMouseLeave={() => setHover(null)}
+           onMouseMove={e => {
+             const r = e.currentTarget.getBoundingClientRect()
+             const f = (e.clientX - r.left) / r.width
+             const t = t0 + f * (t1 - t0)
+             let best = 0
+             for (let i = 1; i < points.length; i++) if (Math.abs(Date.parse(points[i][0]) - t) < Math.abs(Date.parse(points[best][0]) - t)) best = i
+             setHover(best)
+           }}>
+        <path d={`${d} L100,40 L0,40 Z`} className="ops-line-fill" />
+        <path d={d} className="ops-line" vectorEffect="non-scaling-stroke" />
+        {hover !== null && <line x1={x(shown[0])} x2={x(shown[0])} y1="0" y2="40" className="ops-line-cursor" vectorEffect="non-scaling-stroke" />}
+      </svg>
+      <div className="ops-bars-x"><span>{time(points[0][0])}</span><span>now</span></div>
+    </figure>
+  )
+}
+
+/** A typical day: average people online per IST hour, weekdays and weekends side by side. The low bars are the window. */
+function HourBars({ weekday, weekend }: { weekday: ActiveNow['by_hour']; weekend: ActiveNow['by_hour'] }) {
+  const [hover, setHover] = useState<number | null>(null)
+  const wd = new Map(weekday.map(r => [r.hour, r])), we = new Map(weekend.map(r => [r.hour, r]))
+  const max = Math.max(1, ...weekday.map(r => r.avg), ...weekend.map(r => r.avg))
+  const hh = hover ?? Number(new Date().toLocaleString('en-GB', { hour: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }))
+  return (
+    <figure className="ops-bars">
+      <figcaption>
+        <span>Typical day, average online by hour (IST, last 14 days)</span>
+        <span className="ops-bars-read">{String(hh).padStart(2, '0')}:00 · weekday <strong>{wd.get(hh)?.avg ?? '—'}</strong>
+          {' '}· weekend <strong>{we.get(hh)?.avg ?? '—'}</strong></span>
+      </figcaption>
+      <svg viewBox="0 0 240 40" preserveAspectRatio="none" role="img" aria-label="Average people online per hour of day" onMouseLeave={() => setHover(null)}>
+        <line x1="0" x2="240" y1="40" y2="40" className="ops-axis" />
+        {Array.from({ length: 24 }, (_, i) => {
+          const a = wd.get(i)?.avg ?? 0, b = we.get(i)?.avg ?? 0
+          return (
+            <g key={i} onMouseEnter={() => setHover(i)}>
+              <rect x={i * 10} y="0" width="10" height="40" fill="transparent" />
+              <rect x={i * 10 + 1.5} y={40 - (a / max) * 38} width="3.2" height={(a / max) * 38} rx="1" className={hover === i ? 'ops-bar is-hover' : 'ops-bar'} />
+              <rect x={i * 10 + 5.3} y={40 - (b / max) * 38} width="3.2" height={(b / max) * 38} rx="1" className="ops-bar-alt" />
+            </g>
+          )
+        })}
+      </svg>
+      <div className="ops-bars-x"><span>00:00</span><span className="ops-bars-key"><i className="ops-key-a" /> weekday <i className="ops-key-b" /> weekend</span><span>23:00</span></div>
+    </figure>
+  )
 }
 
 function StatusPanel({ health, deploys }: { health: Part<HealthData>; deploys: Part<DeploysData> }) {
