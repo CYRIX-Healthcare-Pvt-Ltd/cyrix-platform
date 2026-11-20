@@ -69,7 +69,8 @@ const hue = (h: Hue) => {
 const grad = (h: Hue) => `linear-gradient(135deg, ${hue(h).from}, ${hue(h).to})`
 const tint = (h: Hue) => ({ ['--hue' as string]: hue(h).ink, ['--soft' as string]: hue(h).soft, ['--grad' as string]: grad(h) }) as CSSProperties
 const ytThumb = (id: string) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
-const cover = (p: Post) => (p.image_url ? `center/cover no-repeat url(${p.image_url})`
+// A photo shows from its top, where a heading usually is (the user, 20 Nov: "show top part of the uploaded image").
+const cover = (p: Post) => (p.image_url ? `center top/cover no-repeat url(${p.image_url})`
   : p.video_id ? `center/cover no-repeat url(${ytThumb(p.video_id)})` : grad(p.color))
 
 const ago = (iso: string) => {
