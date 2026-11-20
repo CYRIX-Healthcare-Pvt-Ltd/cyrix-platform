@@ -181,3 +181,11 @@
 .ops-tl-months { margin: 0 0 1rem; }
 .ops-tl-months > summary { cursor: pointer; font-size: 0.8125rem; color: var(--ink-700); padding: 0.25rem 0; }
 .ops-tl-months > summary:hover { color: var(--ink-950); }
+
+/* People online (KPI 0303). */
+.ops-line { fill: none; stroke: var(--ops-series); stroke-width: 1.75; stroke-linejoin: round; }
+.ops-line-fill { fill: var(--ops-series); opacity: 0.1; }
+.ops-line-cursor { stroke: var(--ink-500); stroke-width: 1; stroke-dasharray: 2 2; }
+.ops-bar-alt { fill: var(--ops-series); opacity: 0.4; }
+.ops-key-a, .ops-key-b { display: inline-block; width: 0.55rem; height: 0.55rem; border-radius: 2px; background: var(--ops-series); margin-left: 0.4rem; }
+.ops-key-b { opacity: 0.4; }
