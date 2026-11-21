@@ -9,7 +9,8 @@
  *   GET /api/ops?part=upstream        Supabase's own status feed (status.supabase.com/feed.atom): incidents of the
  *                                     last 14 days, with the ones that touch our region (ap-northeast-1) marked
  *   GET /api/ops?part=infra&days=N    where things run, this function's round trip to the database, and, when
- *                                     their keys are set, Supabase's request counts and Vercel Web Analytics
+ *                                     their keys are set, Supabase's request counts and Vercel Web Analytics, and
+ *                                     the compute each host is on (Vercel plan and function size, Supabase compute, Render plan)
  *
  * Usage figures from the shared database do not come through here: the page asks ops_overview() with its own
  * session, and the database refuses anyone who is not an Ops admin.
@@ -22,7 +23,9 @@
  *   GITHUB_TOKEN                     a fine-grained, read-only (contents + metadata) token for the repos
  *   CYRA_SUPABASE_URL, CYRA_SERVICE_KEY  CYRA's own project, read with Accept-Profile: cyra_v2
  *   SUPABASE_REGION                  optional: the shared database's region for the status feed (default ap-northeast-1)
- *   SUPABASE_ACCESS_TOKEN            optional: a Supabase account token, for the project's region and request counts
+ *   SUPABASE_ACCESS_TOKEN            optional: a Supabase account token, for the project's region, request counts and
+ *                                    both projects' compute size
+ *   RENDER_API_KEY                   optional: a Render API key, for the Cyra engine's plan and region
  * A part whose key is missing answers { configured: false } rather than failing, so the page can say so.
  *
  * Every answer is counts, names of apps and commit messages. No ticket, score, prompt or stack trace leaves here.
@@ -36,6 +39,7 @@ const VERCEL_TOKEN = process.env.VERCEL_TOKEN || ''
 const VERCEL_TEAM = process.env.VERCEL_TEAM_ID || 'team_yvvPM8g0ikIafJ2RCnZGMga3'
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || ''
 const SUPABASE_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || ''
+const RENDER_KEY = process.env.RENDER_API_KEY || ''
 const SHARED_REF = (SHARED_URL.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/) ?? [])[1] ?? ''
 // Vercel project per app, for Web Analytics. Workplace was cyrix-inventory until it was renamed.
 const VERCEL_PROJECTS = { portal: 'cyrix-platform', kpi: 'cyrix-kpi', spare: 'cyrix-spare-mapping', bemmp: 'cyrix-bemmp-dashboard',
@@ -390,6 +394,8 @@ async function infra(days) {
     }
   }
 
+  out.compute = await compute()
+
   if (out.analytics.configured) {
     const since = sinceDays(days).toISOString(), until = new Date().toISOString()
     out.analytics.apps = await Promise.all(Object.entries(VERCEL_PROJECTS).map(async ([app, project]) => {
@@ -406,6 +412,77 @@ async function infra(days) {
       }
     }))
   }
+  return out
+}
+
+/**
+ * What each host is running on, for the Infrastructure panel's Compute table (the user, 21 Nov). Only what each
+ * provider's API says; the page fills in the rest (the shared database's size from max_connections, svc01 from
+ * Pulse). Every source is optional and fails to null on its own, so one missing key never blanks the others.
+ */
+async function compute() {
+  const out = { vercel: null, supabase: {}, render: null }
+  const jobs = []
+
+  if (VERCEL_TOKEN) {
+    const h = { headers: { Authorization: `Bearer ${VERCEL_TOKEN}` } }
+    jobs.push((async () => {
+      try {
+        const [t, p] = await Promise.all([
+          timed(`https://api.vercel.com/v2/teams/${VERCEL_TEAM}`, h, 6_000),
+          timed(`https://api.vercel.com/v9/projects/${VERCEL_PROJECTS.portal}?teamId=${VERCEL_TEAM}`, h, 6_000),
+        ])
+        const team = t.ok ? await t.json() : null
+        const proj = p.ok ? await p.json() : null
+        const rc = proj?.resourceConfig ?? {}
+        out.vercel = {
+          plan: team?.billing?.plan ?? null,
+          projects: Object.keys(VERCEL_PROJECTS).length,
+          memory: rc.functionDefaultMemoryType ?? proj?.defaultResourceConfig?.functionDefaultMemoryType ?? null,
+          timeout_s: rc.functionDefaultTimeout ?? null,
+          fluid: rc.fluid ?? null,
+          regions: rc.functionDefaultRegions ?? (process.env.VERCEL_REGION ? [process.env.VERCEL_REGION] : null),
+        }
+      } catch { out.vercel = { failed: true } }
+    })())
+  }
+
+  if (SUPABASE_TOKEN) {
+    const h = { headers: { Authorization: `Bearer ${SUPABASE_TOKEN}` } }
+    const CYRA_REF = (CYRA_URL.match(/^https:\/\/([a-z0-9]+)\.supabase\.co/) ?? [])[1] ?? ''
+    for (const [key, ref] of [['shared', SHARED_REF], ['cyra', CYRA_REF]]) {
+      if (!ref) continue
+      jobs.push((async () => {
+        try {
+          const [p, a] = await Promise.all([
+            timed(`https://api.supabase.com/v1/projects/${ref}`, h, 6_000),
+            timed(`https://api.supabase.com/v1/projects/${ref}/billing/addons`, h, 6_000),
+          ])
+          const proj = p.ok ? await p.json() : null
+          const addons = a.ok ? await a.json() : null
+          const ci = (addons?.selected_addons ?? []).find(x => x.type === 'compute_instance')
+          out.supabase[key] = { region: proj?.region ?? null, status: proj?.status ?? null,
+                                size: ci?.variant?.name ?? ci?.variant?.identifier ?? null }
+        } catch { out.supabase[key] = { failed: true } }
+      })())
+    }
+  }
+
+  if (RENDER_KEY) {
+    jobs.push((async () => {
+      try {
+        const r = await timed('https://api.render.com/v1/services?limit=20', { headers: { Authorization: `Bearer ${RENDER_KEY}`, Accept: 'application/json' } }, 6_000)
+        const rows = r.ok ? await r.json() : []
+        out.render = rows.map(x => x.service ?? x).map(s => ({
+          name: s.name, type: s.type, suspended: s.suspended === 'suspended',
+          plan: s.serviceDetails?.plan ?? null, region: s.serviceDetails?.region ?? s.region ?? null,
+          instances: s.serviceDetails?.numInstances ?? null,
+        }))
+      } catch { out.render = [] }
+    })())
+  }
+
+  await Promise.all(jobs)
   return out
 }
 

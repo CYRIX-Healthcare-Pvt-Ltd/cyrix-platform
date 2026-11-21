@@ -117,6 +117,7 @@ interface PulseData {
   sync: { job: string; every_hours: number; age_hours: number | null; late: boolean }[]
   backups: { count: number; total_bytes: number; newest: { name: string; size_bytes: number } | null; age_hours: number | null; late: boolean; scheduled_hour_ist: number }
   disk: { total_bytes: number; free_bytes: number; free_pct: number | null } | null
+  host?: { cpus: number | null; load: number[] | null; memory: { total_bytes: number; available_bytes: number | null } | null; booted_at: string | null }
   ai_chat: { day: string; questions: number; people: number }[]
   backup_failures: { at: string; by: string; file: string | null }[]
   problems: string[]
@@ -154,6 +155,12 @@ interface InfraData {
   supabase: { configured: boolean; region?: string | null; status?: string | null; version?: string | null; failed?: string
               requests_7d?: { rest: number; auth: number; storage: number; realtime: number } }
   analytics: { configured: boolean; apps?: { app: string; enabled: boolean; views?: number; visitors?: number | null; reason?: string }[] }
+  compute?: {
+    vercel: { plan?: string | null; projects?: number; memory?: string | null; timeout_s?: number | null; fluid?: boolean | null
+              regions?: string[] | null; failed?: boolean } | null
+    supabase: Partial<Record<'shared' | 'cyra', { region?: string | null; status?: string | null; size?: string | null; failed?: boolean }>>
+    render: { name: string; type: string; suspended: boolean; plan: string | null; region: string | null; instances: number | null }[] | null
+  }
 }
 interface DbData {
   version: string; started: string; size_bytes: number; max_connections: number
@@ -518,7 +525,7 @@ export default function Ops() {
               </div>
             ) : <SecurityPanel security={sc.security} />}
             <CronPanel cron={cron} />
-            <InfraPanel infra={infra} db={db} browserMs={browserMs} />
+            <InfraPanel infra={infra} db={db} pulse={pulse} browserMs={browserMs} />
             <ChangesPanel changes={sc.changes} deploys={sc.deploys} />
           </>
         )}
@@ -1635,9 +1642,113 @@ function SecurityPanel({ security }: { security: Part<SecurityData> }) {
  * Where things run and how the shared database is holding up. Region and request counts need SUPABASE_ACCESS_TOKEN on
  * the portal; page views need Web Analytics switched on per Vercel project. Everything else needs nothing.
  */
-function InfraPanel({ infra, db, browserMs }: { infra: Part<InfraData>; db: Part<DbData>; browserMs: number | null }) {
+/**
+ * Published sizes, so a row can say what a plan name means (the user, 21 Nov: "showcase the compute"). Checked
+ * against each provider's pricing page in Nov 2026; a plan the table does not know shows its name alone.
+ */
+const SUPABASE_SIZES: Record<string, { ram: string; cpu: string; usd: number; conns: number }> = {
+  Micro: { ram: '1 GB', cpu: '2-core ARM, shared', usd: 10, conns: 60 },
+  Small: { ram: '2 GB', cpu: '2-core ARM, shared', usd: 15, conns: 90 },
+  Medium: { ram: '4 GB', cpu: '2-core ARM, shared', usd: 60, conns: 120 },
+  Large: { ram: '8 GB', cpu: '2-core ARM, dedicated', usd: 110, conns: 160 },
+  XL: { ram: '16 GB', cpu: '4-core ARM, dedicated', usd: 210, conns: 240 },
+  '2XL': { ram: '32 GB', cpu: '8-core ARM, dedicated', usd: 410, conns: 380 },
+  '4XL': { ram: '64 GB', cpu: '16-core ARM, dedicated', usd: 960, conns: 480 },
+}
+const RENDER_PLANS: Record<string, { ram: string; cpu: string; usd: number; note?: string }> = {
+  free: { ram: '512 MB', cpu: '0.1 CPU', usd: 0, note: 'sleeps after 15 min idle' },
+  starter: { ram: '512 MB', cpu: '0.5 CPU', usd: 7 },
+  standard: { ram: '2 GB', cpu: '1 CPU', usd: 25 },
+  pro: { ram: '4 GB', cpu: '2 CPU', usd: 85 },
+}
+const VERCEL_MEMORY: Record<string, string> = { standard: '2 GB, 1 vCPU', performance: '4 GB, 2 vCPU' }
+const cap = (x: string) => x ? x[0].toUpperCase() + x.slice(1) : x
+
+/** A Supabase size from its name, or from max_connections when no account token says the name. */
+function supabaseSize(name: string | null | undefined, maxConns: number | null | undefined) {
+  const key = name ? Object.keys(SUPABASE_SIZES).find(k => k.toLowerCase() === name.replace(/^ci_/, '').toLowerCase()) : undefined
+  if (key) return { name: key, ...SUPABASE_SIZES[key], inferred: false }
+  const byConns = maxConns ? Object.entries(SUPABASE_SIZES).find(([, v]) => v.conns === maxConns) : undefined
+  return byConns ? { name: byConns[0], ...byConns[1], inferred: true } : null
+}
+
+interface ComputeRow { host: string; runs: string; size: string; region: string; now: string; warn?: boolean }
+
+/** One row per place something of ours runs: Vercel, both Supabase projects, Render, cyrix-svc01. */
+function computeRows(i: InfraData | null, d: DbData | null, p: PulseData | null): ComputeRow[] {
+  const c = i?.compute
+  const rows: ComputeRow[] = []
+
+  const v = c?.vercel
+  const mem = v?.memory ? (VERCEL_MEMORY[v.memory] ?? v.memory) : null
+  rows.push({
+    host: `Vercel${v?.plan ? ` (${cap(v.plan)})` : ''}`,
+    runs: `${v?.projects ?? 9} web apps and their API functions`,
+    size: [mem ? `Functions ${mem}` : null, v?.fluid ? 'Fluid compute' : null, v?.timeout_s ? `${v.timeout_s}s limit` : null]
+      .filter(Boolean).join(', ') || (v?.failed ? 'Vercel API did not answer' : 'Serverless, sized per request'),
+    region: (v?.regions?.length ? v.regions : [i?.function_region ?? null]).map(regionName).join(', '),
+    now: '—',
+  })
+
+  const conns = d ? Object.values(d.connections).reduce((n, x) => n + x, 0) : null
+  const shared = supabaseSize(c?.supabase.shared?.size, d?.max_connections)
+  rows.push({
+    host: 'Supabase, shared database',
+    runs: 'Login, KPI, Travel, Revive, My Task, Workplace, Projects, BEMMP, Spare',
+    size: shared ? `${shared.name}${shared.inferred ? ' (from its connection limit)' : ''}: ${shared.ram}, ${shared.cpu}, $${shared.usd}/mo` : '—',
+    region: regionName(c?.supabase.shared?.region ?? i?.supabase.region ?? 'ap-northeast-1'),
+    now: d && conns !== null ? `${fmtInt(conns)} of ${fmtInt(d.max_connections)} connections` : '—',
+    warn: Boolean(d && conns !== null && conns >= 0.8 * d.max_connections),
+  })
+
+  const cy = supabaseSize(c?.supabase.cyra?.size, null)
+  rows.push({
+    host: 'Supabase, Cyra database',
+    runs: 'Cyra Assist (its own project and logins)',
+    size: cy ? `${cy.name}: ${cy.ram}, ${cy.cpu}, $${cy.usd}/mo` : 'Needs SUPABASE_ACCESS_TOKEN',
+    region: regionName(c?.supabase.cyra?.region ?? 'ap-south-1'),
+    now: c?.supabase.cyra?.status ? cap(c.supabase.cyra.status.replace(/_/g, ' ').toLowerCase()) : '—',
+  })
+
+  const live = Boolean(c?.render?.length)
+  const engines = live ? c!.render! : [{ name: 'cyra-diagnostic-chat', type: 'web_service', suspended: false, plan: 'free', region: null, instances: null }]
+  for (const r of engines) {
+    const plan = r.plan ? RENDER_PLANS[r.plan] : undefined
+    rows.push({
+      host: `Render${r.plan ? ` (${cap(r.plan)})` : ''}`,
+      runs: r.name === 'cyra-diagnostic-chat' ? 'Cyra engine (AI guide)' : r.name,
+      size: plan ? [plan.ram, plan.cpu, plan.usd ? `$${plan.usd}/mo` : null, plan.note].filter(Boolean).join(', ') : (r.plan ?? '—'),
+      region: r.region ? cap(r.region) : '—',
+      now: r.suspended ? 'Suspended' : (live ? 'Running' : '—'),
+      warn: r.suspended,
+    })
+  }
+
+  const h = p?.host
+  const memTotal = h?.memory?.total_bytes ?? null
+  const memUsed = memTotal !== null && h?.memory?.available_bytes != null ? memTotal - h.memory.available_bytes : null
+  const load = h?.load?.[1] ?? null
+  rows.push({
+    host: 'cyrix-svc01 (office server)',
+    runs: 'Pulse, SAP sync, SQL Server, Caddy',
+    size: h ? [h.cpus ? `${h.cpus} cores` : null, memTotal ? `${fmtBytes(memTotal)} RAM` : null,
+               p?.disk ? `${fmtBytes(p.disk.total_bytes)} disk` : null].filter(Boolean).join(', ') || '—'
+            : 'Shows after the next Pulse rebuild',
+    region: 'Office (on-prem)',
+    now: [load !== null && h?.cpus ? `load ${load} on ${h.cpus} cores` : null,
+          memUsed !== null && memTotal ? `memory ${Math.round(100 * memUsed / memTotal)}% used` : null,
+          p?.disk?.free_pct != null ? `disk ${p.disk.free_pct}% free` : null,
+          h?.booted_at ? `booted ${ago(h.booted_at)}` : null].filter(Boolean).join(', ') || '—',
+    warn: Boolean((load !== null && h?.cpus && load >= h.cpus) || (p?.disk?.free_pct != null && p.disk.free_pct < 10)),
+  })
+  return rows
+}
+
+function InfraPanel({ infra, db, pulse, browserMs }: { infra: Part<InfraData>; db: Part<DbData>; pulse: Part<PulseData>; browserMs: number | null }) {
   const i = infra.state === 'ok' ? infra.data : null
   const d = db.state === 'ok' ? db.data : null
+  const p = pulse.state === 'ok' ? pulse.data : null
+  const compute = computeRows(i, d, p)
   const conns = d ? Object.values(d.connections).reduce((n, x) => n + x, 0) : 0
   const views = i?.analytics.apps?.filter(a => a.enabled) ?? []
   const notOn = i?.analytics.apps?.filter(a => !a.enabled) ?? []
@@ -1658,6 +1769,21 @@ function InfraPanel({ infra, db, browserMs }: { infra: Part<InfraData>; db: Part
           { label: 'Last restart', value: ago(d.started) },
         ] : []),
       ]} />
+      <div className="ops-table-wrap">
+        <table className="ops-table">
+          <caption>Compute: what each part runs on</caption>
+          <thead><tr><th>Host</th><th>Runs</th><th>Size</th><th>Region</th><th>Now</th></tr></thead>
+          <tbody>
+            {compute.map(r => (
+              <tr key={r.host + r.runs}><td>{r.host}</td><td>{r.runs}</td><td>{r.size}</td><td>{r.region}</td>
+                <td className={r.warn ? 'down' : undefined}>{r.now}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {i && !i.compute?.supabase.cyra && !i.compute?.render?.length && (
+        <p className="ops-note">Without a provider key, sizes come from each plan's published figures: the shared database's from its connection limit, Render's from Cyra's render.yaml. SUPABASE_ACCESS_TOKEN and RENDER_API_KEY on the portal's Vercel project make them live.</p>
+      )}
       {(i?.supabase.region ?? 'ap-northeast-1') !== 'ap-south-1' && (
         <p className="ops-note">The database is outside India, so every request makes the round trip above. Mumbai (ap-south-1) would cut it, but moving means a new project.</p>
       )}
