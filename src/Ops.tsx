@@ -473,10 +473,17 @@ export default function Ops() {
         ) : (
           <>
             <div className="ops-head">
-              <div>
-                <h1>Ops</h1>
-                <p className="sub">Every Cyrix app: up or down, what broke, who used it, what shipped, and what the AI cost.</p>
-              </div>
+              <h1>Ops</h1>
+              <p className="sub">Every Cyrix app: up or down, what broke, who used it, what shipped, and what the AI cost.</p>
+            </div>
+            <p className="ops-live" aria-live="polite">
+              <span className="ops-live-dot" aria-hidden="true" />
+              {updated ? `Updated ${clock(updated)}` : 'Loading'} · refreshes every 2 minutes while open
+            </p>
+
+            {/* Filter, period, export, refresh and the section links stay under the top bar while the page scrolls
+                (the user, 21 Nov). On a phone the controls take one row and the links scroll sideways below them. */}
+            <div className="ops-sticky">
               <div className="ops-controls">
                 <select className="ops-select" aria-label="App" value={app} onChange={e => setApp(e.target.value)}>
                   <option value="all">All apps</option>
@@ -484,7 +491,7 @@ export default function Ops() {
                 </select>
                 <div className="ops-seg" role="group" aria-label="Period">
                   {([7, 30, 90] as Days[]).map(d => (
-                    <button key={d} aria-pressed={days === d} onClick={() => setDays(d)}>{d} days</button>
+                    <button key={d} aria-pressed={days === d} onClick={() => setDays(d)} aria-label={`${d} days`}>{d}<span className="ops-long"> days</span><span className="ops-short" aria-hidden="true">d</span></button>
                   ))}
                 </div>
                 <button className="icon-btn" title="Download this view as an Excel report" onClick={exportReport} disabled={exporting}>
@@ -494,15 +501,10 @@ export default function Ops() {
                   <RefreshCw size={16} className={busy ? 'spin' : undefined} />
                 </button>
               </div>
+              <nav className="ops-jump" aria-label="Sections">
+                {SECTIONS.map(([id, name]) => <a key={id} href={`#${id}`}>{name}</a>)}
+              </nav>
             </div>
-            <p className="ops-live" aria-live="polite">
-              <span className="ops-live-dot" aria-hidden="true" />
-              {updated ? `Updated ${clock(updated)}` : 'Loading'} · refreshes every 2 minutes while open
-            </p>
-
-            <nav className="ops-jump" aria-label="Sections">
-              {SECTIONS.map(([id, name]) => <a key={id} href={`#${id}`}>{name}</a>)}
-            </nav>
 
             {scoped && (
               <p className="ops-note">Showing {appOf(app)?.name} only. Charts that the sources cannot split by app are hidden; Security and Infrastructure stay company-wide.</p>
