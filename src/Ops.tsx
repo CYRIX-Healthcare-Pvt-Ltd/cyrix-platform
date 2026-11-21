@@ -59,7 +59,7 @@ interface ActiveNow {
   by_hour: { hour: number; weekend: boolean; avg: number; peak: number }[]
 }
 
-/** Supabase's own status feed (/api/ops?part=upstream), last 14 days. `ours` = touches ap-northeast-1 or all regions. */
+/** Supabase's own status feed (/api/ops?part=upstream), last 14 days. `ours` = touches ap-south-1 or all regions. */
 interface Upstream {
   checked: string
   region: string
@@ -227,7 +227,7 @@ async function browserToDb(): Promise<number | null> {
   return ms.length ? Math.round(ms[Math.floor(ms.length / 2)]) : null
 }
 
-// AWS region codes as Supabase and Vercel name them. The shared database is in Tokyo (25 Sep cost review).
+// AWS region codes as Supabase and Vercel name them. The shared database is in Mumbai since 21 Nov 2026 (Tokyo before).
 const REGIONS: Record<string, string> = {
   'ap-northeast-1': 'Tokyo', 'ap-south-1': 'Mumbai', 'ap-southeast-1': 'Singapore', 'us-east-1': 'N. Virginia',
   'us-west-1': 'N. California', 'eu-west-1': 'Ireland', 'eu-central-1': 'Frankfurt',
@@ -1760,7 +1760,7 @@ function InfraPanel({ infra, db, pulse, browserMs }: { infra: Part<InfraData>; d
       {db.state === 'failed' && <p className="ops-off">Database: {db.error}</p>}
       {db.state === 'off' && <p className="ops-off">Database figures need KPI migration 0241.</p>}
       <Stats items={[
-        { label: 'Database region', value: regionName(i?.supabase.region ?? 'ap-northeast-1') },
+        { label: 'Database region', value: regionName(i?.supabase.region ?? 'ap-south-1') },
         { label: 'You to database', value: browserMs === null ? '—' : `${fmtInt(browserMs)} ms` },
         { label: 'Portal server', value: regionName(i?.function_region) },
         { label: 'Server to database', value: i?.db_ms == null ? '—' : `${fmtInt(i.db_ms)} ms` },
@@ -1771,6 +1771,7 @@ function InfraPanel({ infra, db, pulse, browserMs }: { infra: Part<InfraData>; d
           { label: 'Last restart', value: ago(d.started) },
         ] : []),
       ]} />
+<<<<<<< Updated upstream
       <div className="ops-table-wrap">
         <table className="ops-table">
           <caption>Compute: what each part runs on</caption>
@@ -1787,6 +1788,9 @@ function InfraPanel({ infra, db, pulse, browserMs }: { infra: Part<InfraData>; d
         <p className="ops-note">Without a provider key, sizes come from each plan's published figures: the shared database's from its connection limit, Render's from Cyra's render.yaml. SUPABASE_ACCESS_TOKEN and RENDER_API_KEY on the portal's Vercel project make them live.</p>
       )}
       {(i?.supabase.region ?? 'ap-northeast-1') !== 'ap-south-1' && (
+=======
+      {(i?.supabase.region ?? 'ap-south-1') !== 'ap-south-1' && (
+>>>>>>> Stashed changes
         <p className="ops-note">The database is outside India, so every request makes the round trip above. Mumbai (ap-south-1) would cut it, but moving means a new project.</p>
       )}
       {i && !i.supabase.configured && (

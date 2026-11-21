@@ -7,7 +7,7 @@
  *   GET /api/ops?part=errors&days=N   CYRA's app_error, grouped by message
  *   GET /api/ops?part=ai&days=N       CYRA's metered AI usage and cost
  *   GET /api/ops?part=upstream        Supabase's own status feed (status.supabase.com/feed.atom): incidents of the
- *                                     last 14 days, with the ones that touch our region (ap-northeast-1) marked
+ *                                     last 14 days, with the ones that touch our region (ap-south-1) marked
  *   GET /api/ops?part=infra&days=N    where things run, this function's round trip to the database, and, when
  *                                     their keys are set, Supabase's request counts and Vercel Web Analytics, and
  *                                     the compute each host is on (Vercel plan and function size, Supabase compute, Render plan)
@@ -313,9 +313,13 @@ async function ai(days) {
  * feed is fetched a handful of times an hour.
  */
 const UPSTREAM_TTL = 10 * 60_000
+<<<<<<< Updated upstream
 // The shared database's region. Set SUPABASE_REGION when it moves (Tokyo to Mumbai is planned: ap-south-1), so the
 // feed marks the right incidents as ours. The Infrastructure panel reads the region from Supabase's API instead.
 const OUR_REGION = process.env.SUPABASE_REGION || 'ap-northeast-1'
+=======
+const OUR_REGION = 'ap-south-1'
+>>>>>>> Stashed changes
 let upstreamCache = null
 
 const unhtml = s => String(s ?? '').replace(/<!\[CDATA\[|\]\]>/g, '').replace(/<[^>]+>/g, ' ')
