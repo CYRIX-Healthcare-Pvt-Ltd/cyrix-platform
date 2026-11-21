@@ -22,7 +22,7 @@
  *   VERCEL_TOKEN (+ VERCEL_TEAM_ID)  a read-only token for team cyrix4
  *   GITHUB_TOKEN                     a fine-grained, read-only (contents + metadata) token for the repos
  *   CYRA_SUPABASE_URL, CYRA_SERVICE_KEY  CYRA's own project, read with Accept-Profile: cyra_v2
- *   SUPABASE_REGION                  optional: the shared database's region for the status feed (default ap-northeast-1)
+ *   SUPABASE_REGION                  optional: the shared database's region for the status feed (default ap-south-1, Mumbai)
  *   SUPABASE_ACCESS_TOKEN            optional: a Supabase account token, for the project's region, request counts and
  *                                    both projects' compute size
  *   RENDER_API_KEY                   optional: a Render API key, for the Cyra engine's plan and region
@@ -313,13 +313,9 @@ async function ai(days) {
  * feed is fetched a handful of times an hour.
  */
 const UPSTREAM_TTL = 10 * 60_000
-<<<<<<< Updated upstream
-// The shared database's region. Set SUPABASE_REGION when it moves (Tokyo to Mumbai is planned: ap-south-1), so the
+// The shared database's region. Mumbai since 21 Nov 2026 (Tokyo before); SUPABASE_REGION overrides, so the
 // feed marks the right incidents as ours. The Infrastructure panel reads the region from Supabase's API instead.
-const OUR_REGION = process.env.SUPABASE_REGION || 'ap-northeast-1'
-=======
-const OUR_REGION = 'ap-south-1'
->>>>>>> Stashed changes
+const OUR_REGION = process.env.SUPABASE_REGION || 'ap-south-1'
 let upstreamCache = null
 
 const unhtml = s => String(s ?? '').replace(/<!\[CDATA\[|\]\]>/g, '').replace(/<[^>]+>/g, ' ')

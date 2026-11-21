@@ -1698,7 +1698,7 @@ function computeRows(i: InfraData | null, d: DbData | null, p: PulseData | null)
     host: 'Supabase, shared database',
     runs: 'Login, KPI, Travel, Revive, My Task, Workplace, Projects, BEMMP, Spare',
     size: shared ? `${shared.name}${shared.inferred ? ' (from its connection limit)' : ''}: ${shared.ram}, ${shared.cpu}, $${shared.usd}/mo` : '—',
-    region: regionName(c?.supabase.shared?.region ?? i?.supabase.region ?? 'ap-northeast-1'),
+    region: regionName(c?.supabase.shared?.region ?? i?.supabase.region ?? 'ap-south-1'),
     now: d && conns !== null ? `${fmtInt(conns)} of ${fmtInt(d.max_connections)} connections` : '—',
     warn: Boolean(d && conns !== null && conns >= 0.8 * d.max_connections),
   })
@@ -1771,7 +1771,6 @@ function InfraPanel({ infra, db, pulse, browserMs }: { infra: Part<InfraData>; d
           { label: 'Last restart', value: ago(d.started) },
         ] : []),
       ]} />
-<<<<<<< Updated upstream
       <div className="ops-table-wrap">
         <table className="ops-table">
           <caption>Compute: what each part runs on</caption>
@@ -1787,10 +1786,7 @@ function InfraPanel({ infra, db, pulse, browserMs }: { infra: Part<InfraData>; d
       {i && !i.compute?.supabase.cyra && !i.compute?.render?.length && (
         <p className="ops-note">Without a provider key, sizes come from each plan's published figures: the shared database's from its connection limit, Render's from Cyra's render.yaml. SUPABASE_ACCESS_TOKEN and RENDER_API_KEY on the portal's Vercel project make them live.</p>
       )}
-      {(i?.supabase.region ?? 'ap-northeast-1') !== 'ap-south-1' && (
-=======
       {(i?.supabase.region ?? 'ap-south-1') !== 'ap-south-1' && (
->>>>>>> Stashed changes
         <p className="ops-note">The database is outside India, so every request makes the round trip above. Mumbai (ap-south-1) would cut it, but moving means a new project.</p>
       )}
       {i && !i.supabase.configured && (
