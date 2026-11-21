@@ -23,8 +23,36 @@
 .ops-main h1 { font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 700; letter-spacing: -0.025em; margin: 0; }
 .ops-main .sub { margin-bottom: 0; }
 
-.ops-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
-.ops-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.ops-head { margin-bottom: 1.25rem; }
+.ops-controls { display: flex; align-items: center; gap: 0.5rem; }
+
+/* The toolbar: filter, period, export, refresh and the section links, held under the top bar (the user, 21 Nov).
+   Its full-bleed margins match .ops-main's padding at each width so the band runs edge to edge. Wide screens put the
+   links and the controls on one row; narrower ones stack them, controls first, links scrolling sideways. */
+.ops { --ops-sticky-h: 6.25rem; }
+.ops-sticky {
+  position: sticky; top: var(--ops-bar-h); z-index: 10; display: flex; flex-direction: column; gap: 0.5rem;
+  margin: 0 -1rem 1rem; padding: 0.55rem 1rem; background: var(--page); border-bottom: 1px solid var(--ink-200);
+}
+@media (min-width: 640px) { .ops-sticky { margin: 0 -2rem 1rem; padding: 0.55rem 2rem; } }
+@media (min-width: 1100px) {
+  .ops { --ops-sticky-h: 3.6rem; }
+  .ops-sticky { flex-direction: row; align-items: center; gap: 1rem; }
+  .ops-sticky .ops-jump { order: 0; flex: 1; }
+  .ops-sticky .ops-controls { order: 1; flex: none; }
+}
+@media (min-width: 1280px) { .ops-sticky { margin: 0 -2.5rem 1.25rem; padding: 0.55rem 2.5rem; } }
+.ops-controls .ops-select { min-width: 0; flex: 1 1 auto; max-width: 14rem; }
+.ops-controls .ops-seg { flex: none; flex-wrap: nowrap; }
+.ops-controls .icon-btn { flex: none; }
+.ops-short { display: none; }
+@media (max-width: 479px) {
+  .ops-long { display: none; }
+  .ops-short { display: inline; }
+  .ops-controls { gap: 0.35rem; }
+  .ops-controls .ops-seg button { padding: 0.35rem 0.6rem; }
+  .ops-controls .ops-select { max-width: none; }
+}
 .ops-select {
   font: inherit; font-size: 0.8125rem; color: var(--ink-950); background: var(--ink-100); border: 0;
   border-radius: 999px; padding: 0.45rem 0.9rem; cursor: pointer;
@@ -106,16 +134,13 @@
 .ops-feed a:hover { text-decoration: underline; }
 
 /* Live line, section links and Needs attention (31 Oct). */
-.ops-live { display: flex; align-items: center; gap: 0.45rem; margin: -0.75rem 0 1rem; font-size: 0.75rem; color: var(--ink-500); }
+.ops-live { display: flex; align-items: center; gap: 0.45rem; margin: -0.5rem 0 0.75rem; font-size: 0.75rem; color: var(--ink-500); }
 .ops-live-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--ops-good); animation: ops-pulse 2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .ops-live-dot { animation: none; } }
-.ops-jump {
-  position: sticky; top: var(--ops-bar-h); z-index: 5; display: flex; gap: 0.25rem; overflow-x: auto; margin: 0 -1rem 1rem; padding: 0.5rem 1rem;
-  background: var(--page, var(--white)); scrollbar-width: none;
-}
+.ops-jump { display: flex; gap: 0.25rem; overflow-x: auto; min-width: 0; scrollbar-width: none; }
 .ops-jump a { flex: none; padding: 0.3rem 0.75rem; border-radius: 999px; background: var(--ink-100); color: var(--ink-700); font-size: 0.8125rem; text-decoration: none; }
 .ops-jump a:hover { color: var(--ink-950); }
-.ops-panel { scroll-margin-top: calc(var(--ops-bar-h) + 3.5rem); }
+.ops-panel { scroll-margin-top: calc(var(--ops-bar-h) + var(--ops-sticky-h) + 0.5rem); }
 .ops-attn { margin: 0 0 1.25rem; padding: 0.9rem 1rem; border: 1px solid var(--ops-bad); border-radius: 14px; }
 .ops-attn.is-clear { display: flex; align-items: center; gap: 0.5rem; border-color: var(--ink-200); font-weight: 600; }
 .ops-attn h2 { display: flex; align-items: center; gap: 0.45rem; margin: 0 0 0.5rem; font-size: 1rem; font-weight: 700; }
