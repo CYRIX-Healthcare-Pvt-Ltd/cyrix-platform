@@ -19,6 +19,7 @@ import {
   Eye, EyeOff,
 } from 'lucide-react'
 import { supabase, ecodeToEmail, type Module } from './lib/supabase'
+import { arrange, useArrange, useTileOrder } from './lib/tileOrder'
 
 /**
  * app.cyrix.in — sign in once, then pick a module.
@@ -322,7 +323,7 @@ function SignIn() {
 function Portal() {
   const [modules, setModules] = useState<Module[] | null>(null)
   /** Name and photo together: the header shows both, the greeting one. */
-  const [me, setMe] = useState<{ full_name: string; avatar: string | null; id: string; ecode: string; mgrId: string | null } | null>(null)
+  const [me, setMe] = useState<{ full_name: string; avatar: string | null; id: string; ecode: string; mgrId: string | null; tiles: string[] | null } | null>(null)
   /** HR, SW, IT and Marketing admin logins: no Cyrix Digest on their home page (the user, 10 Oct). */
   const [adminLogin, setAdminLogin] = useState<boolean | null>(null)
   // Team rank 1 this month: gold greeting, dust and a gold Digest ring (the user, 10 Nov).
@@ -401,14 +402,14 @@ function Portal() {
               // avatar comes along for the ride. It is a data URL on the
               // row itself rather than a file to go and fetch, so the
               // photo costs this query nothing extra to carry.
-              .select('id, full_name, ecode, avatar, account_type, reporting_manager_id')
+              .select('id, full_name, ecode, avatar, account_type, reporting_manager_id, tile_order')
               .eq('auth_user_id', uid).maybeSingle()
           : Promise.resolve({ data: null }),
         loadModules(),
       ])
       if (!alive) return
       if (me.data?.full_name) {
-        setMe({ full_name: me.data.full_name.trim(), avatar: me.data.avatar ?? null, id: String(me.data.id), ecode: String(me.data.ecode ?? ''), mgrId: me.data.reporting_manager_id ?? null })
+        setMe({ full_name: me.data.full_name.trim(), avatar: me.data.avatar ?? null, id: String(me.data.id), ecode: String(me.data.ecode ?? ''), mgrId: me.data.reporting_manager_id ?? null, tiles: me.data.tile_order ?? null })
       }
       if (mods === null) setFailed(true)
       else setModules(mods)
@@ -530,32 +531,48 @@ function Portal() {
         )}
 
         {modules && modules.length > 0 && (
-          <div className={arriving ? 'tiles arrive' : 'tiles'}>
-            {(digestDesk
-              ? [...modules, { code: 'digest', name: 'Cyrix Digest', description: 'Post news, meetings and polls', path: '/kpi/digest', icon: 'Newspaper', sort_order: 999, is_active: true }]
-              : modules).map((m, i, shown) => {
-              const Icon = (m.icon && ICONS[m.icon]) || LayoutGrid
-              // On a phone the tiles go two to a row; with an odd count KPI takes a row of its own
-              // (the user, 24 Oct), or the first tile for somebody without KPI.
-              const wide = shown.length % 2 === 1 && m.code === (shown.find(x => x.code === 'kpi') ?? shown[0]).code
-              return (
-                <a key={m.code} className={wide ? 'tile wide' : 'tile'} data-module={m.code} href={m.path} style={{ '--i': i } as CSSProperties}
-                  onClick={m.code === 'cyra' ? e => { e.preventDefault(); void openCyra() } : undefined}>
-                  <span className="tile-icon"><Icon size={22} /></span>
-                  <span className="tile-body">
-                    <span className="tile-name">{m.name}</span>
-                    {m.description && <span className="tile-desc">{m.description}</span>}
-                  </span>
-                  <ArrowRight className="tile-go" size={17} />
-                </a>
-              )
-            })}
-          </div>
+          <Tiles uid={me?.id} saved={me?.tiles ?? null} arriving={arriving} openCyra={openCyra} items={digestDesk
+            ? [...modules, { code: 'digest', name: 'Cyrix Digest', description: 'Post news, meetings and polls', path: '/kpi/digest', icon: 'Newspaper', sort_order: 999, is_active: true }]
+            : modules} />
         )}
 
         {/* Company news and meetings, under the tiles (KPI 0163). */}
         {me && adminLogin === false && <Digest />}
       </main>
     </div>
+  )
+}
+
+/** The module tiles: KPI first, the rest in the person's order; long press or drag to arrange (the user, 25 Nov). */
+function Tiles({ uid, saved, items, arriving, openCyra }: { uid: string | undefined; saved: string[] | null; items: Module[]; arriving: boolean; openCyra: () => Promise<void> | void }) {
+  const { order, save } = useTileOrder(uid, saved)
+  const sorted = arrange(items, order)
+  const grid = useRef<HTMLDivElement>(null)
+  const { editing, live, lifted, bind } = useArrange(sorted.map(m => m.code), save, grid)
+  const shown = live.map(c => sorted.find(m => m.code === c)).filter((m): m is Module => !!m)
+  return (
+    <>
+      <div ref={grid} className={`tiles${arriving && !editing ? ' arrive' : ''}${editing ? ' editing' : ''}`}>
+        {shown.map((m, i) => {
+          const Icon = (m.icon && ICONS[m.icon]) || LayoutGrid
+          // On a phone the tiles go two to a row; with an odd count KPI takes a row of its own
+          // (the user, 24 Oct), or the first tile for somebody without KPI.
+          const wide = shown.length % 2 === 1 && m.code === (shown.find(x => x.code === 'kpi') ?? shown[0]).code
+          const b = bind(m.code, () => { if (m.code === 'cyra') void openCyra(); else window.location.href = m.path })
+          return (
+            <a key={m.code} className={`tile${wide ? ' wide' : ''}${lifted === m.code ? ' lifted' : ''}`} data-module={m.code} href={m.path}
+              style={{ '--i': i } as CSSProperties} draggable={false} {...b}
+              >
+              <span className="tile-icon"><Icon size={22} /></span>
+              <span className="tile-body">
+                <span className="tile-name">{m.name}</span>
+                {m.description && <span className="tile-desc">{m.description}</span>}
+              </span>
+              <ArrowRight className="tile-go" size={17} />
+            </a>
+          )
+        })}
+      </div>
+    </>
   )
 }
