@@ -544,12 +544,33 @@ function Portal() {
   )
 }
 
+type TileStatus = { code: string; n: number | null; label: string | null; is_new: boolean; down: boolean }
+/**
+ * What each tile has to say (the user, 25 Nov; KPI 0310): how much waits there, whether HR just gave it,
+ * whether it is down. Asked once when the page opens, never on a timer, so it costs one call a visit.
+ * A failure shows plain tiles, the same as before this existed.
+ */
+function useTileStatus(uid: string | undefined) {
+  const [st, setSt] = useState<Record<string, TileStatus>>({})
+  useEffect(() => {
+    if (!uid) return
+    let gone = false
+    void supabase.rpc('my_tile_status').then(({ data, error }) => {
+      if (gone || error || !Array.isArray(data)) return
+      setSt(Object.fromEntries((data as TileStatus[]).map(r => [r.code, r])))
+    }, () => { /* plain tiles */ })
+    return () => { gone = true }
+  }, [uid])
+  return st
+}
+
 /** The module tiles: KPI first, the rest in the person's order; long press or drag to arrange (the user, 25 Nov). */
 function Tiles({ uid, saved, items, arriving, openCyra }: { uid: string | undefined; saved: string[] | null; items: Module[]; arriving: boolean; openCyra: () => Promise<void> | void }) {
   const { order, save, reset, failed, retry } = useTileOrder(uid, saved)
   const sorted = arrange(items, order)
   const grid = useRef<HTMLDivElement>(null)
   const { editing, live, lifted, bind, begin, finish } = useArrange(sorted.map(m => m.code), save, grid)
+  const status = useTileStatus(uid)
   const shown = live.map(c => sorted.find(m => m.code === c)).filter((m): m is Module => !!m)
   // Their first tile, loaded ahead while the page is idle (the user, 23 Nov: "faster opening").
   const first = shown[0]?.path
@@ -566,7 +587,7 @@ function Tiles({ uid, saved, items, arriving, openCyra }: { uid: string | undefi
     : editing
       ? (touch ? 'Drag a tile to move it.' : 'Drag a tile, or use the arrow keys, to move it. Esc undoes.')
       : movable >= 2 && order.length === 0
-        ? (touch ? 'Tip: press and hold a tile to rearrange your tiles.' : 'Tip: double-click and hold a tile to rearrange your tiles.')
+        ? (touch ? 'Tip: press and hold a tile to rearrange your tiles.' : 'Tip: click and hold a tile to rearrange your tiles.')
         : null
   /** The Arrange button: the way in for a keyboard, and for anyone who never finds the gesture. Focus goes to the first tile that moves. */
   const startArranging = () => {
@@ -575,6 +596,37 @@ function Tiles({ uid, saved, items, arriving, openCyra }: { uid: string | undefi
   }
   return (
     <>
+      <div ref={grid} className={`tiles${arriving && !editing ? ' arrive' : ''}${editing ? ' editing' : ''}`}>
+        {shown.map((m, i) => {
+          const Icon = (m.icon && ICONS[m.icon]) || LayoutGrid
+          // On a phone the tiles go two to a row; with an odd count KPI takes a row of its own
+          // (the user, 24 Oct), or the first tile for somebody without KPI.
+          const wide = shown.length % 2 === 1 && m.code === (shown.find(x => x.code === 'kpi') ?? shown[0]).code
+          const st = status[m.code]
+          const b = bind(m.code, () => { if (m.code === 'cyra') void openCyra(); else window.location.href = m.path })
+          return (
+            <a key={m.code} className={`tile${wide ? ' wide' : ''}${lifted === m.code ? ' lifted' : ''}`} data-module={m.code} href={m.path}
+              style={{ '--i': i } as CSSProperties} draggable={false} {...b}
+              // A pointer resting on a tile, a finger landing on it, or focus reaching it: start loading that module.
+              onPointerEnter={() => warmModule(m.path)} onFocus={() => warmModule(m.path)}
+              onPointerDown={e => { warmModule(m.path); b.onPointerDown(e) }}
+              >
+              <span className="tile-icon"><Icon size={22} />
+                {st?.down && <span className="tile-down" title="Having trouble right now" aria-label="Having trouble right now" />}
+              </span>
+              <span className="tile-body">
+                <span className="tile-name">{m.name}
+                  {st?.is_new && <span className="tile-new">New</span>}
+                  {!!st?.n && <span className="tile-count" title={`${st.n} ${st.label}`} aria-label={`${st.n} ${st.label}`}>{st.n > 99 ? '99+' : st.n}</span>}
+                </span>
+                {m.description && <span className="tile-desc">{m.description}</span>}
+              </span>
+              <ArrowRight className="tile-go" size={17} />
+            </a>
+          )
+        })}
+      </div>
+      {/* Under the tiles, not above them (the user, 25 Nov: "keep arrange at bottom"). */}
       {movable >= 2 && (
         <div className="tiles-bar" data-tiles-ctl>
           <p className="tiles-hint" role="status">{hint}</p>
@@ -587,30 +639,6 @@ function Tiles({ uid, saved, items, arriving, openCyra }: { uid: string | undefi
           </span>
         </div>
       )}
-      <div ref={grid} className={`tiles${arriving && !editing ? ' arrive' : ''}${editing ? ' editing' : ''}`}>
-        {shown.map((m, i) => {
-          const Icon = (m.icon && ICONS[m.icon]) || LayoutGrid
-          // On a phone the tiles go two to a row; with an odd count KPI takes a row of its own
-          // (the user, 24 Oct), or the first tile for somebody without KPI.
-          const wide = shown.length % 2 === 1 && m.code === (shown.find(x => x.code === 'kpi') ?? shown[0]).code
-          const b = bind(m.code, () => { if (m.code === 'cyra') void openCyra(); else window.location.href = m.path })
-          return (
-            <a key={m.code} className={`tile${wide ? ' wide' : ''}${lifted === m.code ? ' lifted' : ''}`} data-module={m.code} href={m.path}
-              style={{ '--i': i } as CSSProperties} draggable={false} {...b}
-              // A pointer resting on a tile, a finger landing on it, or focus reaching it: start loading that module.
-              onPointerEnter={() => warmModule(m.path)} onFocus={() => warmModule(m.path)}
-              onPointerDown={e => { warmModule(m.path); b.onPointerDown(e) }}
-              >
-              <span className="tile-icon"><Icon size={22} /></span>
-              <span className="tile-body">
-                <span className="tile-name">{m.name}</span>
-                {m.description && <span className="tile-desc">{m.description}</span>}
-              </span>
-              <ArrowRight className="tile-go" size={17} />
-            </a>
-          )
-        })}
-      </div>
     </>
   )
 }

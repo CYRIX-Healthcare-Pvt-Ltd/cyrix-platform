@@ -46,7 +46,8 @@ type Pt = { x: number; y: number }
 const centre = (el: HTMLElement): Pt => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 } }
 
 /**
- * Phone: long press (450 ms). Mouse: a click waits 280 ms; a second press in that time, held, lifts the tile.
+ * Press and hold (450 ms) lifts a tile, with a finger or a mouse alike. A plain click opens at once: it used to
+ * wait 280 ms on desktop to tell a click from a double-click-hold (the user, 25 Nov: drop that wait).
  * The lifted tile follows the pointer (CSS translate), the others slide to their new places (FLIP), and the jiggle
  * runs on CSS rotate so the two never fight.
  */
@@ -55,7 +56,6 @@ export function useArrange(codes: string[], onSave: (o: string[]) => void | Prom
   const [draft, setDraft] = useState<string[] | null>(null)
   const [lifted, setLifted] = useState<string | null>(null)
   const press = useRef<{ code: string; x: number; y: number; timer: number; moved: boolean } | null>(null)
-  const pending = useRef<{ code: string; timer: number } | null>(null)
   const grab = useRef<Pt>({ x: 0, y: 0 })
   const pointer = useRef<Pt>({ x: 0, y: 0 })
   const before = useRef<Map<string, Pt>>(new Map())
@@ -132,7 +132,6 @@ export function useArrange(codes: string[], onSave: (o: string[]) => void | Prom
   const bind = (code: string, open: () => void) => ({
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
       if (e.button !== 0) return
-      const mouse = e.pointerType === 'mouse'
       const p = { code, x: e.clientX, y: e.clientY, timer: 0, moved: false }
       press.current = p
       const el = e.currentTarget as HTMLElement
@@ -140,15 +139,6 @@ export function useArrange(codes: string[], onSave: (o: string[]) => void | Prom
         if (fixed(code)) return
         e.preventDefault()
         lift(code, el, e.pointerId, e.clientX, e.clientY)
-        return
-      }
-      if (mouse) {
-        const q = pending.current
-        if (q && q.code === code && !fixed(code)) {
-          window.clearTimeout(q.timer); pending.current = null
-          suppress.current = true; e.preventDefault()
-          begin(); lift(code, el, e.pointerId, e.clientX, e.clientY)
-        }
         return
       }
       const id = e.pointerId, x = e.clientX, y = e.clientY
@@ -184,11 +174,11 @@ export function useArrange(codes: string[], onSave: (o: string[]) => void | Prom
     },
     onPointerCancel: () => { if (press.current) window.clearTimeout(press.current.timer); press.current = null; setLifted(null) },
     onClick: (e: React.MouseEvent) => {
+      // Ctrl/Cmd/Shift-click keeps the browser's own meaning (new tab, new window).
+      if (!editing && !suppress.current && (e.ctrlKey || e.metaKey || e.shiftKey)) return
       e.preventDefault()
       if (editing || suppress.current) return
-      if (e.detail === 0 || (e.nativeEvent as PointerEvent).pointerType !== 'mouse') { open(); return }
-      if (pending.current) return
-      pending.current = { code, timer: window.setTimeout(() => { pending.current = null; open() }, 280) }
+      open()
     },
     onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => {
       if (!editing) return
