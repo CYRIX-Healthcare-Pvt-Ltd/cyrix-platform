@@ -19,57 +19,75 @@
     <title>Cyra</title>
     <style>
       /*
-        Opening splash: "Cyra." by Cyrix, with the red full stop as the character that
-        drops in, bounces and lets the letters spring out of it (the user, 18 Nov). It lives
-        here, not in React, so it paints from the HTML alone before any JavaScript has
-        loaded. CSS keyframes on transform and opacity only, so it stays smooth while the
-        phone is busy parsing the app. The inline script below decides animated or static
-        and removes it when App.tsx says the first real screen is ready (cyraSplash.done).
+        Opening splash: the Cyrix X from the app's own launch screen turns into the red full
+        stop of "Cyra.", and the letters unfold out of it (the user, 23 Nov: "transition from
+        the same X to the splash screen animation instead of the dot bouncing"). The Android
+        app (Cyra.apk) shows a 300dp loading image with the X about 210 wide, centred on
+        white, and fades it out when this page first paints; .cs-x starts at that same size
+        and place, so the hand-over has no visible cut. It lives here, not in React, so it
+        paints from the HTML alone before any JavaScript has loaded. CSS keyframes on
+        transform and opacity only, so it stays smooth while the phone is busy parsing the
+        app. The inline script below measures where the dot is, decides animated or static,
+        and removes the splash when App.tsx says the first real screen is ready.
       */
       #cyra-splash { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; background: #ffffff; }
       :root.dark #cyra-splash { background: #111318; }
       #cyra-splash.cs-out { opacity: 0; transition: opacity 240ms ease-in; pointer-events: none; }
+      #cyra-splash > * { grid-area: 1 / 1; }
+      /* Nothing animates until the script below has measured where the X lands (it adds cs-go). */
+      :root:not(.cs-go) #cyra-splash * { animation: none !important; }
       .cs-lock { display: grid; justify-items: center; gap: 22px; width: min(52vw, 260px); }
       .cs-word { width: 100%; height: auto; overflow: visible; }
       .cs-l { fill: #0b0b0c; transform-box: fill-box; }
       :root.dark .cs-l { fill: #f3f3f4; }
-      .cs-dot { fill: #ed1c24; transform-box: fill-box; transform-origin: center bottom; }
+      .cs-dot { fill: #ed1c24; transform-box: fill-box; transform-origin: center; }
       .cs-by { display: flex; align-items: center; gap: 8px; font: 500 13px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #6b6d74; letter-spacing: 0.02em; }
       :root.dark .cs-by { color: #9a9ca3; }
       .cs-by img { height: 16px; width: auto; display: block; }
       .cs-by .cs-dk, :root.dark .cs-by .cs-lt { display: none; }
       :root.dark .cs-by .cs-dk { display: block; }
+      /* The X, drawn as the app icon draws it: black ">" under a red "<". */
+      .cs-x { width: 210px; height: auto; overflow: visible; pointer-events: none; }
+      .cs-xb { fill: #000000; }
+      :root.dark .cs-xb { fill: #f3f3f4; }
+      .cs-xr { fill: #ed1c24; }
 
-      /* The dot falls, squashes on landing, rebounds once, then rolls right into its place. */
-      .cs-dot { animation: cs-dot 1200ms both, cs-show 100ms both; }
+      /* Hold the X while the app's loading image fades over it, then turn it a quarter and
+         shrink it into the full stop (--xdx/--xdy/--xs are measured by the script). The black
+         half goes first, so what lands is red. */
+      .cs-x { animation: cs-x 900ms both; }
+      @keyframes cs-x {
+        0%   { transform: none; opacity: 1; }
+        28%  { transform: none; opacity: 1; animation-timing-function: cubic-bezier(0.7, 0, 0.3, 1); }
+        84%  { transform: translate(var(--xdx, 0px), var(--xdy, 0px)) rotate(90deg) scale(var(--xs, 0.1)); opacity: 1; }
+        100% { transform: translate(var(--xdx, 0px), var(--xdy, 0px)) rotate(90deg) scale(var(--xs, 0.1)); opacity: 0; }
+      }
+      .cs-xb { animation: cs-fade 900ms both; }
+      @keyframes cs-fade { 0%, 50% { opacity: 1; } 75%, 100% { opacity: 0; } }
+      /* The dot takes over from the X with a small pop, then the letters unfold leftwards out of it. */
+      .cs-dot { animation: cs-dot 420ms 700ms ease-out both; }
       @keyframes cs-dot {
-        0%   { transform: translate(-119.3px, -170px) scale(0.9, 1.15); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.4); }
-        27%  { transform: translate(-119.3px, 0) scale(1.4, 0.62); animation-timing-function: cubic-bezier(0.1, 0.6, 0.3, 1); }
-        39%  { transform: translate(-119.3px, -28px) scale(0.92, 1.1); animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.5); }
-        50%  { transform: translate(-119.3px, 0) scale(1.18, 0.84); animation-timing-function: ease-out; }
-        55%  { transform: translate(-119.3px, 0) scale(1); animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1); }
-        100% { transform: none; }
+        from { transform: scale(0.3); opacity: 0; }
+        55%  { transform: scale(1.25); opacity: 1; }
+        to   { transform: none; opacity: 1; }
       }
-      /* Each letter springs out of where the dot landed (--dx: from the dot to the letter). */
-      .cs-l { animation: cs-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-      .cs-c { --dx: 100.4px; animation-delay: 750ms; }
-      .cs-y { --dx: 41.4px;  animation-delay: 660ms; }
-      .cs-r { --dx: -18.5px; animation-delay: 705ms; }
-      .cs-a { --dx: -76.7px; animation-delay: 795ms; }
-      @keyframes cs-pop {
-        0%   { transform: translate(var(--dx), 4px) scale(0.1); opacity: 0; }
-        25%  { opacity: 1; }
-        100% { transform: none; opacity: 1; }
-      }
-      .cs-by { animation: cs-rise 350ms 1000ms ease-out both; }
+      .cs-l { animation: cs-unfold 560ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+      .cs-a { animation-delay: 780ms; }
+      .cs-r { animation-delay: 845ms; }
+      .cs-y { animation-delay: 910ms; }
+      .cs-c { animation-delay: 975ms; }
+      @keyframes cs-unfold { from { transform: translateX(26px); opacity: 0; } to { transform: none; opacity: 1; } }
+      .cs-by { animation: cs-rise 350ms 1150ms ease-out both; }
       @keyframes cs-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
       @keyframes cs-show { from { opacity: 0; } to { opacity: 1; } }
 
-      /* Later loads in the same visit, and reduced motion: no animation, and nothing at all if
-         the app is ready within 150 ms. */
+      /* Later loads in the same visit, and reduced motion: no X, no animation, and nothing at
+         all if the app is ready within 150 ms. */
+      :root.cs-static .cs-x { display: none; }
       :root.cs-static #cyra-splash * { animation: none !important; }
       :root.cs-static .cs-lock { animation: cs-show 200ms 150ms both !important; }
       @media (prefers-reduced-motion: reduce) {
+        .cs-x { display: none; }
         #cyra-splash * { animation: none !important; }
         .cs-lock { animation: cs-show 200ms both !important; }
       }
@@ -87,13 +105,17 @@
         </svg>
         <div class="cs-by"><span>by</span><img class="cs-lt" src="/brand/cyrix-wordmark.png" alt="Cyrix" /><img class="cs-dk" src="/brand/cyrix-wordmark-white.png" alt="Cyrix" /></div>
       </div>
+      <svg class="cs-x" viewBox="223 14 63.5 52">
+        <polygon class="cs-xb" points="223,14 236.5,14 257.25,35.58 257.25,44.42 236.5,66 223,66 248,40"/>
+        <polygon class="cs-xr" points="286.5,14 273,14 248,40 273,66 286.5,66 261.5,40"/>
+      </svg>
     </div>
     <script>
       /*
         Runs before the first paint. Sets the theme class the splash needs (lib/theme.ts does
         the same again once React starts), chooses animated or static, and exposes
         window.cyraSplash.done() for App.tsx to call when the first real screen is ready.
-        The full bounce plays once per visit (an installed app starts a new visit on every
+        The full animation plays once per visit (an installed app starts a new visit on every
         cold open); ?splash forces it.
       */
       (function () {
@@ -108,8 +130,21 @@
         try { seen = sessionStorage.getItem('cyra.splash') === '1'; sessionStorage.setItem('cyra.splash', '1') } catch (e) {}
         var animated = (!seen || /[?&]splash/.test(q)) && !mq('(prefers-reduced-motion: reduce)')
         if (!animated) h.classList.add('cs-static')
-        // Long enough for the letters to land (1.3 s), never cut mid-bounce.
-        var min = animated ? 1300 : 0, t0 = performance.now(), gone = false, wanted = null
+        else {
+          // Where the X has to land: the centre of the full stop, and the size of it. Measured with
+          // nothing animating yet (cs-go is not set), so every box is at its resting size, and the
+          // variables exist before any animation starts: Safari does not always re-read a variable
+          // that changes under a running animation.
+          var x = s.querySelector('.cs-x').getBoundingClientRect(), o = s.querySelector('.cs-dot').getBoundingClientRect()
+          if (x.width && o.width) {
+            s.style.setProperty('--xdx', (o.left + o.width / 2 - (x.left + x.width / 2)).toFixed(1) + 'px')
+            s.style.setProperty('--xdy', (o.top + o.height / 2 - (x.top + x.height / 2)).toFixed(1) + 'px')
+            s.style.setProperty('--xs', (o.width / x.width * 1.1).toFixed(3))
+          } else { animated = false; h.classList.add('cs-static') } // could not measure (hidden tab, no layout): show the still lockup instead
+        }
+        h.classList.add('cs-go')
+        // Long enough for the letters to land (1.5 s), never cut mid-unfold.
+        var min = animated ? 1500 : 0, t0 = performance.now(), gone = false, wanted = null
         /* Nothing under the splash may take focus while it shows (16 Oct: the browser's
            saved-password list opened over it). Whatever tried is focused once it has gone. */
         var hold = function (e) { var el = e.target; if (el && el.blur) { wanted = el; el.blur() } }
