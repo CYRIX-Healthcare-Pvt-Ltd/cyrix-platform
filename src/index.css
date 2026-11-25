@@ -964,3 +964,6 @@ body {
 .tiles.editing .tile.lifted { animation: none; scale: 1.06; box-shadow: 0 16px 32px rgba(0,0,0,0.3); border-color: var(--red-600); z-index: 5; position: relative; cursor: grabbing; }
 @keyframes tile-jiggle { from { rotate: -1.2deg; } to { rotate: 1.2deg; } }
 @media (prefers-reduced-motion: reduce) { .tiles.editing .tile { animation: none !important; } }
+
+/* How to arrange the tiles, one quiet line above them (the user, 25 Nov). */
+.tiles-hint { margin: 0 0 0.75rem; font-size: 0.84rem; color: var(--ink-500); }
