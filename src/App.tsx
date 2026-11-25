@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { supabase, ecodeToEmail, type Module } from './lib/supabase'
 import { arrange, useArrange, useTileOrder } from './lib/tileOrder'
+import { warmModule, warmWhenIdle } from './lib/warm'
 
 /**
  * app.cyrix.in — sign in once, then pick a module.
@@ -550,8 +551,24 @@ function Tiles({ uid, saved, items, arriving, openCyra }: { uid: string | undefi
   const grid = useRef<HTMLDivElement>(null)
   const { editing, live, lifted, bind } = useArrange(sorted.map(m => m.code), save, grid)
   const shown = live.map(c => sorted.find(m => m.code === c)).filter((m): m is Module => !!m)
+  // Their first tile, loaded ahead while the page is idle (the user, 23 Nov: "faster opening").
+  const first = shown[0]?.path
+  useEffect(() => { if (first) warmWhenIdle(first) }, [first])
+  /*
+   * How to arrange, said once on the page (the user, 25 Nov). The gesture alone is invisible:
+   * nobody long-presses a link to see what happens. Shown only to someone with two or more tiles
+   * they can move (KPI stays put) and who has not arranged yet; while arranging it says how to finish.
+   */
+  const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
+  const movable = shown.filter(m => m.code !== 'kpi').length
+  const hint = editing
+    ? (touch ? 'Drag a tile to move it. Tap a tile when you are done.' : 'Drag a tile to move it. Click a tile when you are done, or press Esc to undo.')
+    : movable >= 2 && order.length === 0
+      ? (touch ? 'Tip: press and hold a tile to rearrange your tiles.' : 'Tip: double-click and hold a tile to rearrange your tiles.')
+      : null
   return (
     <>
+      {hint && <p className="tiles-hint" role="status">{hint}</p>}
       <div ref={grid} className={`tiles${arriving && !editing ? ' arrive' : ''}${editing ? ' editing' : ''}`}>
         {shown.map((m, i) => {
           const Icon = (m.icon && ICONS[m.icon]) || LayoutGrid
@@ -562,6 +579,9 @@ function Tiles({ uid, saved, items, arriving, openCyra }: { uid: string | undefi
           return (
             <a key={m.code} className={`tile${wide ? ' wide' : ''}${lifted === m.code ? ' lifted' : ''}`} data-module={m.code} href={m.path}
               style={{ '--i': i } as CSSProperties} draggable={false} {...b}
+              // A pointer resting on a tile, a finger landing on it, or focus reaching it: start loading that module.
+              onPointerEnter={() => warmModule(m.path)} onFocus={() => warmModule(m.path)}
+              onPointerDown={e => { warmModule(m.path); b.onPointerDown(e) }}
               >
               <span className="tile-icon"><Icon size={22} /></span>
               <span className="tile-body">
