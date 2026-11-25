@@ -1,6 +1,7 @@
 import { session as sessionStore } from './lib/storage'
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import Logo from './Logo'
+import CyraMark from './CyraMark'
 import ProfileCard from './ProfileCard'
 import ThemeToggle from './ThemeToggle'
 import InstallButton from './InstallButton'
@@ -462,7 +463,7 @@ function Portal() {
   return (
     <div className={rankOne ? 'portal r1' : 'portal'}>
       <header className="bar">
-        <Logo height={30} />
+        <CyraMark />
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
         {/* Who is signed in, shown the same way every module shows it; a press
             opens their basic details (ProfileCard). The name is hidden on a
