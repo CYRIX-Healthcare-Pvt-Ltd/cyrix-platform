@@ -12,17 +12,23 @@ const key = (uid: string) => `cyrix.tiles.${uid}`
 /** The account's order (employees.tile_order, 0309), so every phone and computer agrees; this browser's copy until it loads. */
 export function useTileOrder(uid: string | undefined, saved: string[] | null) {
   const [order, setOrder] = useState<string[]>([])
+  /** The last save did not reach the account: this browser has the order, other devices do not (the user, 25 Nov). */
+  const [failed, setFailed] = useState<string[] | null>(null)
   useEffect(() => {
     if (!uid) return
     if (saved) { setOrder(saved); return }
     try { setOrder(JSON.parse(local.getItem(key(uid)) ?? '[]')) } catch { setOrder([]) }
   }, [uid, saved])
-  const save = useCallback((o: string[]) => {
-    setOrder(o)
+  const save = useCallback(async (o: string[]) => {
+    setOrder(o); setFailed(null)
     if (uid) try { local.setItem(key(uid), JSON.stringify(o)) } catch { /* memory only */ }
-    void supabase.rpc('set_tile_order', { p_order: o })
+    const { error } = await supabase.rpc('set_tile_order', { p_order: o })
+    if (error) setFailed(o)
   }, [uid])
-  return { order, save }
+  /** Back to the company order: an empty list, saved like any other (the user, 25 Nov). */
+  const reset = useCallback(() => save([]), [save])
+  const retry = useCallback(() => { if (failed) void save(failed) }, [failed, save])
+  return { order, save, reset, failed: failed !== null, retry }
 }
 
 /** KPI first, then the saved order; tiles never arranged keep the company order after them. */
@@ -44,7 +50,7 @@ const centre = (el: HTMLElement): Pt => { const r = el.getBoundingClientRect(); 
  * The lifted tile follows the pointer (CSS translate), the others slide to their new places (FLIP), and the jiggle
  * runs on CSS rotate so the two never fight.
  */
-export function useArrange(codes: string[], onSave: (o: string[]) => void, grid: RefObject<HTMLElement | null>) {
+export function useArrange(codes: string[], onSave: (o: string[]) => void | Promise<void>, grid: RefObject<HTMLElement | null>) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<string[] | null>(null)
   const [lifted, setLifted] = useState<string | null>(null)
@@ -101,6 +107,15 @@ export function useArrange(codes: string[], onSave: (o: string[]) => void, grid:
     before.current = new Map()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.join(','), editing])
+
+  /** Keyboard (the user, 25 Nov): while arranging, the arrow keys move the focused tile one place. KPI stays first. */
+  const nudge = (code: string, by: number) => {
+    const a = [...live]; const i = a.indexOf(code), j = i + by
+    if (i < 0 || fixed(code) || j < 0 || j >= a.length || fixed(a[j])) return
+    snapshot()
+    a.splice(i, 1); a.splice(j, 0, code)
+    setDraft(a)
+  }
 
   const moveOver = (x: number, y: number) => {
     const from = lifted; if (!from) return
@@ -175,6 +190,12 @@ export function useArrange(codes: string[], onSave: (o: string[]) => void, grid:
       if (pending.current) return
       pending.current = { code, timer: window.setTimeout(() => { pending.current = null; open() }, 280) }
     },
+    onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => {
+      if (!editing) return
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); nudge(code, -1) }
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); nudge(code, 1) }
+      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); finish(true) }
+    },
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
     onDragStart: (e: React.DragEvent) => e.preventDefault(),
   })
@@ -182,7 +203,7 @@ export function useArrange(codes: string[], onSave: (o: string[]) => void, grid:
   // A click anywhere off the tiles ends arranging and keeps it; Esc puts everything back.
   useEffect(() => {
     if (!editing) return
-    const down = (e: PointerEvent) => { if (!(e.target as HTMLElement).closest?.('.tiles [data-module]')) finish(true) }
+    const down = (e: PointerEvent) => { if (!(e.target as HTMLElement).closest?.('.tiles [data-module], [data-tiles-ctl]')) finish(true) }
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') finish(false) }
     window.addEventListener('pointerdown', down)
     window.addEventListener('keydown', esc)
@@ -196,5 +217,5 @@ export function useArrange(codes: string[], onSave: (o: string[]) => void, grid:
     return () => document.removeEventListener('touchmove', stop)
   }, [lifted])
 
-  return { editing, live, lifted, bind }
+  return { editing, live, lifted, bind, begin, finish }
 }
