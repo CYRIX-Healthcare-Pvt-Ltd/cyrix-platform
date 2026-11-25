@@ -308,6 +308,20 @@ body {
 }
 @media (min-width: 640px) { .bar { padding: 0.9rem 2rem; } }
 
+/* The header mark (CyraMark.tsx): "Cyra." at the bar's ink, then a hairline and a quiet "by Cyrix".
+   The byline steps aside on the narrowest phones, where the controls need the room. */
+.cyra-mark { display: flex; align-items: center; gap: 0.7rem; flex: none; color: var(--ink-950); }
+.cyra-word { display: block; height: 20px; width: auto; fill: currentColor; overflow: visible; }
+.cyra-word .cyra-dot { fill: #ed1c24; }
+.cyra-by {
+  display: flex; align-items: center; gap: 0.35rem; padding-left: 0.7rem;
+  border-left: 1px solid var(--ink-200);
+  font-size: 0.7rem; font-weight: 500; letter-spacing: 0.02em; color: var(--ink-500);
+}
+.cyra-by img { display: block; height: 10px; width: auto; opacity: 0.85; }
+.cyra-by .cyrix-logo-dark { display: none; }
+@media (max-width: 379px) { .cyra-by { display: none; } }
+
 .icon-btn {
   display: grid; place-items: center; width: 2.2rem; height: 2.2rem;
   background: transparent; border: 0; border-radius: 8px; cursor: pointer;
