@@ -34,6 +34,8 @@
       :root.dark #cyra-splash { background: #111318; }
       #cyra-splash.cs-out { opacity: 0; transition: opacity 240ms ease-in; pointer-events: none; }
       #cyra-splash > * { grid-area: 1 / 1; }
+      /* Nothing animates until the script below has measured where the X lands (it adds cs-go). */
+      :root:not(.cs-go) #cyra-splash * { animation: none !important; }
       .cs-lock { display: grid; justify-items: center; gap: 22px; width: min(52vw, 260px); }
       .cs-word { width: 100%; height: auto; overflow: visible; }
       .cs-l { fill: #0b0b0c; transform-box: fill-box; }
@@ -129,15 +131,18 @@
         var animated = (!seen || /[?&]splash/.test(q)) && !mq('(prefers-reduced-motion: reduce)')
         if (!animated) h.classList.add('cs-static')
         else {
-          // Where the X has to land: the centre of the full stop, and the size of it.
+          // Where the X has to land: the centre of the full stop, and the size of it. Measured with
+          // nothing animating yet (cs-go is not set), so every box is at its resting size, and the
+          // variables exist before any animation starts: Safari does not always re-read a variable
+          // that changes under a running animation.
           var x = s.querySelector('.cs-x').getBoundingClientRect(), o = s.querySelector('.cs-dot').getBoundingClientRect()
-          if (x.width && o.width) { // the dot's centre is right even while it is scaled
+          if (x.width && o.width) {
             s.style.setProperty('--xdx', (o.left + o.width / 2 - (x.left + x.width / 2)).toFixed(1) + 'px')
             s.style.setProperty('--xdy', (o.top + o.height / 2 - (x.top + x.height / 2)).toFixed(1) + 'px')
-            // The dot is mid-animation (scaled down) here, so its size comes from the wordmark: 19 of 267 units.
-            s.style.setProperty('--xs', (s.querySelector('.cs-word').getBoundingClientRect().width * 19 / 267 / x.width * 1.1).toFixed(3))
-          }
+            s.style.setProperty('--xs', (o.width / x.width * 1.1).toFixed(3))
+          } else { animated = false; h.classList.add('cs-static') } // could not measure (hidden tab, no layout): show the still lockup instead
         }
+        h.classList.add('cs-go')
         // Long enough for the letters to land (1.5 s), never cut mid-unfold.
         var min = animated ? 1500 : 0, t0 = performance.now(), gone = false, wanted = null
         /* Nothing under the splash may take focus while it shows (16 Oct: the browser's
