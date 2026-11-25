@@ -186,12 +186,6 @@ export function useArrange(codes: string[], onSave: (o: string[]) => void | Prom
       else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); nudge(code, 1) }
       else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); finish(true) }
     },
-    onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => {
-      if (!editing) return
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); nudge(code, -1) }
-      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); nudge(code, 1) }
-      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); finish(true) }
-    },
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
     onDragStart: (e: React.DragEvent) => e.preventDefault(),
   })
