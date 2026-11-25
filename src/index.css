@@ -966,4 +966,17 @@ body {
 @media (prefers-reduced-motion: reduce) { .tiles.editing .tile { animation: none !important; } }
 
 /* How to arrange the tiles, one quiet line above them (the user, 25 Nov). */
-.tiles-hint { margin: 0 0 0.75rem; font-size: 0.84rem; color: var(--ink-500); }
+.tiles-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem 1rem; margin: 0 0 0.75rem; min-height: 2rem; }
+.tiles-hint { margin: 0; flex: 1 1 14rem; font-size: 0.84rem; color: var(--ink-500); }
+.tiles-ctl { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; flex: none; }
+.link-btn.quiet { font-size: 0.84rem; color: var(--ink-500); }
+.pill-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.34rem 0.85rem; border: 1px solid var(--ink-200); border-radius: 999px;
+  background: var(--white); color: var(--ink-700); font: inherit; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+.pill-btn:hover { border-color: var(--ink-950); color: var(--ink-950); }
+.pill-btn.solid { background: var(--ink-950); border-color: var(--ink-950); color: var(--white); }
+.pill-btn.solid:hover { background: var(--red-600); border-color: var(--red-600); color: #fff; }
+.tiles.editing .tile:focus-visible { outline: 2px solid var(--red-600); outline-offset: 3px; }

@@ -546,10 +546,10 @@ function Portal() {
 
 /** The module tiles: KPI first, the rest in the person's order; long press or drag to arrange (the user, 25 Nov). */
 function Tiles({ uid, saved, items, arriving, openCyra }: { uid: string | undefined; saved: string[] | null; items: Module[]; arriving: boolean; openCyra: () => Promise<void> | void }) {
-  const { order, save } = useTileOrder(uid, saved)
+  const { order, save, reset, failed, retry } = useTileOrder(uid, saved)
   const sorted = arrange(items, order)
   const grid = useRef<HTMLDivElement>(null)
-  const { editing, live, lifted, bind } = useArrange(sorted.map(m => m.code), save, grid)
+  const { editing, live, lifted, bind, begin, finish } = useArrange(sorted.map(m => m.code), save, grid)
   const shown = live.map(c => sorted.find(m => m.code === c)).filter((m): m is Module => !!m)
   // Their first tile, loaded ahead while the page is idle (the user, 23 Nov: "faster opening").
   const first = shown[0]?.path
@@ -561,14 +561,32 @@ function Tiles({ uid, saved, items, arriving, openCyra }: { uid: string | undefi
    */
   const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
   const movable = shown.filter(m => m.code !== 'kpi').length
-  const hint = editing
-    ? (touch ? 'Drag a tile to move it. Tap a tile when you are done.' : 'Drag a tile to move it. Click a tile when you are done, or press Esc to undo.')
-    : movable >= 2 && order.length === 0
-      ? (touch ? 'Tip: press and hold a tile to rearrange your tiles.' : 'Tip: double-click and hold a tile to rearrange your tiles.')
-      : null
+  const hint = failed
+    ? 'Could not save your order to your account, so your other devices will not see it.'
+    : editing
+      ? (touch ? 'Drag a tile to move it.' : 'Drag a tile, or use the arrow keys, to move it. Esc undoes.')
+      : movable >= 2 && order.length === 0
+        ? (touch ? 'Tip: press and hold a tile to rearrange your tiles.' : 'Tip: double-click and hold a tile to rearrange your tiles.')
+        : null
+  /** The Arrange button: the way in for a keyboard, and for anyone who never finds the gesture. Focus goes to the first tile that moves. */
+  const startArranging = () => {
+    begin()
+    window.setTimeout(() => grid.current?.querySelector<HTMLElement>('[data-module]:not([data-module="kpi"])')?.focus(), 0)
+  }
   return (
     <>
-      {hint && <p className="tiles-hint" role="status">{hint}</p>}
+      {movable >= 2 && (
+        <div className="tiles-bar" data-tiles-ctl>
+          <p className="tiles-hint" role="status">{hint}</p>
+          <span className="tiles-ctl">
+            {failed && !editing && <button className="link-btn" onClick={retry}>Try again</button>}
+            {editing && order.length > 0 && <button className="link-btn quiet" onClick={() => { finish(false); void reset() }}>Reset to default</button>}
+            {editing
+              ? <button className="pill-btn solid" onClick={() => finish(true)}>Done</button>
+              : <button className="pill-btn" onClick={startArranging} title="Put your tiles in the order you use them">Arrange</button>}
+          </span>
+        </div>
+      )}
       <div ref={grid} className={`tiles${arriving && !editing ? ' arrive' : ''}${editing ? ' editing' : ''}`}>
         {shown.map((m, i) => {
           const Icon = (m.icon && ICONS[m.icon]) || LayoutGrid
