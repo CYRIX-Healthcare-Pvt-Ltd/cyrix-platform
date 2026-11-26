@@ -4,7 +4,7 @@ import { Bell, Check, Download, Loader2 } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import { enablePush, pushState, syncPush, type PushState } from './lib/push'
 import { promptInstall } from './lib/pwa'
-import { Steps, useRoute } from './InstallButton'
+import { AndroidSheet, Steps, useRoute } from './InstallButton'
 
 /**
  * After signing in: turn on notifications, and install the app (the user,
@@ -42,7 +42,7 @@ export default function NotifyCard() {
   // Wherever it is already allowed, keep this device on for whoever is signed in.
   useEffect(() => { if (pushOn) void syncPush(supabase).catch(() => {}) }, [pushOn])
 
-  const canInstall = route === 'prompt' || route === 'ios' || route === 'desktop-manual'
+  const canInstall = route === 'prompt' || route === 'ios' || route === 'android' || route === 'desktop-manual'
   const show = pushOn === true && !closed && (push === 'ask' || push === 'install-first' || canInstall)
   useEffect(() => { if (show) put(session, SHOWN, '1') }, [show])
   if (!show) return null
@@ -97,7 +97,7 @@ export default function NotifyCard() {
           <button type="button" className="secondary-btn prompt-btn" onClick={later}>Remind me later</button>
         </div>
       </div>
-      {steps && <Steps ios={route === 'ios'} onClose={() => setSteps(false)} />}
+      {steps && (route === 'android' ? <AndroidSheet onClose={() => setSteps(false)} /> : <Steps ios={route === 'ios'} onClose={() => setSteps(false)} />)}
     </div>
   )
 }

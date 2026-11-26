@@ -14,7 +14,8 @@
     { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "related_applications": [
-    { "platform": "webapp", "url": "https://app.cyrix.in/manifest.webmanifest" }
+    { "platform": "webapp", "url": "https://app.cyrix.in/manifest.webmanifest" },
+    { "platform": "play", "id": "in.cyrix.cyra" }
   ],
   "prefer_related_applications": false
 }

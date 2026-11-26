@@ -1,0 +1,314 @@
+/* Team rank 1 on the portal home (RankOne.tsx). The gold is KPI's (LegendCrest GOLD). */
+.portal-main.r1 { position: relative; }
+/* The dust runs the page's whole width (the user, 10 Nov: "need full page, see it is cutted"). */
+.portal.r1 { overflow-x: clip; }
+.portal-main.r1 > :not(.r1-stage):not(.r1-sky) { position: relative; z-index: 1; }
+/* The dust layer stays on the screen while the page scrolls under it, behind the cards. */
+.r1-sky { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+
+.r1-stage { position: absolute; top: 0; left: calc(50% - 50vw); width: 100vw; height: 34rem; pointer-events: none; overflow: hidden; z-index: 0;
+  -webkit-mask-image: linear-gradient(#000 75%, transparent); mask-image: linear-gradient(#000 75%, transparent); }
+/* The glow stays behind the greeting and Digest bar, not across a wide screen (the user, 10 Nov). */
+.r1-cloud { position: absolute; left: 50%; width: min(84vw, 40rem); transform: translateX(-62%); top: 11rem; height: 5rem; border-radius: 50%; background: #ffcf40; opacity: 0.1; filter: blur(36px); }
+.r1-dust { position: absolute; bottom: 0; border-radius: 50%; background: #d4940a; box-shadow: 0 0 4px #f0b42a; opacity: 0; animation: r1-up linear infinite; }
+/* Light mode: a deeper gold so it shows on white (the user, 10 Nov); dark mode the pale gold. */
+:root[data-theme='dark'] .r1-dust { background: #ffe08a; box-shadow: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .r1-dust { background: #ffe08a; box-shadow: none; } }
+@keyframes r1-up { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 0.9; } 85% { opacity: 0.6; } 100% { transform: translate(calc(var(--dx) * var(--dxs, 1)), -100vh); opacity: 0; } }
+/* A phone: half the specks and half the sideways drift, so the narrow screen is calmer (the user, 10 Nov: "is dust speed more in mobile than desktop?"). */
+@media (max-width: 639px) { .r1-sky { --dxs: 0.5; } .r1-dust:nth-child(even) { display: none; } }
+
+/* No border or pill: the words themselves in metallic gold, a shine passing (the user, 10 Nov: "do we need that border? what about gold shining?"). */
+.r1-chip {
+  display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.6rem; vertical-align: middle;
+  font-size: 0.75rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; line-height: 1.4; white-space: nowrap; position: relative; top: -0.15em;
+  --m: linear-gradient(100deg, #8f5d06 0%, #e6a817 20%, #fff7d6 34%, #e6a817 46%, #b9820b 60%, #e6a817 76%, #8f5d06 100%);
+}
+.r1-chip-words {
+  background: var(--m); background-size: 240% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: r1-metal 6s linear 1s infinite;
+}
+@keyframes r1-metal { from { background-position: 130% 0; } to { background-position: -110% 0; } }
+.r1-chip svg { flex: none; color: #b9820b; }
+.r1-chip-team { font-weight: 600; letter-spacing: 0.1em; }
+/* On a phone the chip goes under the name, whole. */
+@media (max-width: 639px) { .r1-chip { display: flex; width: max-content; margin: 0.5rem 0 0; top: 0; } }
+/* "Hello," a size under the name, for everybody (the user, 10 Nov: "for all hello should be 20 px"). */
+.portal-main h1 .r1-hello { font-size: 0.85em; }
+.r1-gold, .r1-name {
+  background: linear-gradient(180deg, #e6a817 0%, #b9820b 55%, #8f5d06 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.r1-name {
+  background: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.9) 48%, rgba(255, 255, 255, 0.9) 52%, transparent 62%) no-repeat,
+              linear-gradient(180deg, #e6a817 0%, #b9820b 55%, #8f5d06 100%);
+  background-size: 250% 100%, 100% 100%; background-position: 160% 0, 0 0;
+  -webkit-background-clip: text; background-clip: text; animation: r1-shine 5s ease-in-out 1.5s infinite;
+}
+@keyframes r1-shine { 0% { background-position: 160% 0, 0 0; } 40%, 100% { background-position: -60% 0, 0 0; } }
+
+/* The Digest bar: two gold sparkles travelling round its border. */
+@property --r1a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.digest-teaser.r1-ring {
+  background: linear-gradient(var(--white), var(--white)) padding-box,
+              conic-gradient(from var(--r1a), #e6a81740 0deg, #e6a81780 60deg, #fff1b8 80deg, #ffffff 88deg, #ffcf40 96deg, #e6a81780 120deg, #e6a81740 180deg,
+                #e6a81780 240deg, #fff1b8 260deg, #ffffff 268deg, #ffcf40 276deg, #e6a81780 300deg, #e6a81740 360deg) border-box;
+  background-size: 100% 100%, 100% 100%; animation: r1-spin 4s linear infinite;
+}
+@keyframes r1-spin { to { --r1a: 360deg; } }
+.digest-teaser.r1-ring:hover { box-shadow: 0 12px 28px -16px rgb(230 168 23 / 0.7); }
+
+/* Dark: KPI's light golds on the dark page. */
+:root[data-theme='dark'] .r1-gold, :root[data-theme='dark'] .r1-name { --g: linear-gradient(180deg, #fffaf0 0%, #fff1b8 45%, #ffcf40 100%); }
+:root[data-theme='dark'] .r1-gold { background-image: var(--g); }
+:root[data-theme='dark'] .r1-name { background-image: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.95) 48%, rgba(255, 255, 255, 0.95) 52%, transparent 62%), var(--g); }
+:root[data-theme='dark'] .r1-chip { --m: linear-gradient(100deg, #8f5d06 0%, #ffcf40 20%, #ffffff 34%, #ffcf40 46%, #e6a817 60%, #fff1b8 76%, #8f5d06 100%); }
+:root[data-theme='dark'] .r1-chip svg { color: #ffcf40; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .r1-gold, :root:not([data-theme='light']) .r1-name { --g: linear-gradient(180deg, #fffaf0 0%, #fff1b8 45%, #ffcf40 100%); }
+  :root:not([data-theme='light']) .r1-gold { background-image: var(--g); }
+  :root:not([data-theme='light']) .r1-name { background-image: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.95) 48%, rgba(255, 255, 255, 0.95) 52%, transparent 62%), var(--g); }
+  :root:not([data-theme='light']) .r1-chip { --m: linear-gradient(100deg, #8f5d06 0%, #ffcf40 20%, #ffffff 34%, #ffcf40 46%, #e6a817 60%, #fff1b8 76%, #8f5d06 100%); }
+  :root:not([data-theme='light']) .r1-chip svg { color: #ffcf40; }
+}
+
+/* The Digest bar and every team's Rank 1 (Leaders.tsx) on one row; on a phone the Rank 1s bar is its gold tag alone. */
+.home-bars { display: flex; gap: 0.6rem; margin: -1.4rem 0 1.8rem; }
+.home-bars:empty { display: none; }
+.home-bars > .digest-teaser { margin: 0; flex: 1 1 0; min-width: 0; }
+.leaders-bar {
+  position: relative; display: flex; align-items: center; gap: 0.7rem; flex: 1 1 0; min-width: 0; padding: 0.55rem 0.9rem 0.55rem 0.55rem;
+  border-radius: 999px; cursor: pointer; font: inherit; text-align: left; color: var(--ink-900);
+  border: 2px solid transparent;
+  background: linear-gradient(var(--white), var(--white)) padding-box,
+              conic-gradient(from var(--r1a), #e6a81740 0deg, #e6a81780 60deg, #fff1b8 80deg, #ffffff 88deg, #ffcf40 96deg, #e6a81780 120deg, #e6a81740 180deg,
+                #e6a81780 240deg, #fff1b8 260deg, #ffffff 268deg, #ffcf40 276deg, #e6a81780 300deg, #e6a81740 360deg) border-box;
+  animation: r1-spin 4s linear infinite; transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 200ms ease;
+}
+.leaders-bar:hover { transform: translateY(-2px); box-shadow: 0 12px 28px -16px rgb(230 168 23 / 0.7); }
+.leaders-tag { flex: none; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; border-radius: 999px;
+  background: linear-gradient(135deg, #ffcf40, #e6a817 55%, #b9820b); color: #3d2600; font-size: 0.8rem; font-weight: 800; white-space: nowrap; }
+.leaders-line { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 0.4rem; overflow: hidden; white-space: nowrap;
+  font-size: 0.9rem; font-weight: 600; animation: digest-ticker 420ms cubic-bezier(0.23, 1, 0.32, 1); }
+.leaders-line svg { flex: none; color: #e6a817; }
+.leaders-team { color: var(--ink-500); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+.leaders-go { flex: none; color: var(--ink-500); transition: transform 180ms ease; }
+.leaders-bar:hover .leaders-go { transform: translateX(3px); color: var(--ink-950); }
+@media (max-width: 767px) {
+  .leaders-bar { flex: none; padding: 0.3rem; }
+  .leaders-line, .leaders-go { display: none; }
+}
+
+/* The list: its gold top and close button stay while the names scroll; a phone's whole screen, a card on a computer. */
+.leaders-shade { position: fixed; inset: 0; z-index: 50; display: flex; align-items: stretch; justify-content: center; background: rgb(11 13 16 / 0.6);
+  animation: leaders-fade 200ms ease-out; }
+@keyframes leaders-fade { from { opacity: 0; } }
+.leaders-panel { display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--white); color: var(--ink-950); overflow: hidden;
+  animation: sheet-in 220ms cubic-bezier(0.23, 1, 0.32, 1); }
+@media (min-width: 640px) {
+  .leaders-shade { align-items: center; padding: 1.5rem; }
+  .leaders-panel { max-width: 32rem; height: auto; max-height: min(44rem, 88vh); border-radius: 18px; box-shadow: 0 24px 60px rgb(0 0 0 / 0.35); }
+}
+.leaders-panel { position: relative; }
+.leaders-sky { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.leaders-sky span { position: absolute; top: 100%; border-radius: 50%; background: #d4940a; box-shadow: 0 0 4px #f0b42a; opacity: 0; animation: leaders-up linear infinite; }
+:root[data-theme='dark'] .leaders-sky span { background: #ffe08a; box-shadow: 0 0 3px #ffcf40; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .leaders-sky span { background: #ffe08a; box-shadow: 0 0 3px #ffcf40; } }
+@keyframes leaders-up { 0% { top: 100%; transform: translateX(0); opacity: 0; } 10% { opacity: 0.9; } 85% { opacity: 0.6; } 100% { top: -2%; transform: translateX(var(--dx)); opacity: 0; } }
+.leaders-head { position: relative; flex: none; overflow: hidden; padding: calc(1.2rem + env(safe-area-inset-top, 0px)) 1.3rem 1.1rem; color: #3d2600;
+  background: linear-gradient(135deg, #fff1b8, #ffcf40 40%, #e6a817 75%, #b9820b); }
+.leaders-head h2 { position: relative; margin: 0.45rem 0 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
+.leaders-art { position: absolute; right: 3.4rem; top: -0.4rem; color: rgb(255 255 255 / 0.4); transform-origin: 50% 90%;
+  animation: leaders-crown 3.2s ease-in-out infinite; filter: drop-shadow(0 4px 10px rgb(143 93 6 / 0.35)); }
+/* The crown rocks and rises a little, as if settling on a head (the user, 10 Nov: "not trophy, a crown moving"). */
+@keyframes leaders-crown {
+  0%, 100% { transform: rotate(-14deg) translateY(0); }
+  50% { transform: rotate(-4deg) translateY(-6px); }
+}
+.leaders-count { position: relative; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.65rem; border-radius: 99px;
+  background: rgb(255 255 255 / 0.45); font-size: 0.75rem; font-weight: 800; }
+.leaders-close { position: absolute; top: calc(0.9rem + env(safe-area-inset-top, 0px)); right: 0.9rem; display: grid; place-items: center; width: 2.25rem; height: 2.25rem;
+  border-radius: 99px; border: 0; background: rgb(61 38 0 / 0.18); color: #3d2600; cursor: pointer; transition: transform 160ms ease, background 160ms ease; }
+.leaders-close:hover { background: rgb(61 38 0 / 0.3); transform: rotate(90deg); }
+.leaders-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; list-style: none; margin: 0;
+  padding: 0.3rem 1.1rem calc(1rem + env(safe-area-inset-bottom, 0px)); }
+.leaders-list li { display: grid; gap: 0.15rem; padding: 0.75rem 0.2rem; border-bottom: 1px solid var(--ink-100); }
+.leaders-list li:last-child { border-bottom: 0; }
+.leaders-mgr { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.05em; color: var(--ink-500); text-transform: uppercase; }
+.leaders-who { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; font-size: 0.95rem; color: var(--ink-950); }
+.leaders-who svg { color: #e6a817; flex: none; }
+.leaders-who span { font-size: 0.8rem; color: var(--ink-500); }
+
+@media (prefers-reduced-motion: reduce) { .leaders-bar, .leaders-line, .leaders-shade, .leaders-panel, .leaders-art { animation: none; } .leaders-sky { display: none; }
+ .r1-dust { display: none; } .r1-name, .r1-chip-words, .digest-teaser.r1-ring { animation: none; } }
+
+/* Each Rank 1's round photo in front of the name, the crown in a round when there is none; a press shows it large
+   with "Oct-26 Rank 1 in X's team", and another press anywhere closes it (the user, 11 Nov). */
+.leaders-list li { grid-template-columns: auto minmax(0, 1fr); column-gap: 0.8rem; align-items: center; }
+.leaders-text { display: grid; gap: 0.15rem; min-width: 0; }
+.leaders-face { width: 42px; height: 42px; border-radius: 50%; padding: 0; overflow: hidden; flex: none; cursor: pointer;
+  display: grid; place-items: center; border: 2px solid #e6a817; background: color-mix(in srgb, #e6a817 16%, var(--white)); color: #b9820b;
+  transition: transform 0.15s ease; }
+.leaders-face:active { transform: scale(0.94); }
+.leaders-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.leaders-zoom { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 1.5rem;
+  background: rgb(0 0 0 / 0.55); cursor: pointer; animation: leaders-zoom-in 0.18s ease-out; }
+.leaders-zoom-card { width: min(100%, 20rem); display: grid; justify-items: center; gap: 0.3rem; text-align: center;
+  padding: 1.6rem 1.25rem 1.4rem; border-radius: 20px; background: var(--white); color: var(--ink-950);
+  border: 1px solid color-mix(in srgb, #e6a817 45%, transparent); box-shadow: 0 24px 60px rgb(0 0 0 / 0.4); }
+.leaders-zoom-face { width: 128px; height: 128px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; margin-bottom: 0.6rem;
+  border: 3px solid #e6a817; background: color-mix(in srgb, #e6a817 16%, var(--white)); color: #b9820b; }
+.leaders-zoom-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.leaders-zoom-name { font-size: 1.15rem; }
+.leaders-zoom-role { font-size: 0.82rem; color: var(--ink-500); }
+.leaders-zoom-rank { display: inline-flex; align-items: center; gap: 0.35rem; margin-top: 0.75rem; padding: 0.4rem 0.9rem; border-radius: 999px;
+  font-size: 0.88rem; font-weight: 600; color: #7a4f04; background: color-mix(in srgb, #e6a817 22%, var(--white)); }
+.leaders-zoom-rank svg { color: #b9820b; flex: none; }
+.leaders-zoom-fn { font-size: 0.78rem; color: var(--ink-500); }
+:root[data-theme='dark'] .leaders-zoom-rank { color: #ffd76a; }
+:root[data-theme='dark'] :is(.leaders-face, .leaders-zoom-face, .leaders-zoom-rank svg) { color: #ffcf40; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .leaders-zoom-rank { color: #ffd76a; }
+  :root:not([data-theme='light']) :is(.leaders-face, .leaders-zoom-face, .leaders-zoom-rank svg) { color: #ffcf40; }
+}
+@keyframes leaders-zoom-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .leaders-zoom { animation: none; } }
+
+/* Royal setup for the large photo (the user, 11 Nov). */
+.leaders-zoom-card { position: relative; overflow: hidden; isolation: isolate;
+  border: 1.5px solid transparent;
+  background: linear-gradient(var(--white), var(--white)) padding-box,
+              linear-gradient(160deg, #fff1b8, #e6a817 35%, #8f5d06 60%, #ffcf40 85%, #fff1b8) border-box;
+  animation: lz-rise 0.5s cubic-bezier(0.2, 1.3, 0.35, 1) both; }
+.leaders-zoom-card::before { content: ''; position: absolute; inset: -40% -20% auto; height: 70%; z-index: -1; pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, #ffcf40 28%, transparent), transparent); animation: lz-glow 3.2s ease-in-out infinite; }
+.leaders-zoom-halo { position: relative; width: 148px; height: 148px; display: grid; place-items: center; margin: 1rem 0 0.7rem; }
+.leaders-zoom-halo .leaders-zoom-face { margin: 0; border-width: 0; width: 130px; height: 130px; box-shadow: 0 10px 30px -10px rgb(185 130 11 / 0.7);
+  animation: lz-face-in 0.55s 0.08s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.leaders-zoom-ring { position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from 0deg, #8f5d06, #e6a817, #fff7d6, #ffcf40, #b9820b, #8f5d06, #e6a817, #fff7d6, #8f5d06);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+  animation: lz-spin 5s linear infinite, lz-fade 0.4s ease-out both; }
+.leaders-zoom-crown { position: absolute; top: -22px; left: 50%; color: #e6a817; z-index: 2;
+  filter: drop-shadow(0 3px 4px rgb(143 93 6 / 0.55)); animation: lz-crown 0.7s 0.35s cubic-bezier(0.25, 1.5, 0.45, 1) both; }
+.leaders-zoom-crown svg { display: block; fill: color-mix(in srgb, #ffcf40 55%, transparent); }
+.leaders-zoom-burst { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.leaders-zoom-burst i { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%;
+  background: #ffcf40; box-shadow: 0 0 8px 2px rgb(255 207 64 / 0.7); opacity: 0;
+  animation: lz-spark 0.9s calc(0.3s + var(--d)) ease-out both; }
+.leaders-zoom-name { animation: lz-up 0.45s 0.3s ease-out both; }
+.leaders-zoom-role { animation: lz-up 0.45s 0.38s ease-out both; }
+.leaders-zoom-fn { animation: lz-up 0.45s 0.5s ease-out both; }
+.leaders-zoom-rank { position: relative; overflow: hidden; border: 1px solid color-mix(in srgb, #e6a817 55%, transparent);
+  animation: lz-up 0.45s 0.45s ease-out both; }
+.leaders-zoom-rank::after { content: ''; position: absolute; inset: 0; transform: translateX(-120%);
+  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.65) 50%, transparent 70%); animation: lz-sheen 3.4s 1s ease-in-out infinite; }
+@keyframes lz-rise { from { opacity: 0; transform: translateY(24px) scale(0.86); } to { opacity: 1; transform: none; } }
+@keyframes lz-face-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+@keyframes lz-spin { to { transform: rotate(360deg); } }
+@keyframes lz-fade { from { opacity: 0; } }
+@keyframes lz-crown { 0% { opacity: 0; transform: translate(-50%, -46px) rotate(-18deg) scale(0.6); } 70% { opacity: 1; transform: translate(-50%, 3px) rotate(-8deg) scale(1.08); } 100% { opacity: 1; transform: translate(-50%, 0) rotate(-8deg); } }
+@keyframes lz-spark { 0% { opacity: 0; transform: rotate(var(--a)) translateY(0) scale(0.4); } 25% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-104px) scale(1); } }
+@keyframes lz-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes lz-sheen { 0%, 55% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+@keyframes lz-glow { 50% { opacity: 0.55; } }
+:root[data-theme='dark'] .leaders-zoom-rank::after { background: linear-gradient(105deg, transparent 30%, rgb(255 241 184 / 0.35) 50%, transparent 70%); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .leaders-zoom-rank::after { background: linear-gradient(105deg, transparent 30%, rgb(255 241 184 / 0.35) 50%, transparent 70%); } }
+@media (prefers-reduced-motion: reduce) {
+  .leaders-zoom-card, .leaders-zoom-card::before, .leaders-zoom-halo .leaders-zoom-face, .leaders-zoom-ring, .leaders-zoom-crown,
+  .leaders-zoom-name, .leaders-zoom-role, .leaders-zoom-fn, .leaders-zoom-rank, .leaders-zoom-rank::after { animation: none; }
+  .leaders-zoom-crown { transform: translate(-50%, 0) rotate(-8deg); }
+  .leaders-zoom-burst { display: none; }
+}
+/* Every Rank 1's name in gold with the shine (the user, 11 Nov); the shine runs a little apart row by row. */
+.leaders-who b.leaders-gold { font-weight: 750; animation-duration: 4.5s; }
+.leaders-list li:nth-child(3n + 2) b.leaders-gold { animation-delay: 2.1s; }
+.leaders-list li:nth-child(3n) b.leaders-gold { animation-delay: 3.2s; }
+@media (prefers-reduced-motion: reduce) { .leaders-who b.leaders-gold, .leaders-zoom-name.r1-name { animation: none; } }
+.leaders-zoom-name.r1-name { animation: lz-up 0.45s 0.3s ease-out both, r1-shine 4.5s ease-in-out 1.2s infinite; }
+@media (prefers-reduced-motion: reduce) { .leaders-zoom-name.r1-name { animation: none; } }
+/* Mine on top (the user, 11 Nov): a soft gold band and a small tag. */
+.leaders-mine { display: inline-block; margin-right: 0.45rem; padding: 0.05rem 0.5rem; border-radius: 999px; font-size: 0.68rem; letter-spacing: 0.04em;
+  background: #e6a817; color: #3b2600; vertical-align: 1px; }
+/* Every row the same inside padding, so the photos make one straight line with or without the band. */
+.leaders-list li { padding-left: 0.6rem; padding-right: 0.6rem; }
+/* Light mode: the list's gold names a step deeper so they read on white (the user, 11 Nov); dark keeps its light gold. */
+.leaders-list b.leaders-gold, .leaders-zoom-name.r1-name {
+  background-image: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.85) 48%, rgba(255, 255, 255, 0.85) 52%, transparent 62%),
+                    linear-gradient(180deg, #b98309 0%, #8f6205 55%, #6b4502 100%);
+}
+:root[data-theme='dark'] .leaders-list b.leaders-gold, :root[data-theme='dark'] .leaders-zoom-name.r1-name {
+  background-image: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.95) 48%, rgba(255, 255, 255, 0.95) 52%, transparent 62%),
+                    linear-gradient(180deg, #fffaf0 0%, #fff1b8 45%, #ffcf40 100%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .leaders-list b.leaders-gold, :root:not([data-theme='light']) .leaders-zoom-name.r1-name {
+    background-image: linear-gradient(110deg, transparent 38%, rgba(255, 255, 255, 0.95) 48%, rgba(255, 255, 255, 0.95) 52%, transparent 62%),
+                      linear-gradient(180deg, #fffaf0 0%, #fff1b8 45%, #ffcf40 100%);
+  }
+}
+
+/* Royal, premium head (the user, 11 Nov). */
+.leaders-head { padding-bottom: 0.8rem; color: #3a2400;
+  background: linear-gradient(125deg, #fff4c4 0%, #f7d465 22%, #e6a817 48%, #c98e0c 70%, #f2c94c 86%, #a8740a 100%);
+}
+.leaders-head::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.55) 48%, transparent 60%) no-repeat;
+  background-size: 260% 100%; background-position: 160% 0; animation: lz-head-sheen 6s ease-in-out 0.8s infinite; }
+@keyframes lz-head-sheen { 0% { background-position: 160% 0; } 45%, 100% { background-position: -70% 0; } }
+.leaders-eyebrow { position: relative; display: inline-flex; align-items: center; gap: 0.55rem; font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.28em; text-transform: uppercase; color: #5c3b02; }
+.leaders-eyebrow i { width: 1.6rem; height: 1px; background: linear-gradient(90deg, transparent, #5c3b02); position: relative; }
+.leaders-eyebrow i:last-child { background: linear-gradient(90deg, #5c3b02, transparent); }
+.leaders-eyebrow i::after { content: ''; position: absolute; top: -2.5px; width: 6px; height: 6px; transform: rotate(45deg); background: #5c3b02; }
+.leaders-eyebrow i:first-child::after { right: -3px; } .leaders-eyebrow i:last-child::after { left: -3px; }
+.leaders-head h2 { margin-top: 0.35rem; font-family: Georgia, 'Times New Roman', serif; font-size: 2rem; font-weight: 700; letter-spacing: 0.01em;
+  color: #3a2400; text-shadow: 0 1px 0 rgb(255 244 196 / 0.75), 0 -1px 0 rgb(90 58 2 / 0.25); }
+.leaders-art { right: 3.4rem; top: auto; bottom: 0.25rem; color: #fff7d6; }
+/* The crown arrives once on opening: drops from above, settles with a small bounce, its glow fades up, then the
+   gentle rock begins (the user, 11 Nov). */
+/* Calmer (the user, 11 Nov: "reduce the motion"): a short drop and a slow, small sway. */
+.leaders-art { animation: lz-crown-drop 0.8s cubic-bezier(0.22, 1.1, 0.36, 1) both, lz-crown-calm 5s ease-in-out 0.8s infinite; }
+@keyframes lz-crown-calm { 0%, 100% { transform: rotate(-14deg) translateY(0); } 50% { transform: rotate(-11deg) translateY(-2px); } }
+@keyframes lz-crown-drop {
+  0% { opacity: 0; transform: translateY(-18px) rotate(-18deg) scale(0.92); }
+  60% { opacity: 1; transform: translateY(2px) rotate(-13deg) scale(1.01); }
+  100% { opacity: 1; transform: rotate(-14deg) translateY(0); }
+}
+.lz-crown-glow { animation: lz-glow-up 1.2s ease-out 0.35s both; }
+@keyframes lz-glow-up { from { opacity: 0; } to { opacity: 1; } }
+.lz-gem-flash > * { opacity: 0; animation: lz-gem 4.5s ease-in-out 1.4s infinite; }
+@keyframes lz-gem { 0%, 14%, 100% { opacity: 0; } 6% { opacity: 0.75; } }
+@media (prefers-reduced-motion: reduce) { .leaders-art, .lz-crown-glow, .lz-gem-flash > * { animation: none; } .lz-gem-flash { display: none; } }
+/* A small, raised s: the 1 carries the title (the user, 11 Nov: "make s very small"). */
+.leaders-head h2 small { font-size: 0.5em; font-weight: 700; margin-left: 0.04em; vertical-align: 0.15em; }
+.leaders-art svg { filter: drop-shadow(0 6px 10px rgb(110 70 4 / 0.4)); }
+/* Only a gold outline (the user, 11 Nov: "gold border enough for crown"): no fill, a soft gold line just above the background, not standing out. */
+.leaders-art svg.leaders-crown-old { fill: none; color: #b9820b; opacity: 0.7; filter: drop-shadow(0 1px 0 rgb(255 244 196 / 0.45)); }
+.leaders-glint { position: absolute; width: 12px; height: 12px; background: #fff;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  opacity: 0; animation: lz-glint 2.6s ease-in-out infinite; }
+.leaders-glint.g1 { top: 2px; left: 2px; } .leaders-glint.g2 { top: -2px; right: 26px; width: 9px; height: 9px; animation-delay: 0.9s; }
+.leaders-glint.g3 { top: 38px; left: 48px; width: 8px; height: 8px; animation-delay: 1.7s; }
+@keyframes lz-glint { 0%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); } 45% { opacity: 1; transform: scale(1) rotate(45deg); } 70% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .leaders-head::after, .leaders-glint { animation: none; } .leaders-glint { opacity: 0.8; } }
+
+/* A press anywhere on a row opens the large photo (the user, 11 Nov). */
+.leaders-list li[role='button'] { cursor: pointer; border-radius: 12px; -webkit-tap-highlight-color: transparent; transition: background 0.15s ease; }
+.leaders-list li[role='button']:active { background: color-mix(in srgb, #e6a817 16%, transparent); }
+.leaders-list li[role='button']:active .leaders-face { transform: scale(0.94); }
+.leaders-list li[role='button']:focus-visible { outline: 2px solid #e6a817; outline-offset: -2px; }
+
+.leaders-zoom-rank { flex-wrap: wrap; justify-content: center; column-gap: 0.3em; row-gap: 0; text-align: center; }
+.lz-rank-of { white-space: nowrap; }
+.lz-rank-team { max-width: 100%; }
+/* Phone: the Digest bar is half the row, so "1 new" becomes a count on its corner instead of a pill that runs out of the bar (the user, 13 Nov). */
+@media (max-width: 767px) {
+  .home-bars > .digest-teaser { padding: 0.3rem; }
+  .home-bars > .digest-teaser .digest-teaser-line, .home-bars > .digest-teaser .digest-teaser-go { display: none; }
+  .home-bars > .digest-teaser .digest-teaser-tag { white-space: nowrap; min-width: 0; flex: 1; justify-content: center; }
+  .home-bars > .digest-teaser .digest-teaser-new { position: absolute; top: -0.55rem; right: -0.35rem; min-width: 1.35rem; padding: 0.1rem 0.4rem;
+    font-size: 0; text-align: center; box-shadow: 0 0 0 2px var(--white); }
+  .home-bars > .digest-teaser .digest-teaser-new::before { content: attr(data-n); font-size: 0.72rem; }
+}

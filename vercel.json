@@ -4,6 +4,8 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "redirects": [
+    { "source": "/inventory", "destination": "/workplace/", "permanent": false },
+    { "source": "/inventory/:rest*", "destination": "/workplace/:rest*", "permanent": false },
     { "source": "/my-kpi", "destination": "/kpi/my-kpi", "permanent": false },
     { "source": "/my-kpi/:rest*", "destination": "/kpi/my-kpi/:rest*", "permanent": false },
     { "source": "/history", "destination": "/kpi/history", "permanent": false },
@@ -82,6 +84,22 @@
       "destination": "https://cyrix-task.vercel.app/tasks/:path*"
     },
     {
+      "source": "/workplace/",
+      "destination": "https://cyrix-workplace.vercel.app/workplace/"
+    },
+    {
+      "source": "/workplace/:path*",
+      "destination": "https://cyrix-workplace.vercel.app/workplace/:path*"
+    },
+    {
+      "source": "/projects/",
+      "destination": "https://cyrix-projects.vercel.app/projects/"
+    },
+    {
+      "source": "/projects/:path*",
+      "destination": "https://cyrix-projects.vercel.app/projects/:path*"
+    },
+    {
       "source": "/cyra/",
       "destination": "https://cyrix-cyra.vercel.app/cyra/"
     },
@@ -90,13 +108,35 @@
       "destination": "https://cyrix-cyra.vercel.app/cyra/:path*"
     },
     {
-      "source": "/((?!assets/|favicon|sw\\.js|push-sw\\.js|manifest\\.webmanifest|icon-).*)",
+      "source": "/((?!api/|assets/|favicon|sw\\.js|push-sw\\.js|manifest\\.webmanifest|icon-).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/(kpi|spare|bemmp|pulse|revive|travel|tasks|workplace|projects|cyra)/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/tasks/outlook(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
+        { "key": "Content-Security-Policy", "value": "frame-ancestors 'self' https://outlook.office.com https://outlook.office365.com https://outlook.live.com https://*.outlook.com https://*.office.com https://*.office365.com https://*.officeapps.live.com; base-uri 'self'; object-src 'none'; form-action 'self'" },
+        { "key": "Permissions-Policy", "value": "camera=(self), microphone=(self), geolocation=(self), payment=(), usb=()" }
+      ]
+    },
+    {
+      "source": "/((?!tasks/outlook).*)",
       "headers": [
         {
           "key": "X-Content-Type-Options",
@@ -109,7 +149,31 @@
         {
           "key": "Strict-Transport-Security",
           "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(self), microphone=(self), geolocation=(self), payment=(), usb=()"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
         }
+      ]
+    },
+    {
+      "source": "/Cyra.apk",
+      "headers": [
+        { "key": "Content-Type", "value": "application/vnd.android.package-archive" },
+        { "key": "Content-Disposition", "value": "attachment; filename=\"Cyra.apk\"" },
+        { "key": "Cache-Control", "value": "no-cache" }
       ]
     },
     {

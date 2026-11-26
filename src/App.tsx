@@ -1,21 +1,27 @@
 import { session as sessionStore } from './lib/storage'
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import Logo from './Logo'
+import CyraMark from './CyraMark'
 import ProfileCard from './ProfileCard'
 import ThemeToggle from './ThemeToggle'
 import InstallButton from './InstallButton'
 import NotifyCard from './NotifyCard'
 import Digest, { DigestTeaser } from './Digest'
+import { RankOneChip, RankOneDust, useRankOne } from './RankOne'
+import Leaders, { useRankOnes } from './Leaders'
 import { dropPush } from './lib/push'
 import ForgotPassword from './ForgotPassword'
 import DeviceGate from './DeviceGate'
+import Ops from './Ops'
 import { deviceCheck, sessionIdOf, sessionState, type DeviceCheck } from './lib/session'
 import type { Session } from '@supabase/supabase-js'
 import {
-  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, LayoutGrid, LogOut, ArrowRight, Loader2,
+  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, Gauge, Briefcase, Newspaper, LayoutGrid, LogOut, ArrowRight, Loader2,
   Eye, EyeOff,
 } from 'lucide-react'
 import { supabase, ecodeToEmail, type Module } from './lib/supabase'
+import { arrange, useArrange, useTileOrder } from './lib/tileOrder'
+import { warmModule, warmWhenIdle } from './lib/warm'
 
 /**
  * app.cyrix.in — sign in once, then pick a module.
@@ -29,7 +35,7 @@ import { supabase, ecodeToEmail, type Module } from './lib/supabase'
 
 /** The icon names the registry uses, resolved to real components. */
 const ICONS: Record<string, typeof ClipboardList> = {
-  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope,
+  ClipboardList, QrCode, Activity, Wrench, Navigation, ListChecks, Stethoscope, Gauge, Briefcase, Newspaper,
 }
 
 /**
@@ -127,6 +133,11 @@ export default function App() {
     if (toCyra && session && device?.state === 'ok') void openCyra()
   }, [toCyra, session, device])
 
+  // The opening splash in index.html stays up until the first real screen can draw: the
+  // sign-in page, the device code, or the portal itself (never the spinner below).
+  const booting = !ready || (!!session && !device) || (toCyra && device?.state === 'ok')
+  useEffect(() => { if (!booting) window.cyraSplash?.done() }, [booting])
+
   if (!ready) return <Splash />
   if (!session) return <SignIn />
   if (!device) return <Splash />
@@ -134,6 +145,8 @@ export default function App() {
   if (device.state === 'pending') {
     return <DeviceGate others={device.others} emailHint={device.email_hint} onDone={() => setDevice({ state: 'ok' })} />
   }
+  // /ops is the portal's own page, not a module behind a rewrite (KPI 0227): it answers only to Ops admins.
+  if (window.location.pathname.replace(/\/+$/, '') === '/ops') return <Ops />
   return <Portal />
 }
 
@@ -312,9 +325,15 @@ function SignIn() {
 function Portal() {
   const [modules, setModules] = useState<Module[] | null>(null)
   /** Name and photo together: the header shows both, the greeting one. */
-  const [me, setMe] = useState<{ full_name: string; avatar: string | null } | null>(null)
+  const [me, setMe] = useState<{ full_name: string; avatar: string | null; id: string; ecode: string; mgrId: string | null; tiles: string[] | null } | null>(null)
   /** HR, SW, IT and Marketing admin logins: no Cyrix Digest on their home page (the user, 10 Oct). */
   const [adminLogin, setAdminLogin] = useState<boolean | null>(null)
+  // Team rank 1 this month: gold greeting, dust and a gold Digest ring (the user, 10 Nov).
+  const rankOne = useRankOne(!!me && adminLogin === false)
+  // Asked for the moment the portal opens, not after the name lookup, so the Rank 1s bar is not left behind the Digest bar (the user, 11 Nov).
+  const rankOnes = useRankOnes(true)
+  /** HR, IT and Marketing post to Cyrix Digest, from a tile here rather than a KPI tab (the user, 2 Nov). */
+  const [digestDesk, setDigestDesk] = useState(false)
   const [failed, setFailed] = useState(false)
   /** A retry is in flight, so the button says so rather than doing nothing. */
   const [retrying, setRetrying] = useState(false)
@@ -385,14 +404,14 @@ function Portal() {
               // avatar comes along for the ride. It is a data URL on the
               // row itself rather than a file to go and fetch, so the
               // photo costs this query nothing extra to carry.
-              .select('id, full_name, ecode, avatar')
+              .select('id, full_name, ecode, avatar, account_type, reporting_manager_id, tile_order')
               .eq('auth_user_id', uid).maybeSingle()
           : Promise.resolve({ data: null }),
         loadModules(),
       ])
       if (!alive) return
       if (me.data?.full_name) {
-        setMe({ full_name: me.data.full_name.trim(), avatar: me.data.avatar ?? null })
+        setMe({ full_name: me.data.full_name.trim(), avatar: me.data.avatar ?? null, id: String(me.data.id), ecode: String(me.data.ecode ?? ''), mgrId: me.data.reporting_manager_id ?? null, tiles: me.data.tile_order ?? null })
       }
       if (mods === null) setFailed(true)
       else setModules(mods)
@@ -414,9 +433,15 @@ function Portal() {
       const roles = await supabase.from('user_roles')
         .select('role').eq('employee_id', me.data.id)
       if (!alive) return
-      const isAdmin = (roles.data ?? []).some(
-        // Marketing too (KPI 0164): its whole KPI is the Cyrix Digest page.
-        r => r.role === 'hr_admin' || r.role === 'sw_admin' || r.role === 'it_admin' || r.role === 'mkt_admin')
+      const roleNames = (roles.data ?? []).map(r => r.role as string)
+      // Digest ticked for their desk by SW Admin, or a shared desk login (KPI 0246).
+      const posts = await supabase.rpc('digest_can_post')
+      if (!alive) return
+      setDigestDesk(!!posts.data)
+      // A shared desk login only: a person given a desk role is appraised too, and reads the Digest
+      // like everyone else (the user, 2 Nov).
+      const isAdmin = me.data.account_type === 'admin' && roleNames.some(
+        r => r === 'hr_admin' || r === 'sw_admin' || r === 'it_admin' || r === 'mkt_admin')
       setAdminLogin(isAdmin)
       if (!isAdmin) return
 
@@ -429,20 +454,21 @@ function Portal() {
         // beats a redirect that cannot remember it already happened.
         return
       }
-      window.location.assign('/kpi')
+      // Marketing's whole desk is the Digest.
+      window.location.assign(roleNames.some(r => r === 'hr_admin' || r === 'sw_admin' || r === 'it_admin') ? '/kpi' : '/kpi/digest')
     })()
     return () => { alive = false }
   }, [])
 
   return (
-    <div className="portal">
+    <div className={rankOne ? 'portal r1' : 'portal'}>
       <header className="bar">
-        <Logo height={30} />
+        <CyraMark />
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
         {/* Who is signed in, shown the same way every module shows it; a press
             opens their basic details (ProfileCard). The name is hidden on a
             phone where the mark and the controls already fill the bar. */}
-        {me && <ProfileCard name={me.full_name} avatar={me.avatar} />}
+        {me && <ProfileCard name={me.full_name} avatar={me.avatar} onAvatar={avatar => setMe(m => (m ? { ...m, avatar } : m))} />}
         <ThemeToggle />
         <InstallButton />
         <button
@@ -463,14 +489,24 @@ function Portal() {
         </div>
       </header>
 
-      <main className="portal-main">
-        <h1>{me ? `Hello, ${me.full_name.split(/\s+/)[0]}` : 'Hello'}</h1>
+      <main className={rankOne ? 'portal-main r1' : 'portal-main'}>
+        {rankOne && <RankOneDust />}
+        {rankOne && me
+          ? <h1><span className="r1-gold r1-hello">Hello, </span><span className="r1-name">{me.full_name.split(/\s+/)[0]}</span> <RankOneChip month={rankOne.month} team={rankOne.team} /></h1>
+          : <h1>{me ? <><span className="r1-hello">Hello, </span>{me.full_name.split(/\s+/)[0]}</> : 'Hello'}</h1>}
         {/* States what the set is rather than instructing somebody to click
             one of three large obvious cards. It also answers the question
             the page actually raises — why this person sees three tiles and
             the colleague beside them sees one. */}
         <p className="sub">The modules assigned to you.</p>
-        {me && adminLogin === false && <DigestTeaser />}
+        {/* The Digest bar and the Rank 1s bar on one row, ranking first (the user, 10 Nov: "2 rows in bad, but need both", "first ranking then digest"). */}
+        {/* Both bars together, once the Rank 1s are known, so neither arrives first and pushes the other (the user, 11 Nov). */}
+        {me && adminLogin === false && rankOnes !== null && (
+          <div className="home-bars">
+            {!!rankOnes?.length && <Leaders ones={rankOnes} me={me} />}
+            <DigestTeaser />
+          </div>
+        )}
 
         {me && <NotifyCard />}
 
@@ -497,30 +533,113 @@ function Portal() {
         )}
 
         {modules && modules.length > 0 && (
-          <div className={arriving ? 'tiles arrive' : 'tiles'}>
-            {modules.map((m, i) => {
-              const Icon = (m.icon && ICONS[m.icon]) || LayoutGrid
-              // On a phone the tiles go two to a row; with an odd count KPI takes a row of its own
-              // (the user, 24 Oct), or the first tile for somebody without KPI.
-              const wide = modules.length % 2 === 1 && m.code === (modules.find(x => x.code === 'kpi') ?? modules[0]).code
-              return (
-                <a key={m.code} className={wide ? 'tile wide' : 'tile'} data-module={m.code} href={m.path} style={{ '--i': i } as CSSProperties}
-                  onClick={m.code === 'cyra' ? e => { e.preventDefault(); void openCyra() } : undefined}>
-                  <span className="tile-icon"><Icon size={22} /></span>
-                  <span className="tile-body">
-                    <span className="tile-name">{m.name}</span>
-                    {m.description && <span className="tile-desc">{m.description}</span>}
-                  </span>
-                  <ArrowRight className="tile-go" size={17} />
-                </a>
-              )
-            })}
-          </div>
+          <Tiles uid={me?.id} saved={me?.tiles ?? null} arriving={arriving} openCyra={openCyra} items={digestDesk
+            ? [...modules, { code: 'digest', name: 'Cyrix Digest', description: 'Post news, meetings and polls', path: '/kpi/digest', icon: 'Newspaper', sort_order: 999, is_active: true }]
+            : modules} />
         )}
 
         {/* Company news and meetings, under the tiles (KPI 0163). */}
         {me && adminLogin === false && <Digest />}
       </main>
     </div>
+  )
+}
+
+type TileStatus = { code: string; n: number | null; label: string | null; is_new: boolean; down: boolean }
+/**
+ * What each tile has to say (the user, 25 Nov; KPI 0310): how much waits there, whether HR just gave it,
+ * whether it is down. Asked once when the page opens, never on a timer, so it costs one call a visit.
+ * A failure shows plain tiles, the same as before this existed.
+ */
+function useTileStatus(uid: string | undefined) {
+  const [st, setSt] = useState<Record<string, TileStatus>>({})
+  useEffect(() => {
+    if (!uid) return
+    let gone = false
+    void supabase.rpc('my_tile_status').then(({ data, error }) => {
+      if (gone || error || !Array.isArray(data)) return
+      setSt(Object.fromEntries((data as TileStatus[]).map(r => [r.code, r])))
+    }, () => { /* plain tiles */ })
+    return () => { gone = true }
+  }, [uid])
+  return st
+}
+
+/** The module tiles: KPI first, the rest in the person's order; long press or drag to arrange (the user, 25 Nov). */
+function Tiles({ uid, saved, items, arriving, openCyra }: { uid: string | undefined; saved: string[] | null; items: Module[]; arriving: boolean; openCyra: () => Promise<void> | void }) {
+  const { order, save, reset, failed, retry } = useTileOrder(uid, saved)
+  const sorted = arrange(items, order)
+  const grid = useRef<HTMLDivElement>(null)
+  const { editing, live, lifted, bind, begin, finish } = useArrange(sorted.map(m => m.code), save, grid)
+  const status = useTileStatus(uid)
+  const shown = live.map(c => sorted.find(m => m.code === c)).filter((m): m is Module => !!m)
+  // Their first tile, loaded ahead while the page is idle (the user, 23 Nov: "faster opening").
+  const first = shown[0]?.path
+  useEffect(() => { if (first) warmWhenIdle(first) }, [first])
+  /*
+   * How to arrange, said once on the page (the user, 25 Nov). The gesture alone is invisible:
+   * nobody long-presses a link to see what happens. Shown only to someone with two or more tiles
+   * they can move (KPI stays put) and who has not arranged yet; while arranging it says how to finish.
+   */
+  const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
+  const movable = shown.filter(m => m.code !== 'kpi').length
+  const hint = failed
+    ? 'Could not save your order to your account, so your other devices will not see it.'
+    : editing
+      ? (touch ? 'Drag a tile to move it.' : 'Drag a tile, or use the arrow keys, to move it. Esc undoes.')
+      : movable >= 2 && order.length === 0
+        ? (touch ? 'Tip: press and hold a tile to rearrange your tiles.' : 'Tip: click and hold a tile to rearrange your tiles.')
+        : null
+  /** The Arrange button: the way in for a keyboard, and for anyone who never finds the gesture. Focus goes to the first tile that moves. */
+  const startArranging = () => {
+    begin()
+    window.setTimeout(() => grid.current?.querySelector<HTMLElement>('[data-module]:not([data-module="kpi"])')?.focus(), 0)
+  }
+  return (
+    <>
+      <div ref={grid} className={`tiles${arriving && !editing ? ' arrive' : ''}${editing ? ' editing' : ''}`}>
+        {shown.map((m, i) => {
+          const Icon = (m.icon && ICONS[m.icon]) || LayoutGrid
+          // On a phone the tiles go two to a row; with an odd count KPI takes a row of its own
+          // (the user, 24 Oct), or the first tile for somebody without KPI.
+          const wide = shown.length % 2 === 1 && m.code === (shown.find(x => x.code === 'kpi') ?? shown[0]).code
+          const st = status[m.code]
+          const b = bind(m.code, () => { if (m.code === 'cyra') void openCyra(); else window.location.href = m.path })
+          return (
+            <a key={m.code} className={`tile${wide ? ' wide' : ''}${lifted === m.code ? ' lifted' : ''}`} data-module={m.code} href={m.path}
+              style={{ '--i': i } as CSSProperties} draggable={false} {...b}
+              // A pointer resting on a tile, a finger landing on it, or focus reaching it: start loading that module.
+              onPointerEnter={() => warmModule(m.path)} onFocus={() => warmModule(m.path)}
+              onPointerDown={e => { warmModule(m.path); b.onPointerDown(e) }}
+              >
+              <span className="tile-icon"><Icon size={22} />
+                {st?.down && <span className="tile-down" title="Having trouble right now" aria-label="Having trouble right now" />}
+              </span>
+              <span className="tile-body">
+                <span className="tile-name">{m.name}
+                  {st?.is_new && <span className="tile-new">New</span>}
+                  {!!st?.n && <span className="tile-count" title={`${st.n} ${st.label}`} aria-label={`${st.n} ${st.label}`}>{st.n > 99 ? '99+' : st.n}</span>}
+                </span>
+                {m.description && <span className="tile-desc">{m.description}</span>}
+              </span>
+              <ArrowRight className="tile-go" size={17} />
+            </a>
+          )
+        })}
+      </div>
+      {/* Under the tiles, not above them (the user, 25 Nov: "keep arrange at bottom"). */}
+      {movable >= 2 && (
+        <div className="tiles-bar" data-tiles-ctl>
+          <p className="tiles-hint" role="status">{hint}</p>
+          <span className="tiles-ctl">
+            {failed && !editing && <button className="link-btn" onClick={retry}>Try again</button>}
+            {editing && order.length > 0 && <button className="link-btn quiet" onClick={() => { finish(false); void reset() }}>Reset to default</button>}
+            {editing
+              ? <button className="pill-btn solid" onClick={() => finish(true)}>Done</button>
+              : <button className="pill-btn" onClick={startArranging} title="Put your tiles in the order you use them">Arrange</button>}
+          </span>
+        </div>
+      )}
+    </>
   )
 }

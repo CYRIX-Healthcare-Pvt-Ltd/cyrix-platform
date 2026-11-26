@@ -14,6 +14,8 @@
   --ink-50:  #f6f7f8;
   --red-600: #ce2434;
   --white:   #ffffff;
+  /* The page a step from the white cards, as in dark (the user, 29 Oct: light "looks blank"). */
+  --page:    #f3f4f7;
   /* SF Pro, the stack every Cyrix module uses. Apple-licensed and so not
      shippable; -apple-system finds it where it exists and Inter is bundled
      as the stand-in everywhere else. */
@@ -73,6 +75,7 @@
   --ink-50:  #111318;
   --red-600: #ff5c6b;
   --white:   #1c1f25;
+  --page:    #1c1f25;
   --error-ink:  #ffb4bd;
   --error-bg:   #2a1216;
   --error-line: #5d2028;
@@ -95,6 +98,7 @@
     --ink-50:  #111318;
     --red-600: #ff5c6b;
     --white:   #1c1f25;
+  --page:    #1c1f25;
     --error-ink:  #ffb4bd;
     --error-bg:   #2a1216;
     --error-line: #5d2028;
@@ -113,7 +117,7 @@ html, body, #root { height: 100%; }
 body {
   margin: 0;
   font-family: var(--sans);
-  background: var(--white);
+  background: var(--page);
   color: var(--ink-950);
   -webkit-font-smoothing: antialiased;
 }
@@ -304,6 +308,20 @@ body {
 }
 @media (min-width: 640px) { .bar { padding: 0.9rem 2rem; } }
 
+/* The header mark (CyraMark.tsx): "Cyra." at the bar's ink, then a hairline and a quiet "by Cyrix".
+   The byline steps aside on the narrowest phones, where the controls need the room. */
+.cyra-mark { display: flex; align-items: center; gap: 0.7rem; flex: none; color: var(--ink-950); }
+.cyra-word { display: block; height: 20px; width: auto; fill: currentColor; overflow: visible; }
+.cyra-word .cyra-dot { fill: #ed1c24; }
+.cyra-by {
+  display: flex; align-items: center; gap: 0.35rem; padding-left: 0.7rem;
+  border-left: 1px solid var(--ink-200);
+  font-size: 0.7rem; font-weight: 500; letter-spacing: 0.02em; color: var(--ink-500);
+}
+.cyra-by img { display: block; height: 10px; width: auto; opacity: 0.85; }
+.cyra-by .cyrix-logo-dark { display: none; }
+@media (max-width: 379px) { .cyra-by { display: none; } }
+
 .icon-btn {
   display: grid; place-items: center; width: 2.2rem; height: 2.2rem;
   background: transparent; border: 0; border-radius: 8px; cursor: pointer;
@@ -428,6 +446,10 @@ body {
 .tile[data-module='tasks'] .tile-icon { background: #65a30d; --glow: rgba(101, 163, 13, 0.7); }  /* lime */
 /* CYRA (12 Oct) takes red, its own mark's colour, between the pink and the amber. */
 .tile[data-module='cyra'] .tile-icon { background: #dc2626; --glow: rgba(220, 38, 38, 0.7); }  /* red */
+.tile[data-module='digest'] .tile-icon { background: #7c3aed; --glow: rgba(124, 58, 237, 0.7); }  /* violet */
+/* Workplace and Ops were the black default, and hovered violet (the user, 13 Nov: chose C, brown and slate). */
+.tile[data-module='workplace'] .tile-icon { background: #a16207; --glow: rgba(161, 98, 7, 0.7); }  /* brown */
+.tile[data-module='ops'] .tile-icon { background: #475569; --glow: rgba(71, 85, 105, 0.7); }  /* slate */
 
 /*
  * Roughly a third of the wheel apart, deliberately.
@@ -892,6 +914,11 @@ body {
 }
 .sheet-foot { margin: 1rem 0 0; font-size: 0.75rem; line-height: 1.5; color: var(--ink-500); }
 
+/* Android: the Cyra app download (6 Nov). */
+.apk-get { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 1.1rem; padding: 0.85rem 1rem;
+  border-radius: 12px; font-weight: 650; text-decoration: none; }
+.apk-size { font-weight: 500; opacity: 0.75; font-size: 0.85rem; }
+
 /* After signing in: notifications and install (KPI 0154), in the install sheet's frame. */
 .sheet.prompt { display: flex; flex-direction: column; gap: 0.75rem; }
 .prompt-sub { margin: -0.25rem 0 0.25rem; color: var(--ink-500); font-size: 0.9rem; }
@@ -912,49 +939,10 @@ body {
 .prompt-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.25rem; }
 .prompt-never { width: auto !important; font-size: 0.85rem; color: var(--ink-500); cursor: pointer; }
 
-/* Opening splash (16 Oct): the X meets, zooms onto the logo's own X, the wordmark opens out
-   leftwards, a band of light sweeps the letters (no stars, the user said). Splash.tsx. */
-.splash { overflow: hidden; position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; background: #ffffff;
-  animation: splash-out 3s ease forwards; pointer-events: none; }
-:root[data-theme="dark"] .splash, :root.dark .splash { background: #111318; }
-.splash-mark { position: relative; width: min(72vw, 420px); aspect-ratio: 300 / 115; }
-.splash-logo { position: absolute; inset: 0; width: 100%; height: 100%;
-  animation: splash-open 3s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
-.splash-logo.on-dark { display: none; }
-:root[data-theme="dark"] .splash-logo.on-dark, :root.dark .splash-logo.on-dark { display: block; }
-:root[data-theme="dark"] .splash-logo.on-light, :root.dark .splash-logo.on-light { display: none; }
-/* Drawn over the whole logo in its own coordinates, so it ends exactly on the logo's X
-   (rows 14-66 of 115, centred 84.9% across, 34.8% down). */
-.splash-x { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible;
-  transform-origin: 84.9% 34.8%; animation: splash-land 3s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
-.splash-x-left, .splash-x-right { transform-box: fill-box; }
-/* The drawn X stays as the wordmark's X; this patch hides the logo's own X beneath it once landed. */
-.splash-x-cover { fill: #ffffff; opacity: 0; animation: splash-cover 3s linear forwards; }
-:root[data-theme="dark"] .splash-x-cover, :root.dark .splash-x-cover { fill: #111318; }
-@keyframes splash-cover { 0%, 52% { opacity: 0; } 53%, 100% { opacity: 1; } }
-.splash-x-left { fill: #000000; animation: splash-left 3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-.splash-x-right { fill: #ED1C24; animation: splash-right 3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-:root[data-theme="dark"] .splash-x-left, :root.dark .splash-x-left { fill: #ffffff; }
-.splash-shine { position: absolute; inset: 0; opacity: 0;
-  background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 0.95) 50%, transparent 62%) no-repeat;
-  background-size: 260% 100%; -webkit-mask: var(--logo) center / 100% 100% no-repeat; mask: var(--logo) center / 100% 100% no-repeat;
-  mix-blend-mode: screen; animation: splash-shine 3s ease-in-out forwards; }
-/* From either side of the screen, meeting in the middle (the user, 16 Oct: "come from both sides and join, then go"). */
-@keyframes splash-left  { 0% { transform: translateX(-280%); opacity: 0; } 8% { opacity: 1; } 24%, 100% { transform: none; opacity: 1; } }
-@keyframes splash-right { 0% { transform: translateX(280%); opacity: 0; } 8% { opacity: 1; } 24%, 100% { transform: none; opacity: 1; } }
-@keyframes splash-land {
-  0%, 34% { transform: translate(-34.9%, 15.2%) scale(2.6); opacity: 1; }
-  54%     { transform: none; opacity: 1; }
-  100%    { transform: none; opacity: 1; } }
-@keyframes splash-open { 0%, 53% { clip-path: inset(0 0 0 100%); opacity: 0; } 55% { opacity: 1; } 70%, 100% { clip-path: inset(0 0 0 0); opacity: 1; } }
-@keyframes splash-shine { 0%, 72% { opacity: 0; background-position: 130% 0; } 75% { opacity: 1; } 88% { opacity: 1; background-position: -30% 0; } 90%, 100% { opacity: 0; background-position: -30% 0; } }
-/* The wave carries on across the drawn X, reaching it as the letters' wave does (the user, 16 Oct). */
-.splash-x-shine { mix-blend-mode: screen; animation: splash-x-shine 3s ease-in-out forwards; }
-@keyframes splash-x-shine { 0%, 79% { transform: translateX(0); } 87%, 100% { transform: translateX(120px); } }
-@keyframes splash-out { 0%, 90% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 
 /* Hover in each tile's own icon colour, like a Digest card (the user, 16 Oct). */
-.tile { --tint: 124 58 237; transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1), border-color 180ms ease, box-shadow 220ms ease; }
+/* A tile with no colour of its own (Workplace, Ops: black icons) hovers in a neutral grey, not violet (the user, 13 Nov). */
+.tile { --tint: 113 113 122; transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1), border-color 180ms ease, box-shadow 220ms ease; }
 .tile[data-module='kpi'] { --tint: 217 119 6; }
 .tile[data-module='spare'] { --tint: 147 51 234; }
 .tile[data-module='bemmp'] { --tint: 13 148 136; }
@@ -962,5 +950,69 @@ body {
 .tile[data-module='travel'] { --tint: 219 39 119; }
 .tile[data-module='tasks'] { --tint: 101 163 13; }
 .tile[data-module='cyra'] { --tint: 220 38 38; }
+.tile[data-module='digest'] { --tint: 124 58 237; }
+.tile[data-module='workplace'] { --tint: 161 98 7; }
+.tile[data-module='ops'] { --tint: 71 85 105; }
 .tile:hover { border-color: rgb(var(--tint)); box-shadow: 0 0 0 1px rgb(var(--tint) / 0.35), 0 18px 40px -16px rgb(var(--tint) / 0.6); }
 .tile:hover .tile-go { color: rgb(var(--tint)); }
+
+/* The profile photo is pressable: add or change it (the user, 11 Nov). */
+.profile-photo { position: relative; padding: 0; border: 0; background: none; border-radius: 999px; cursor: pointer; flex: none; }
+.profile-photo:disabled { opacity: 0.6; cursor: progress; }
+.profile-photo-cam { position: absolute; right: -2px; bottom: -2px; width: 1.25rem; height: 1.25rem; border-radius: 999px;
+  display: grid; place-items: center; background: var(--red-600); color: #fff; border: 2px solid var(--white); }
+.profile-photo-btn { margin-top: 0.35rem; padding: 0.2rem 0.65rem; border: 1px solid var(--ink-200); border-radius: 999px;
+  background: transparent; color: var(--ink-700); font: inherit; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+.profile-photo-btn:hover:not(:disabled) { border-color: var(--red-600); color: var(--red-600); }
+.profile-photo-err { display: block; margin-top: 0.6rem; font-size: 0.78rem; color: var(--red-600); }
+/* On a phone the card sits across the screen under the header, never off its left edge (the user, 11 Nov). */
+@media (max-width: 640px) {
+  .profile-card { position: fixed; top: var(--pc-top, 4.5rem); left: 0.75rem; right: 0.75rem; width: auto; transform-origin: top center; }
+}
+
+/* Arranging the tiles (the user, 25 Nov): an iPhone-style jiggle on rotate; the held tile moves on translate. KPI stays still. */
+.tiles .tile { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+.tiles.editing .tile:not([data-module='kpi']) { animation: tile-jiggle 260ms ease-in-out infinite alternate; touch-action: none; cursor: grab; }
+.tiles.editing .tile:nth-child(odd) { animation-delay: -130ms; }
+.tiles.editing .tile:hover { transform: none; }
+.tiles.editing .tile.lifted { animation: none; scale: 1.06; box-shadow: 0 16px 32px rgba(0,0,0,0.3); border-color: var(--red-600); z-index: 5; position: relative; cursor: grabbing; }
+@keyframes tile-jiggle { from { rotate: -1.2deg; } to { rotate: 1.2deg; } }
+@media (prefers-reduced-motion: reduce) { .tiles.editing .tile { animation: none !important; } }
+
+/* How to arrange the tiles, one quiet line above them (the user, 25 Nov). */
+.tiles-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem 1rem; margin: 0.85rem 0 0; min-height: 2rem; }
+.tiles-hint { margin: 0; flex: 1 1 14rem; font-size: 0.84rem; color: var(--ink-500); }
+.tiles-ctl { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; flex: none; }
+.link-btn.quiet { font-size: 0.84rem; color: var(--ink-500); }
+.pill-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.34rem 0.85rem; border: 1px solid var(--ink-200); border-radius: 999px;
+  background: var(--white); color: var(--ink-700); font: inherit; font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+.pill-btn:hover { border-color: var(--ink-950); color: var(--ink-950); }
+.pill-btn.solid { background: var(--ink-950); border-color: var(--ink-950); color: var(--white); }
+.pill-btn.solid:hover { background: var(--red-600); border-color: var(--red-600); color: #fff; }
+.tiles.editing .tile:focus-visible { outline: 2px solid var(--red-600); outline-offset: 3px; }
+
+/*
+ * What a tile has to say (the user, 25 Nov; KPI 0310): a count of what waits there, "New" for a module
+ * HR gave in the last week, and a red dot on the icon when the app's uptime check is failing.
+ */
+.tile-name { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; }
+.tile-count {
+  display: inline-grid; place-items: center; min-width: 1.35rem; height: 1.35rem; padding: 0 0.4rem;
+  border-radius: 999px; background: #dc2626; color: #fff;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0; font-variant-numeric: tabular-nums;
+}
+.tile-new {
+  display: inline-flex; align-items: center; height: 1.2rem; padding: 0 0.45rem; border-radius: 999px;
+  background: rgba(22, 163, 74, 0.12); color: #15803d;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
+}
+[data-theme='dark'] .tile-new { background: rgba(74, 222, 128, 0.14); color: #4ade80; }
+.tile-icon { position: relative; }
+.tile-down {
+  position: absolute; top: -3px; right: -3px; width: 0.8rem; height: 0.8rem; border-radius: 50%;
+  background: #dc2626; box-shadow: 0 0 0 2px var(--white);
+}
