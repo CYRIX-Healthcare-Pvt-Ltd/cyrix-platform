@@ -576,20 +576,10 @@ function Tiles({ uid, saved, items, arriving, openCyra }: { uid: string | undefi
   // Their first tile, loaded ahead while the page is idle (the user, 23 Nov: "faster opening").
   const first = shown[0]?.path
   useEffect(() => { if (first) warmWhenIdle(first) }, [first])
-  /*
-   * How to arrange, said once on the page (the user, 25 Nov). The gesture alone is invisible:
-   * nobody long-presses a link to see what happens. Shown only to someone with two or more tiles
-   * they can move (KPI stays put) and who has not arranged yet; while arranging it says how to finish.
-   */
-  const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
+  // Arrange shows once two or more tiles can move (KPI stays put).
   const movable = shown.filter(m => m.code !== 'kpi').length
-  const hint = failed
-    ? 'Could not save your order to your account, so your other devices will not see it.'
-    : editing
-      ? (touch ? 'Drag a tile to move it.' : 'Drag a tile, or use the arrow keys, to move it. Esc undoes.')
-      : movable >= 2 && order.length === 0
-        ? (touch ? 'Tip: press and hold a tile to rearrange your tiles.' : 'Tip: click and hold a tile to rearrange your tiles.')
-        : null
+  // No tip or how-to lines (the user, 26 Nov: "WHY?"); only a failed save is said.
+  const hint = failed ? 'Could not save your order to your account, so your other devices will not see it.' : null
   /** The Arrange button: the way in for a keyboard, and for anyone who never finds the gesture. Focus goes to the first tile that moves. */
   const startArranging = () => {
     begin()

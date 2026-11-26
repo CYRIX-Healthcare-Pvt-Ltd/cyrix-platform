@@ -986,11 +986,13 @@ body {
 .link-btn.quiet { font-size: 0.84rem; color: var(--ink-500); }
 .pill-btn {
   display: inline-flex; align-items: center; gap: 0.4rem;
-  padding: 0.34rem 0.85rem; border: 1px solid var(--ink-200); border-radius: 999px;
-  background: var(--white); color: var(--ink-700); font: inherit; font-size: 0.8rem; font-weight: 600;
+  padding: 0.34rem 0.85rem; border: 1px solid transparent; border-radius: 999px;
+  background: transparent; color: var(--ink-700); font: inherit; font-size: 0.8rem; font-weight: 600;
   cursor: pointer; transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
 }
-.pill-btn:hover { border-color: var(--ink-950); color: var(--ink-950); }
+/* Arrange is the word only — no box (the user, 26 Nov); Done keeps its solid pill. */
+.pill-btn:not(.solid) { padding-left: 0.25rem; padding-right: 0.25rem; }
+.pill-btn:hover { color: var(--ink-950); }
 .pill-btn.solid { background: var(--ink-950); border-color: var(--ink-950); color: var(--white); }
 .pill-btn.solid:hover { background: var(--red-600); border-color: var(--red-600); color: #fff; }
 .tiles.editing .tile:focus-visible { outline: 2px solid var(--red-600); outline-offset: 3px; }
